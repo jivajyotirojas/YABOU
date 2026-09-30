@@ -6,3 +6,15 @@
 |---|---|
 | `sengoku_v7.html` | 参照実装（単一 HTML）。ブラウザで開けば遊べる |
 | `sengoku_spec.md` | 仕様書 |
+
+## 遊ぶ
+
+GitHub Pages で公開すると、ブラウザから直接遊べる。`index.html` は `sengoku_v7.html` へ飛ばすだけの入口。
+
+公開の手順: Settings → Pages → Source を「Deploy from a branch」、Branch を `main` / `(root)` にして Save。
+
+## ライセンス
+
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja)（表示 - 非営利 - 継承）。
+学術研究や趣味など非営利の範囲なら、使用・改変・再配布してよい。営利目的には使えない。
+再配布するときは作者を表示し、同じライセンスで配る。詳しくは `LICENSE` を参照。
