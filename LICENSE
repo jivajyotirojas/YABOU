@@ -1,21 +1,20 @@
-戦国の野望 (YABOU)
+Sengoku no Yabou (YABOU)
 Copyright (c) 2026 jivajyotirojas
 
-このリポジトリの内容（ゲーム本体・仕様書を含む）は、
-クリエイティブ・コモンズ 表示 - 非営利 - 継承 4.0 国際 ライセンス
-（CC BY-NC-SA 4.0）のもとで提供する。
-https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja
+The contents of this repository, including the game and its specification,
+are licensed under the Creative Commons Attribution-NonCommercial-ShareAlike
+4.0 International License (CC BY-NC-SA 4.0).
+https://creativecommons.org/licenses/by-nc-sa/4.0/
 
-要約（法的な効力を持つのは下の英文の本文である）:
-- 学術研究や趣味など、営利を目的としない範囲で、使用・改変・再配布してよい。
-- 営利を目的とした使用・改変・再配布はできない。
-- 再配布するときは、作者の表示とこのライセンスへの案内を残し、
-  改変した場合はその旨を示す。
-- 改変したものを配布するときは、同じ CC BY-NC-SA 4.0 で配布する。
-
-This work is licensed under the Creative Commons
-Attribution-NonCommercial-ShareAlike 4.0 International License.
-The full legal code follows.
+Summary (only the legal code below is legally binding):
+- You may use, modify, and redistribute this work for non-commercial
+  purposes, such as academic research or personal hobby use.
+- You may not use, modify, or redistribute this work for commercial
+  purposes.
+- When redistributing, give appropriate credit, provide a link to this
+  license, and indicate if changes were made.
+- If you distribute a modified version, you must distribute it under
+  the same license, CC BY-NC-SA 4.0.
 
 ================================================================================
 
