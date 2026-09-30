@@ -1,0 +1,41 @@
+name: 不具合
+description: 思った通りに動かない、画面が崩れる、止まる
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 版
+      description: 画面の隅に出ている版（例 7.82.1）
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 起きたこと
+      description: 何をしたら、何が起きたか
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 本来どうなるべきか
+      description: 仕様書の節が分かれば書く（例 §26.3）
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現の手順
+      placeholder: |
+        1. 
+        2. 
+        3. 
+  - type: input
+    id: env
+    attributes:
+      label: 環境
+      placeholder: 例 iPhone / Safari、Windows / Chrome
+  - type: textarea
+    id: extra
+    attributes:
+      label: 画像・セーブなど
+      description: スクリーンショットやセーブデータを貼る

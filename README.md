@@ -9,9 +9,24 @@
 
 ## 遊ぶ
 
-GitHub Pages で公開すると、ブラウザから直接遊べる。`index.html` は `sengoku_v7.html` へ飛ばすだけの入口。
+https://jivajyotirojas.github.io/YABOU/
 
-公開の手順: Settings → Pages → Source を「Deploy from a branch」、Branch を `main` / `(root)` にして Save。
+`main` に入ると GitHub Actions（`.github/workflows/deploy.yml`）が `gh-pages` ブランチへ出し、そこが公開される。
+`index.html` は `sengoku_v7.html` へ飛ばすだけの入口。
+
+## 事前に試す（PR プレビュー）
+
+PR を作ると、その PR の中身だけを載せたページが別の URL に出る（`.github/workflows/preview.yml`）。
+
+- URL は `https://jivajyotirojas.github.io/YABOU/pr-preview/pr-<PR番号>/`。PR にコメントで付く
+- PR に push するたびに更新される
+- PR を閉じるかマージすると消える
+
+本番を変えずに確かめられるので、遊んで問題なければマージする。
+
+## Issue
+
+不具合・追加の提案・仕様書の直しの3種類の雛形がある。PR の本文に `Closes #番号` と書くと、マージしたときにその Issue が閉じる。
 
 ## ライセンス
 

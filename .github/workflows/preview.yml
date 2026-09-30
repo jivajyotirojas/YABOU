@@ -1,0 +1,32 @@
+# PR ごとにプレビューを出す。
+# https://jivajyotirojas.github.io/YABOU/pr-preview/pr-<番号>/ で遊べ、URL は PR にコメントされる。
+# PR を閉じると消える。
+name: PR Preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build site
+        if: github.event.action != 'closed'
+        run: |
+          mkdir _site
+          cp index.html sengoku_v7.html LICENSE .nojekyll _site/
+
+      - uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: _site
