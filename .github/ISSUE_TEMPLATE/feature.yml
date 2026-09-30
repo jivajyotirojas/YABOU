@@ -1,0 +1,19 @@
+name: 追加・変更の提案
+description: 新しい決まり、画面、遊び方の変更
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 何をしたいか
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: なぜ要るか
+  - type: input
+    id: spec
+    attributes:
+      label: 関わる仕様書の節
+      placeholder: 例 §24 設営、§28 外交と忍び
