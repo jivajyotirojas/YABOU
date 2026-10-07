@@ -5887,13 +5887,29 @@ function* glBuildMeshGen(){
      **終点のすぐ先が水の升なら、その中心まで帯を伸ばす。** 岸の升で切ると、持ち上がった湖の
      岸の壁の手前で川が途切れる。湖のそばから始まる川も同じ */
   const pre=new Map();
-  const waterNear=(x,y)=>{
-    const r0=Math.round(y/ROWH), q0=Math.round(x/COLW-((r0&1)?0.5:0));
-    let wc=null,wd=1e9;
-    const look=(q,r)=>{const c=cellRow.get((cellOf(q,r)||{}).id); if(!c||!c.wet)return;
-      const dd=(c.x-x)**2+(c.y-y)**2; if(dd<wd){wd=dd;wc=c;}};
-    look(q0,r0); for(const [dq,dr] of DIR6[r0&1])look(q0+dq,r0+dr);
-    return wc;
+  const cellNear=(x,y)=>{const r0=Math.round(y/ROWH), q0=Math.round(x/COLW-((r0&1)?0.5:0)); return cellOf(q0,r0);};
+  /* 終点の先の水の升。**流れの向きにいちばん沿う升を取る。** 2升先まで見る（大野川は海の2升手前で
+     終わっている）。終点の一つ手前の升のほうが向きに沿う水の升を持つなら、終点を捨ててそちらから
+     伸ばす（鬼怒川の河口が折り返しになっていた）*/
+  const waterAhead=(nd)=>{
+    const N=nd.length; if(N<2)return null;
+    const pick=(a,b)=>{                            /* a→b の向きで b から見た水の升と、向きのずれ */
+      const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
+      const c0=cellNear(b.x,b.y); if(!c0)return null;
+      let best=null,bs=-2;
+      for(const c of hexWithin(c0.q,c0.r,2)){
+        const cr=cellRow.get(c.id); if(!cr||!cr.wet||c.id===c0.id)continue;
+        const ex=cr.x-b.x, ey=cr.y-b.y, el=Math.hypot(ex,ey)||1;
+        const cos=(ex*dx+ey*dy)/(el*d)-0.08*(el/COLW);  /* 向きの一致。遠いぶん少し割り引く */
+        if(cos>bs){bs=cos;best=cr;}
+      }
+      return best?{c:best,cos:bs}:null;
+    };
+    const w1=pick(nd[N-2],nd[N-1]);
+    const w2=N>=3?pick(nd[N-3],nd[N-2]):null;
+    if(w2&&(!w1||w1.cos<0.3)&&w2.cos>w1?.cos+0.2)return {c:w2.c,drop:1};
+    if(w1&&w1.cos>-0.2)return {c:w1.c,drop:0};
+    return null;
   };
   for(const ln of playLines){
     const nd0=ln.nodes, N0=nd0.length; if(N0<2)continue;
@@ -5915,15 +5931,32 @@ function* glBuildMeshGen(){
         if(trib)break;
       }
     }
-    if(ln.type===3&&!trib&&nd.length>=2){                  /* 終点のすぐ先の水の升まで */
-      const a=nd[nd.length-2], b=nd[nd.length-1], dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
-      const wc=waterNear(b.x+dx/d*R*0.9, b.y+dy/d*R*0.9);
-      if(wc){ nd.push({x:wc.x, y:wc.y, g:wc.g, water:true}); wid.push(wid[wid.length-1]); }
+    /* **升を共有していなくても、終点の近く（3升以内）にほかの川があれば、そこへ注ぐ**（§10.15）。
+       千曲川は信濃川の2升手前で、姫川の上流は下流の1升手前で終わっている。
+       支流→本流→海の鎖が切れていては、川がどこへ流れるのか分からない */
+    if(ln.type===3&&ln.cells&&ln.dst==="-"&&!trib){
+      const last=cellRow.get(ln.cells[ln.cells.length-1]);
+      if(last){
+        let best=null,bd=1e9;
+        for(const c of hexWithin(last.q,last.r,3)){
+          for(const e of (riv.get(c.id)||[])){
+            if(e.ln===ln||!e.ln.cells)continue;
+            const nO=e.ln.cells.length, nMe=ln.cells.length;
+            if(!(e.ln.dst!=="-"||nO>nMe||(nO===nMe&&e.ln.id<ln.id)))continue;
+            const cr=cellRow.get(c.id); const d=(cr.x-last.x)**2+(cr.y-last.y)**2;
+            if(d<bd){bd=d;best={ln:e.ln,c:cr};}
+          }
+        }
+        if(best){ nd.push({x:best.c.x, y:best.c.y, g:best.c.g}); wid.push(wid[wid.length-1]); trib=best.ln; }
+      }
+    }
+    if(ln.type===3&&!trib&&nd.length>=2){                  /* 終点の先の水の升まで */
+      const wa=waterAhead(nd);
+      if(wa){ if(wa.drop){nd.pop(); wid.pop();} nd.push({x:wa.c.x, y:wa.c.y, g:wa.c.g, water:true}); wid.push(wid[wid.length-1]); }
     }
     if(ln.type===3&&!ln.src&&nd.length>=2){                /* 湖のそばから始まる川 */
-      const a=nd[1], b=nd[0], dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
-      const wc=waterNear(b.x+dx/d*R*0.9, b.y+dy/d*R*0.9);
-      if(wc&&wc.type===T_LAKE){ nd.unshift({x:wc.x, y:wc.y, g:wc.g, water:true}); wid.unshift(wid[0]); shift=1; }
+      const rev=nd.slice().reverse(); const wa=waterAhead(rev);
+      if(wa&&wa.c.type===T_LAKE&&!wa.drop){ nd.unshift({x:wa.c.x, y:wa.c.y, g:wa.c.g, water:true}); wid.unshift(wid[0]); shift=1; }
     }
     const N=nd.length;
     const Pp=nd.map(n=>{const g=n.water?n.g:(ln.type===3||ln.type===4?surfG(n):n.g);
@@ -5936,17 +5969,27 @@ function* glBuildMeshGen(){
   /* 二巡め：**支流の端は本流の流れの線の上に置く**（§10.15）。開いた本流の曲線は升の中心を
      通らないので、中心へ向けて張ると端が届かなかったり突き抜けたりする。
      本流の曲線のいちばん近い点を端にし、幅は本流のその場の幅に収める。端には継ぎ手を置く */
-  for(const ln of playLines){
+  /* 深い支流から順に。支流が本流を太らせ、その本流がさらに先の本流を太らせる（奈良井川→犀川→千曲川→信濃川）*/
+  const depth0=ln=>{let d=0,cur=pre.get(ln); while(cur&&cur.trib&&d<16){d++; cur=pre.get(cur.trib);} return d;};
+  for(const ln of playLines.slice().sort((a,b)=>depth0(b)-depth0(a))){
     const me=pre.get(ln); if(!me||!me.trib||me.N<3)continue;
     const mp=pre.get(me.trib); if(!mp)continue;
     const e=me.P[me.P.length-1];
     let bi=0,bd=1e9;
     for(let k=0;k<mp.P.length;k++){const d=(mp.P[k][0]-e[0])**2+(mp.P[k][1]-e[1])**2; if(d<bd){bd=d;bi=k;}}
+    /* **本流は合流から先、支流より細くならない。** 千曲川が注ぐ所から始まる信濃川は、
+       始点の幅（いちばん細い）のままでは太い川が急に細くなる */
+    const jn=Math.min(mp.N-1,Math.ceil(mp.I?mp.I[bi]:bi)), tw=me.wid[me.N-2];
+    for(let k=jn;k<mp.N;k++)if(mp.wid[k]<tw)mp.wid[k]=tw;
     const mwid=mp.I?(()=>{const f=mp.I[bi],i=Math.floor(f),t=f-i; return i+1<mp.N?mp.wid[i]*(1-t)+mp.wid[i+1]*t:mp.wid[i];})():mp.wid[bi];
     me.P[me.P.length-1]=[mp.P[bi][0],mp.P[bi][1]];
     me.wid[me.N-1]=Math.min(me.wid[me.N-1],mwid); me.wid[me.N-2]=Math.min(me.wid[me.N-2],mwid);
+    /* **支流の下流の色は、注ぐ先の本流のその場の色**。湖の色のまま濃い本流に突き当たると段が出る */
+    me.endCol={ln:me.trib, t:(mp.I?mp.I[bi]:bi)/(mp.N-1)};
   }
-  for(const ln of playLines){
+  /* 本流を先に、支流を後に。支流の下流の色は本流の色から取るので、本流が先に要る */
+  const depthOf=ln=>{let d=0,cur=pre.get(ln); while(cur&&cur.trib&&d<16){d++; cur=pre.get(cur.trib);} return d;};
+  for(const ln of playLines.slice().sort((a,b)=>depthOf(a)-depthOf(b))){
     const me=pre.get(ln); if(!me)continue;
     const {nd,N,wid,P,I}=me, Nn=P.length;
     const widAt=k=>{ if(!I)return wid[k]; const f=I[k], i=Math.floor(f), t=f-i;
@@ -5963,7 +6006,8 @@ function* glBuildMeshGen(){
       L.push([P[k][0]+nx*hw,P[k][1]+ny*hw]);
       Rt.push([P[k][0]-nx*hw,P[k][1]-ny*hw]);
     }
-    const dst=ln.dst==="-"?LAKE_RGB:hex2rgb(color.get(ln.dst)||"#33719a");
+    let dst=ln.dst==="-"?LAKE_RGB:hex2rgb(color.get(ln.dst)||"#33719a");
+    if(me.endCol){ const C0=lc.get(me.endCol.ln); if(C0)dst=C0.at(me.endCol.t).slice(0,3); }
     const at=t=>[Math.round(LAKE_RGB[0]+(dst[0]-LAKE_RGB[0])*t),
                  Math.round(LAKE_RGB[1]+(dst[1]-LAKE_RGB[1])*t),
                  Math.round(LAKE_RGB[2]+(dst[2]-LAKE_RGB[2])*t),255];
