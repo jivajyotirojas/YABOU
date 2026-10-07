@@ -1892,6 +1892,7 @@ const MARGIN=12;             // 盤の縁から画布の縁までの余白（px�
    ------------------------------------------------------------ */
 /* 描き込みの細かさは倍率で決める。升が小さいときに舌や勾配を描いても
    1画素に満たず、見えないものに費用だけが掛かる */
+const WALL_MIN  =0.02;    // これ未満（km）の段差には壁を立てない。1画素に満たない
 const LOD_BAND  =11;      // これ未満の半径では辺の勾配を描かない
 const LOD_TONGUE=20;      // これ未満の半径では崖の舌を描かない
 
@@ -5821,8 +5822,26 @@ function glSil(pts){
   return out;
 }
 
+/* 折れ線を曲線に開く（`glSil` と同じ割り方）。**川の帯に使う。**
+   升の中心と辺の中点を結んだだけの折れ線は 30 度ずつ折れてぎざぎざになる（§13）。
+   返すのは、開いた点の並びと、それぞれが元の節点の並びのどこに当たるか（小数の添字）。
+   幅や色は元の節点の並びで決まっているので、添字で割り付ける */
+function glSmooth(pts,n){
+  const P=[pts[0]], I=[0];
+  if(pts.length<3){ if(pts.length>1){P.push(pts[1]);I.push(1);} return {P,I}; }
+  const qd=(p0,i0,cp,p1,i1)=>{for(let k=1;k<=n;k++){const t=k/n,u=1-t;
+    P.push([u*u*p0[0]+2*u*t*cp[0]+t*t*p1[0], u*u*p0[1]+2*u*t*cp[1]+t*t*p1[1]]);
+    I.push(i0+(i1-i0)*t);}};
+  for(let i=1;i<pts.length-1;i++){
+    const mid=[(pts[i][0]+pts[i+1][0])/2,(pts[i][1]+pts[i+1][1])/2];
+    qd(P[P.length-1],I[I.length-1],pts[i],mid,i+0.5);
+  }
+  P.push(pts[pts.length-1]); I.push(pts.length-1);
+  return {P,I};
+}
+
 /* 街道の一区間と、そこに架かる橋 */
-function glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged){
+function glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged,ys){
   const nd=ln.nodes, Pp=C.P, N=C.N, Wd=R*0.20;
   const hw=Wd*sRef/2, core=0.5;                  /* 芯は幅の半分 */
   const edge=[255,255,255,0], mid=[255,255,255,255];
@@ -5834,8 +5853,11 @@ function glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged){
        橋の手前と先で街道が二重に途切れる */
     if(nd[j].br)continue;
     const p0=Pp[j], p1=Pp[j+1];
-    const dx=p1[0]-p0[0], dy=p1[1]-p0[1], d=Math.hypot(dx,dy)||1;
-    const nx=-dy/d, ny=dx/d;
+    /* **帯は地面に寝かせる。** 法線は世界の向きで取り、縦の成分に斜めの圧縮（`ys`）を掛ける。
+       画面の向きで等幅に張ると、東西に走る帯の下縁が手前の行の升の頂点より下まで届き、
+       そこが手前の面に隠されて升の間隔で欠けた */
+    const dx=nd[j+1].x-nd[j].x, dy=nd[j+1].y-nd[j].y, d=Math.hypot(dx,dy)||1;
+    const nx=-dy/d, ny=dx/d*ys;
     const at=(p,k)=>W([p[0]+nx*hw*k, p[1]+ny*hw*k]);
     for(const sg of [1,-1]){
       M.quad(at(p0,sg),at(p1,sg),at(p1,sg*core),at(p0,sg*core),
@@ -5849,7 +5871,7 @@ function glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged){
     if(nd[j].br||(nd[j-1]&&nd[j-1].br))continue; /* 橋の口には置かない */
     const p=Pp[j], ring=[];
     for(let i=0;i<=8;i++){const t=i/8*Math.PI*2;
-      ring.push(W([p[0]+Math.cos(t)*hw*core, p[1]+Math.sin(t)*hw*core]));}
+      ring.push(W([p[0]+Math.cos(t)*hw*core, p[1]+Math.sin(t)*hw*core*ys]));}
     M.fan(W(p),ring,mid);
   }
   for(let j=a;j<b;j++){
@@ -5857,7 +5879,8 @@ function glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged){
     const key=ln.id+"|"+j; if(bridged.has(key))continue; bridged.add(key);
     const p0=Pp[j],p1=Pp[j+1];
     const dx=p1[0]-p0[0],dy=p1[1]-p0[1],d=Math.hypot(dx,dy)||1;
-    const nx=-dy/d,ny=dx/d,bw=Math.max(1.6,Wd*sRef/2*1.45);
+    const dxw=nd[j+1].x-nd[j].x,dyw=nd[j+1].y-nd[j].y,dw=Math.hypot(dxw,dyw)||1;
+    const nx=-dyw/dw,ny=dxw/dw*ys,bw=Math.max(1.6,Wd*sRef/2*1.45);
     M.quad(W([p0[0]+nx*bw,p0[1]+ny*bw]),W([p1[0]+nx*bw,p1[1]+ny*bw]),
            W([p1[0]-nx*bw,p1[1]-ny*bw]),W([p0[0]-nx*bw,p0[1]-ny*bw]),
            hex2rgb("#a3763f").concat(255));
@@ -5908,42 +5931,91 @@ function glBuildMesh(){
   const zOf=r=>1-2*(r+1)/(span+2);
 
   /* --- 川と街道の下ごしらえ --- */
-  const lc=new Map(), runs=[];
+  const cellRow=new Map(drawCache.map(c=>[c.id,c]));
+  /* **節点の高さは、描いた面から取る**（§10.15）。節点の `g` は升の中心の高さだが、
+     面は角ごとの高さ（隣3升の平均・§10.9）で張ってあるので、`g` のままでは帯が面から
+     浮いたり沈んだりする。沈んだぶんは手前の行の面に隠され、**帯の下縁に升の間隔で
+     欠けが出ていた。** 中心の節点は面の対角（角0と角3）の中点、辺の中点の節点は
+     その辺の両端の角の平均にする。どちらも面の上にぴたりと乗る */
+  const surfG=n=>{
+    const r0=Math.round(n.y/ROWH), q0=Math.round(n.x/COLW-((r0&1)?0.5:0));
+    let A=null,dA=1e9,B=null,dB=1e9;
+    const look=(q,r)=>{const c=cellRow.get((cellOf(q,r)||{}).id); if(!c)return;
+      const d=(c.x-n.x)**2+(c.y-n.y)**2;
+      if(d<dA){B=A;dB=dA;A=c;dA=d;}else if(d<dB){B=c;dB=d;}};
+    look(q0,r0); for(const [dq,dr] of DIR6[r0&1])look(q0+dq,r0+dr);
+    if(!A)return n.g;
+    if(dA<0.01)return (A.cor[0]+A.cor[3])/2;          /* 升の中心 */
+    if(!B)return A.g;
+    const D=DIR6[A.r&1];
+    for(let i=0;i<6;i++)if(A.q+D[i][0]===B.q&&A.r+D[i][1]===B.r)
+      return (A.cor[i]+A.cor[(i+1)%6])/2;             /* 辺の中点 */
+    return A.g;
+  };
+  const widOf=new Map();
   for(const ln of playLines){
     const nd=ln.nodes, N=nd.length; if(N<2)continue;
-    const Pp=nd.map(n=>[n.x*sRef, (n.y*ys)*sRef-n.g*sRef]);
     const wid=nd.map((n,j)=>R*(0.22+0.40*(N>1?j/(N-1):0)));
     if(N>2){ if(ln.src){wid[0]=R*0.70;wid[1]=R*0.70;}
              if(ln.dst!=="-"){wid[N-1]=R*0.92;wid[N-2]=R*0.92;} }
-    const L=[],Rt=[];
-    for(let j=0;j<N;j++){
-      const a=Pp[Math.max(0,j-1)], b=Pp[Math.min(N-1,j+1)];
-      const tx=b[0]-a[0],ty=b[1]-a[1],len=Math.hypot(tx,ty)||1;
-      const nx=-ty/len, ny=tx/len, hw=wid[j]*sRef/2;
-      L.push([Pp[j][0]+nx*hw,Pp[j][1]+ny*hw]);
-      Rt.push([Pp[j][0]-nx*hw,Pp[j][1]-ny*hw]);
-    }
-    const dst=ln.dst==="-"?LAKE_RGB:hex2rgb(color.get(ln.dst)||"#33719a");
-    const at=t=>[Math.round(LAKE_RGB[0]+(dst[0]-LAKE_RGB[0])*t),
-                 Math.round(LAKE_RGB[1]+(dst[1]-LAKE_RGB[1])*t),
-                 Math.round(LAKE_RGB[2]+(dst[2]-LAKE_RGB[2])*t),255];
-    lc.set(ln,{P:Pp,L,Rt,at,N});
-    const rowOf=n=>Math.max(0,Math.min(cellSpan.r1-cellSpan.r0,
-      Math.round(n.y/ROWH)-cellSpan.r0));
-    const segRow=j=>Math.max(rowOf(nd[j]),rowOf(nd[j+1]));
-    let j=0;
-    while(j<N-1){ const r=segRow(j); let k=j;
-      while(k+1<N-1&&segRow(k+1)===r)k++;
-      (runs[r]||(runs[r]=[])).push({ln,a:j,b:k+1}); j=k+1; }
+    widOf.set(ln,wid);
   }
-  /* 升 → その升を通る川。**1本とは限らない。** 合流点では2本通る。
-     1本しか覚えないと、そこだけ堤が描かれなくなる */
+  /* 升 → その升を通る川と節点。合流点では2本通る（§10.17）*/
   const riv=new Map();
   for(const ln of playLines){ if(ln.type!==3||!ln.cells)continue;
     const off=ln.src?2:0;
     ln.cells.forEach((cid,i)=>{ if(!cid)return;
       (riv.get(cid)||riv.set(cid,[]).get(cid)).push({ln,node:off+2*i}); }); }
-
+  const lc=new Map(), runs=[];
+  for(const ln of playLines){
+    const nd=ln.nodes, N=nd.length; if(N<2)continue;
+    const Pp=nd.map(n=>{const g=ln.type===3||ln.type===4?surfG(n):n.g;
+      return [n.x*sRef, (n.y*ys)*sRef-g*sRef];});
+    const wid=widOf.get(ln);
+    /* **支流は本流の岸で止める**（§10.15）。合流の升の中心まで帯を張ると、
+       支流の端が本流の向こう岸へ突き抜ける。本流のその升での幅に合わせて細め、
+       端を本流の半幅ぶん手前へ引く */
+    if(ln.type===3&&ln.cells&&N>2){
+      const last=ln.cells[ln.cells.length-1];
+      const main=(riv.get(last)||[]).find(e=>e.ln!==ln);
+      if(main){
+        const mw=widOf.get(main.ln)[Math.min(main.node,main.ln.nodes.length-1)];
+        wid[N-1]=Math.min(wid[N-1],mw); wid[N-2]=Math.min(wid[N-2],mw);
+        const a=Pp[N-2], b=Pp[N-1], dx=b[0]-a[0], dy=b[1]-a[1], d=Math.hypot(dx,dy)||1;
+        const back=Math.min(d*0.9, mw*sRef/2);
+        Pp[N-1]=[b[0]-dx/d*back, b[1]-dy/d*back];
+      }
+    }
+    /* **川は曲線に開く**（§13）。街道は節点の `br`（橋）を添字で引くので折れ線のまま */
+    let P=Pp, I=null, Nn=N;
+    if(ln.type===3){ const sm=glSmooth(Pp,3); P=sm.P; I=sm.I; Nn=P.length; }
+    const widAt=k=>{ if(!I)return wid[k]; const f=I[k], i=Math.floor(f), t=f-i;
+      return i+1<N?wid[i]*(1-t)+wid[i+1]*t:wid[i]; };
+    const yWorld=k=>I?(()=>{const f=I[k],i=Math.floor(f),t=f-i; return i+1<N?nd[i].y*(1-t)+nd[i+1].y*t:nd[i].y;})():nd[k].y;
+    const xWorld=k=>I?(()=>{const f=I[k],i=Math.floor(f),t=f-i; return i+1<N?nd[i].x*(1-t)+nd[i+1].x*t:nd[i].x;})():nd[k].x;
+    /* 帯は地面に寝かせる。法線は世界の向きで取り、縦の成分に `ys` を掛ける（`glRoadSpan` と同じ）*/
+    const L=[],Rt=[],NX=[],NY=[];
+    for(let k=0;k<Nn;k++){
+      const a=Math.max(0,k-1), b=Math.min(Nn-1,k+1);
+      const tx=xWorld(b)-xWorld(a),ty=yWorld(b)-yWorld(a),len=Math.hypot(tx,ty)||1;
+      const nx=-ty/len, ny=tx/len*ys, hw=widAt(k)*sRef/2;
+      NX.push(nx); NY.push(ny);
+      L.push([P[k][0]+nx*hw,P[k][1]+ny*hw]);
+      Rt.push([P[k][0]-nx*hw,P[k][1]-ny*hw]);
+    }
+    const dst=ln.dst==="-"?LAKE_RGB:hex2rgb(color.get(ln.dst)||"#33719a");
+    const at=t=>[Math.round(LAKE_RGB[0]+(dst[0]-LAKE_RGB[0])*t),
+                 Math.round(LAKE_RGB[1]+(dst[1]-LAKE_RGB[1])*t),
+                 Math.round(LAKE_RGB[2]+(dst[2]-LAKE_RGB[2])*t),255];
+    lc.set(ln,{P,L,Rt,at,N:Nn,I,hw:k=>widAt(k)*sRef/2,nx:k=>NX[k],ny:k=>NY[k],tOf:k=>(I?I[k]:k)/(N-1)});
+    const rowOf=y=>Math.max(0,Math.min(cellSpan.r1-cellSpan.r0,
+      Math.round(y/ROWH)-cellSpan.r0));
+    const segRow=j=>Math.max(rowOf(yWorld(j)),rowOf(yWorld(j+1)));
+    let j=0;
+    while(j<Nn-1){ const r=segRow(j); let k=j;
+      while(k+1<Nn-1&&segRow(k+1)===r)k++;
+      (runs[r]||(runs[r]=[])).push({ln,a:j,b:k+1}); j=k+1; }
+  }
   /* --- 上から見るとき。**別の道を通る。**
      升は平らに並べるだけで、陰影も崖も持ち上げも無く、隠れもしない。深さを使わない --- */
   if(!obl){
@@ -6014,7 +6086,10 @@ function glBuildMesh(){
         const own=glShade(color.get(c.paint)||"#000",c.sh);
         for(const [i,gw,ky] of (c.wall||[])){
           const j=(i+1)%6, dz=(c.cor[i]-gw)*sRef, dz2=(c.cor[j]-gw)*sRef;
-          if(Math.abs(dz)<0.7*sRef&&Math.abs(dz2)<0.7*sRef)continue;
+          /* **段差が1画素に満たない辺だけ飛ばす。** 0.7（基準の高さ 0.51 より大きい）で
+             飛ばしていたため、湖の岸や低い海岸の壁がまるごと抜け、持ち上がった湖の奥に
+             盤の外の色が覗く穴が開いていた（§10.8・§10.10）*/
+          if(Math.abs(dz)<WALL_MIN*sRef&&Math.abs(dz2)<WALL_MIN*sRef)continue;
           const front=!((ky*ys)*sRef-gw*sRef < cy-c.g*sRef);
           const A=pt[i],B=pt[j],A2=[A[0],A[1]+dz],B2=[B[0],B[1]+dz2];
           if(!front||dz<0||dz2<0){                /* 奥側、または相手が高い */
@@ -6162,22 +6237,23 @@ function glBuildMesh(){
         /* **節点の中割りで岸を出すと、曲がりのきついところで内岸が
            行き違って帯がねじれ、切れ込みが出る。** 区間ごとにその区間の
            法線で帯を張り、節点には円い継ぎ手を置く */
-        const hwOf=j=>Math.hypot(C.L[j][0]-C.P[j][0], C.L[j][1]-C.P[j][1]);
         for(let j=a;j<b;j++){
-          const c0=C.at(j/(C.N-1)), c1=C.at((j+1)/(C.N-1));
+          const c0=C.at(C.tOf(j)), c1=C.at(C.tOf(j+1));
+          const h0=C.hw(j), h1=C.hw(j+1);
+          /* 区間の法線は両端の節点の法線の平均（世界の向き・縦は `ys` 済み）*/
+          let nx=C.nx(j)+C.nx(j+1), ny=C.ny(j)+C.ny(j+1);
+          const nl=Math.hypot(nx,ny/ys)||1; nx/=nl; ny/=nl;
           const p0=C.P[j], p1=C.P[j+1];
-          const dx=p1[0]-p0[0], dy=p1[1]-p0[1], d=Math.hypot(dx,dy)||1;
-          const nx=-dy/d, ny=dx/d, h0=hwOf(j), h1=hwOf(j+1);
           M.quad(W([p0[0]+nx*h0,p0[1]+ny*h0]),W([p1[0]+nx*h1,p1[1]+ny*h1]),
                  W([p1[0]-nx*h1,p1[1]-ny*h1]),W([p0[0]-nx*h0,p0[1]-ny*h0]),
                  c0,c1,c1,c0);
         }
-        for(let j=a;j<=b;j++){                     /* 継ぎ手 */
+        for(let j=a;j<=b;j++){                     /* 継ぎ手。地面に寝かせた楕円 */
           if(j===0||j===C.N-1)continue;
-          const p=C.P[j], h=hwOf(j), ring=[];
+          const p=C.P[j], h=C.hw(j), ring=[];
           for(let i=0;i<=8;i++){const t=i/8*Math.PI*2;
-            ring.push(W([p[0]+Math.cos(t)*h, p[1]+Math.sin(t)*h]));}
-          M.fan(W(p),ring,C.at(j/(C.N-1)));
+            ring.push(W([p[0]+Math.cos(t)*h, p[1]+Math.sin(t)*h*ys]));}
+          M.fan(W(p),ring,C.at(C.tOf(j)));
         }
       }
       for(const c of row){                         /* 堤 */
@@ -6187,7 +6263,11 @@ function glBuildMesh(){
            それぞれ自分の岸をなぞるので、互いの川筋には掛からない */
         for(const e of es){
           const C=lc.get(e.ln); if(!C)continue;
-          const a=Math.max(0,e.node-1), b=Math.min(C.N-1,e.node+1);
+          /* 節点の番号は元の並び。開いた並びでは、その範囲に当たる点を取る */
+          let a,b;
+          if(C.I){ a=C.I.findIndex(f=>f>=e.node-1); b=C.I.findLastIndex(f=>f<=e.node+1);
+                   if(a<0)a=0; if(b<0)b=C.N-1; }
+          else { a=Math.max(0,e.node-1); b=Math.min(C.N-1,e.node+1); }
           if(b<=a)continue;
           /* **合流点では、相手の川筋に掛かる岸を落とす。** そのまま引くと
              片方の堤がもう片方の水面を横切る。落とした所で折れ線を切る */
@@ -6235,7 +6315,7 @@ function glBuildMesh(){
     for(const {ln,a,b} of (runs[r]||[])){          /* 街道と橋 */
       if(ln.type!==4)continue;
       const C=lc.get(ln); if(!C)continue;
-      glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged);
+      glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged,ys);
     }
     roadAt[r]={start,count:M.n-start};
   }
@@ -14378,6 +14458,9 @@ function runDelPower(id){
   if(i<0)return false;
   const pw=playPowers[i];
   playPowers.splice(i,1); idxDrop(playPowers);
+  /* 家の武将グループ（テーブルID 19）も消す。残すと、滅んだ家の番号で空の行が溜まる */
+  {const k=playBushouGroups.findIndex(g=>g.id===id);
+   if(k>=0){playBushouGroups.splice(k,1); idxDrop(playBushouGroups);}}
   /* **家の番号は空きへ返さない。** 旗揚げで家が増えるようになったので（§19.2）、
      返すと滅んだ家の番号が新しい家に付き、残っていた縁がその家のものになる */
   /* **滅びた大名家は報せる**（§31.5）。独立勢力は取り込まれても滅亡とは言わない。
@@ -14527,20 +14610,25 @@ function runRoninOut(bushouId,cell){
   const b=byId(playBushou,bushouId); if(!b)return null;
   const tb=runRoninType(); if(!tb)return null;
   if(playUnits.some(u=>isLink(u.bushou)&&u.bushou.id===bushouId))return null;
+  /* **水の上で隊を失った者は、水の上の浪人の隊になる**（`runPutIdou` と同じ判じ）。
+     陸の姿でしか探していなかったため、隣に陸の無い船の軍勢が崩れると、浪人が盤に出ず、
+     表にだけ残り続けていた */
+  const c0=BASE_CELLS[cell-1], t0=c0&&byId(BASE_TERRAIN,c0.type);
+  const stt=(t0&&t0.sui&&!runCanWalk(cell))?"sui":"sagyo";
   let put=null;
-  if(runCanStand(cell,"sagyo",null,null,false))put=cell;
+  if(runCanStand(cell,stt,null,null,false))put=cell;
   else{
     const c=BASE_CELLS[cell-1];
     if(c)for(const [dq,dr] of DIR6[c.r&1]){
       const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
-      if(runCanStand(n.id,"sagyo",null,null,false)){put=n.id;break;}
+      if(runCanStand(n.id,stt,null,null,false)){put=n.id;break;}
     }
   }
   if(put===null)return null;
   const g=runGroupAt(put); if(!g)return null;
   const row={
     id:idTake(unitIds), label:"浪人 "+b.name, type:mkLink(5,tb.id,"label"),
-    state:"idou", power:"-", bushou:mkLink(18,bushouId,"name"),
+    state:stt==="sui"?"sui":"idou", power:"-", bushou:mkLink(18,bushouId,"name"),
     q:mkLink(6,put,"q"), r:mkLink(6,put,"r"), dir:"-",
     hei:0, hyoro:0, kane:0, sonae:[], work:null, occ:null, done:null, wait:0,
     rest2:false, uma:0, teppo:0, toSite:null, toUnit:null, toMan:null,
@@ -14588,7 +14676,7 @@ function runRoninRoute(from,fromSui,goals){
     const atPort=runIsMinato(id);
     for(const [dq,dr] of DIR6[c.r&1]){
       const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
-      if(BASE_SITES.some(x=>x.cell===n.id))continue;
+      if(isSiteCell(n.id))continue;
       /* 次の姿。港に立っているなら行き先で決まる（`runPostureTo` と同じ）。
          そうでなければ姿は変わらない */
       let ns=sui;
@@ -14617,17 +14705,6 @@ function runTownCells(){
   return out;
 }
 /* その升のある国の拠点（自国領域 §11.3 を持つ拠点）*/
-let kuniSiteMap=null;
-function runKuniSite(cellId){
-  if(!kuniSiteMap){
-    kuniSiteMap=new Map();
-    for(const bs of BASE_SITES){
-      const d=BASE_CELLGROUPS[bs.domain-1]; if(!d)continue;
-      for(const c of d.cells)if(!kuniSiteMap.has(c))kuniSiteMap.set(c,bs.id);
-    }
-  }
-  return kuniSiteMap.get(cellId)??null;
-}
 /* 家を興す番号。家の番号と武将の群の番号を揃える（群の番号＝家の番号）*/
 function runNewPowerId(){
   const id=Math.max(powerIds.next,bushouGroupIds.next);
@@ -15382,7 +15459,9 @@ function runSetTaikyu(siteId,v){
   /* **更地から建ったら実効支配域を作り、更地に戻ったら手放す**（§11.2.1・§14）。
      更地は領有されない升なので、城が朽ちればその土地は誰のものでもなくなる */
   if(st.taikyu>0&&!isLink(st.group)&&runSiteOwner(siteId))runMakeDomain(siteId,true);
-  if(st.taikyu<=0&&runSiteOwner(siteId))runAbandonSite(siteId);
+  /* 無主のまま朽ちた拠点も、域を手放す。バグ：持ち主のいる拠点だけ手放していたため、
+     無主になってから朽ちた拠点の実効支配域が更地に残り続けていた */
+  if(st.taikyu<=0&&(runSiteOwner(siteId)||isLink(st.group)))runAbandonSite(siteId);
   const want=taikyuObj(st.taikyu);
   if(isLink(st.object)){
     const o=byId(playObjects,st.object.id);
@@ -15402,6 +15481,10 @@ function runAbandonSite(siteId){
   /* **城に詰めている者は浪人になる。盤に出ている者は隊と共に別の城へ移る**
      （§26.6 の割り当て直し）。出ている者まで浪人にすると、
      浪人が率いる隊が盤に残る */
+  /* **跡目は、在番がみな浪人になってから一度だけ立てる**（§19.3）。
+     一人ずつ浪人にするたびに跡目を立てると、同じ朽ちた城の者が当主に選ばれ、
+     次の繰り返しで即座に浪人にされる。札と勲功の書き換えがその数だけ重なっていた */
+  runHeirHold++;
   for(const m of runBushouAt(siteId).slice())if(!m.busy)runRonin(m.id);
   if(isLink(st.group)){
     const i=playCellGroups.findIndex(x=>x.id===st.group.id);
@@ -15410,6 +15493,8 @@ function runAbandonSite(siteId){
   }
   runSetSiteOwner(siteId,null);                  /* 兵・蔵は 0 に。城が尽きれば滅亡の判じが走る */
   if(ow&&playPowers.some(x=>x.id===ow))runReassign(ow);
+  runHeirHold--;
+  if(runHeirHold<=0)runHeirNow();
   playStamp++;
   return true;
 }
@@ -15652,7 +15737,7 @@ function runSpendTouchi(siteId){
   const pw=runSiteOwner(siteId); if(!pw)return false;
   /* **値段はマスで決まる**（依頼・§32.4）。自国のグレーゾーンの空き 50、相手のグレーゾーンの空き 75、
      相手の実効支配域 100。いまの統治力で買えるうち、いちばん安いマスを取る */
-  if(st.touchi>=TOUCHI_IN&&runGrowDomain(siteId,st.touchi)){ st.touchi=0; return true; }
+  if(st.touchi>=TOUCHI_IN&&runGrowDomain(siteId,st.touchi)){ st.touchi=0; playStamp++; return true; }
   return false;
 }
 
@@ -15802,7 +15887,7 @@ function runTakeCell(cellId,siteId){
       const i=fg.cells.indexOf(cellId);
       if(i>=0){fg.cells.splice(i,1); fg.cellNum=fg.cells.length;
         /* 切れた先は域から落ちる（依頼）*/
-        window.__trim=(window.__trim||0)+runDomainTrim(from);}
+        runDomainTrim(from);}
     }
     const fp=runSiteOwner(from);
     if(fp&&fp!==pw){runAddMind(fp,pw,-MIND_TAKEN); runProvoke(fp,pw,MIND_TAKEN);}
@@ -16054,6 +16139,12 @@ function runKane(siteId){ const k=runKaneParts(siteId); return k.take-k.pay; }
 /* 入りと禄を分けて返す。禄が払えたかどうかを忠誠が見る（§19.6）*/
 /* 城（拠点）か港の建つ升に隣り合う升か、街道の升か（依頼。町の入りが1.5倍）*/
 let siteCellSet=null;
+/* 拠点の升か。**`BASE_SITES` を舐めない。** 升ごとの問い（立てるか・通れるか・建てられるか）の
+   内側で呼ばれるので、拠点の数ぶん掛かる */
+const isSiteCell=cellId=>{
+  if(!siteCellSet)siteCellSet=new Set(BASE_SITES.map(x=>x.cell));
+  return siteCellSet.has(cellId);
+};
 function runMachiBonus(cellId){
   const pc=playCells[cellId-1]; if(pc&&(pc.effect&8))return true;
   const c=BASE_CELLS[cellId-1]; if(!c)return false;
@@ -16569,19 +16660,22 @@ function runFallCheck(powerId){
   if(runFallHold>0){ runFallLater(powerId); return false; }
   const pw=byId(playPowers,powerId); if(!pw)return false;
   const g=byId(playBushouGroups,powerId);
-  const men=g?g.bushou.slice():[];
+  const menN=g?g.bushou.length:0;
   /* **大名家は拠点を失って滅び、独立勢力は人を失って滅ぶ**（§16.1）。
      独立勢力はもともと拠点を持たないので、拠点の数では測れない */
   /* **大名家が生きているかは、拠点だけで測る。** 武将の数では測らない。
      武将が尽きただけで家を消すと、**その家の城が消えた家を指したまま盤に残る。**
      人のいない家は何も指図できないが、それは滅びではない。浪人を召し抱えれば
      立ち直るし、立ち直れなければ城を取られて滅ぶ */
-  const alive=pw.kind==="daimyo"?runPowerSites(powerId).length>0:men.length>0;
+  const alive=pw.kind==="daimyo"?runPowerSites(powerId).length>0:menN>0;
   if(alive)return false;
   /* **盤に出ている隊も片づける**（§26.6）。落城で滅ぶ道は `runFallSite` が
      片づけるが、城が朽ちて滅ぶ道はここしか通らない。片づけないと、
      滅んだ家の隊が盤に立ち続ける */
   runReassign(powerId);
+  /* **残った者を数えるのは割り当て直しの後。** 先に写すと、盤に出ていて `runReassign` で
+     浪人になった者にもう一度 `runRonin` が掛かり、勲功が二度（600）落ちていた */
+  const men=g?g.bushou.slice():[];
   for(const id of men)runRonin(id);              /* 残った者は浪人へ */
   if(g){g.bushou=[]; g.bushouNum=0;}
   runDelPower(powerId);
@@ -16787,7 +16881,7 @@ const isOpenUnit=u=>isLink(u.type)&&isOpenType(u.type.id);
 function runCanStand(cellId,state,power,self,open=true){
   const c=BASE_CELLS[cellId-1]; if(!c)return false;
   /* **拠点の升には重ねられない。** 拠点そのものが仮想のユニットで埋まっている */
-  if(BASE_SITES.some(x=>x.cell===cellId))return false;
+  if(isSiteCell(cellId))return false;
   const t=byId(BASE_TERRAIN,c.type); if(!t)return false;
   /* **陸の隊は陸と、建っている港。水上の隊は水**（§24.1）。
      港適地は水なので陸の隊は入れないが、港に開発すれば陸から入って船になる（依頼）*/
@@ -16805,7 +16899,7 @@ function runCanStand(cellId,state,power,self,open=true){
    `visible` でない隊は誰であろうと通り抜けの妨げにならない */
 function runCanPass(cellId,state,power,self,open=true){
   const c=BASE_CELLS[cellId-1]; if(!c)return false;
-  if(BASE_SITES.some(x=>x.cell===cellId))return false;
+  if(isSiteCell(cellId))return false;
   const t=byId(BASE_TERRAIN,c.type); if(!t)return false;
   if(!(state==="sui"?t.mvSea>0:runCanWalk(cellId)))return false;
   /* **関所は道を塞がない。通ろうとしたときに、確率で止める**（依頼・§27.4）。
@@ -17066,7 +17160,7 @@ const isRiverCell=cellId=>{
    港適地だけは港が建つので、分類の側（`runCanPut`）で通す */
 function runCanBuild(cellId){
   const c=BASE_CELLS[cellId-1]; if(!c)return false;
-  if(BASE_SITES.some(x=>x.cell===cellId))return false;
+  if(isSiteCell(cellId))return false;
   if(isRiverCell(cellId))return false;           /* 川は治水だけ（§24.1）*/
   return isLandCell(cellId);
 }
@@ -17085,7 +17179,7 @@ function runCanBuild(cellId){
    ------------------------------------------------------------ */
 const runIsHarborSpot=cellId=>{
   const c=BASE_CELLS[cellId-1];
-  return !!c&&c.type===HARBOR&&!BASE_SITES.some(x=>x.cell===cellId);
+  return !!c&&c.type===HARBOR&&!isSiteCell(cellId);
 };
 const runCanWork=cellId=>runCanBuild(cellId)||runIsHarborSpot(cellId);
 
@@ -17138,7 +17232,7 @@ function runCanPut(cellId,cat,site,unitId){
   /* **港は港適地にだけ建つ。** 水際の升なので、ほかの縛りとは別に判じる */
   if(cat==="港"){
     const c=BASE_CELLS[cellId-1];
-    return !!c&&c.type===HARBOR&&!BASE_SITES.some(x=>x.cell===cellId)
+    return !!c&&c.type===HARBOR&&!isSiteCell(cellId)
       &&playCells[cellId-1].object==="-";
   }
   /* ここから先は陸の升の話である。**港適地は上で片が付いている** */
@@ -17405,17 +17499,19 @@ function runWorkDone(u){
   u.work=null;
   /* **成ったことは、次のその隊の手で告げる**（§25.1）。
      月の変わり目には手番の帯が無いので、ここで告げる先がない。
-     隊に印を置いて、次に動くときに1度だけ出す */
-  u.done={label:w.label, cat:w.cat, cost:w.cost||0, fix:w.fix??null, site:w.site};
+     隊に印を置いて、次に動くときに1度だけ出す。**建たなかったときは置かない** */
+  const done={label:w.label, cat:w.cat, cost:w.cost||0, fix:w.fix??null, site:w.site};
   /* **治水は建築物を置かない。** 土手を盛り、率いた者に勲功が入る（依頼・§24.4）*/
   if(w.cat==="治水"){
-    if(!runLevee(w.cell))return null;
+    if(!runLevee(w.cell)){playStamp++; return null;}
+    u.done=done;
     if(isLink(u.bushou))runAddKunkou(u.bushou.id,KUNKOU_LEVEE);
     playStamp++;
     return w;
   }
   const ok=w.up?runSetObject(w.cell,w.label):runAddObject(w.cell,w.label);
-  if(!ok)return null;
+  if(!ok){playStamp++; return null;}
+  u.done=done;
   /* **建物が建ち、段が上がれば、土地が馴染む**（依頼）。拠点の普請はここを通らない */
   runJunnoAtCell(w.cell,JUNNO_BUILD);
   /* **建てれば土地が治まる**（§21.2）。成ったときに効く */
@@ -17505,8 +17601,12 @@ function runDecayAlly(){
   }
   /* 休戦も期限で解ける（§28.6）*/
   const g=playProgress[0];
-  if(g&&g.truces)g.truces=g.truces.filter(t=>t.until>now
-    &&playPowers.some(p=>p.id===t.a)&&playPowers.some(p=>p.id===t.b)&&!runIsAlly(t.a,t.b));
+  if(g&&g.truces){
+    const n0=g.truces.length;
+    g.truces=g.truces.filter(t=>t.until>now
+      &&playPowers.some(p=>p.id===t.a)&&playPowers.some(p=>p.id===t.b)&&!runIsAlly(t.a,t.b));
+    if(g.truces.length!==n0)playStamp++;
+  }
 }
 /* ------------------------------------------------------------
    休戦（依頼・§28.6）
@@ -17711,6 +17811,7 @@ function runSeniDecay(){
       if(v<=0||!playPowers.some(x=>x.id===+k))delete p.seni[k]; else p.seni[k]=v;
     }
   }
+  playStamp++;
 }
 
 /* **所業の報い**（依頼・§32.2）。された家と、その隣接大名の友好を下げる。
@@ -18044,6 +18145,8 @@ function runAddUnit({type,site,bushou,cell,dir="-",state,keep}){
        "fort"（支城確保）・"guard"（追い払い）。null は目的を持たない（人の隊など）*/
     mission: null,
     aim  : null,                                 /* 浪人の行き先（§19.2）。ほかは null */
+    /* 援軍の請われた城・城へ帰る印・常駐する支城・混乱の解ける月・囲みの升・支城を築く升（§28.1・§32.3・§27.4）*/
+    aid  : null, back: false, toFort: null, konranTo: 0, ring: null, fortAim: null,
     /* **前の月に立っていた升**（§26.3）。城攻めは、城の隣に着いた月には
        始められない。着いてから1月かけて陣を敷く。
        出したばかりの隊は前の月の升を持たないので、`null` にする */
@@ -18067,12 +18170,16 @@ function runAddUnit({type,site,bushou,cell,dir="-",state,keep}){
 /* 盤から1隊消す。空になったグループも消す */
 function runDelUnit(id){
   const i=playUnits.findIndex(u=>u.id===id); if(i<0)return false;
+  const u0=playUnits[i];
   playUnits.splice(i,1); idxDrop(playUnits); idFree(unitIds,id);
   for(const g of playGroups){
     const k=g.units.indexOf(id); if(k<0)continue;
     g.units.splice(k,1); g.unitNum=g.units.length;
     if(!g.unitNum){
-      const pc=playCells.find(x=>x.group===g.id); if(pc)pc.group="-";
+      /* 升は隊の `q` から引く。5万升を舐めない */
+      const pc0=u0&&isLink(u0.q)?playCells[u0.q.id-1]:null;
+      const pc=(pc0&&pc0.group===g.id)?pc0:playCells.find(x=>x.group===g.id);
+      if(pc)pc.group="-";
       playGroups.splice(playGroups.indexOf(g),1); idxDrop(playGroups); idFree(groupIds,g.id);
     }
     break;
@@ -18169,7 +18276,9 @@ function runPutCell(u,cell,want){
   if(from){
     from.units.splice(from.units.indexOf(id),1); from.unitNum=from.units.length;
     if(!from.unitNum){
-      const pc=playCells.find(x=>x.group===from.id); if(pc)pc.group="-";
+      const pc0=isLink(u.q)?playCells[u.q.id-1]:null;
+      const pc=(pc0&&pc0.group===from.id)?pc0:playCells.find(x=>x.group===from.id);
+      if(pc)pc.group="-";
       playGroups.splice(playGroups.indexOf(from),1); idxDrop(playGroups); idFree(groupIds,from.id);
     }
   }
@@ -19224,11 +19333,11 @@ function runThreatOf(u){
   let side=false,front=false;
   for(const [dq,dr] of DIR6[c.r&1]){
     const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
-    if(!runCanWalk(n.id)||BASE_SITES.some(x=>x.cell===n.id))continue;   /* 山・水・拠点 */
+    if(!runCanWalk(n.id)||isSiteCell(n.id))continue;   /* 山・水・拠点 */
     if(runOpenUnits(n.id).some(o=>isLink(o.type)&&linkValue(o.type)==="軍勢"
          &&isLink(o.power)&&(o.power.id===pw||runIsAlly(pw,o.power.id))))continue;
     /* 城から出た軍勢は門（城の隣）に立つので、城の升からは歩数＋1 */
-    if(!src.some(s=>runAIDist(s,n.id)<=step+(BASE_SITES.some(x=>x.cell===s)?1:0)))continue;
+    if(!src.some(s=>runAIDist(s,n.id)<=step+(isSiteCell(s)?1:0)))continue;
     const fl=runFlank(u.id,n.id);
     if(fl==="正面")front=true; else side=true;
   }
@@ -19446,6 +19555,7 @@ function runBattleOpen(atkId,defId,siteId){
       if(o.state==="sui")continue;                 /* 水の上の隊は城攻めに加わらない（依頼）*/
       if(runKonranNow(o))continue;                 /* 混乱している軍勢も加わらない（依頼）*/
       if(runAIDist(o.q.id,bs.cell)!==1)continue;
+      if(!runCampReady(o))continue;                /* 着いた月には攻められない（§26.3）。二隊めも同じ */
       if(!a2||(o.hei||0)>(a2.hei||0))a2=o;
     }
     if(a2){
@@ -20071,8 +20181,11 @@ function runBattleRound(){
   /* **人が指していない側の下知は、ここで決める**（§31.2）。
      見ている戦と見ていない戦で下知の決め方が変わってはならない */
   const me0=playProgress[0]?playProgress[0].player|0:0;
-  if(B.atk.power!==me0)B.atk.order=runAIOrder(B.atk,B.def,B);
-  if(B.def.power!==me0)B.def.order=runAIOrder(B.def,B.atk,B);
+  /* **画面に出さない戦では、人の側も NPC の下知で戦う**（§31.1）。
+     出さないときに「射る」のままにすると、見る戦と見ない戦で強さが変わる */
+  const shown=runBattleWatch();
+  if(!shown||B.atk.power!==me0)B.atk.order=runAIOrder(B.atk,B.def,B);
+  if(!shown||B.def.power!==me0)B.def.order=runAIOrder(B.def,B.atk,B);
   B.round++;
   const ev=[];
   /* **1部隊ぶんの手ごとに段を打ち、済むごとに兵を控える**（§31.5）。
@@ -20580,6 +20693,8 @@ function runBattleClose(){
   }else if(B.win==="def"){
     if(a)runRout(a.id,B.def.unit||null,
       B.def.site!==null&&B.def.site!==undefined?runSiteOwner(B.def.site):null);
+    /* 同じ拍に本陣が尽きた受け手の隊は、勝っても兵 0 では立てない。崩れた扱いにする */
+    if(B.def.unit&&d&&byId(playUnits,d.id)&&(d.hei||0)<=0)runRout(d.id,null);
     /* **攻城を跳ね返したことも報せる**（§31.5）*/
     if(B.kind==="攻城"&&B.def.site!==null){
       const st0=byId(playSites,B.def.site);
@@ -20703,9 +20818,17 @@ function runRetreat(unitId,byPowerId,byName){
   const home=runAIHome(u);
   const hei=u.hei||0;
   /* **半分ほどが城へ戻る** */
-  const back=Math.round(hei*(RETREAT_HOME+(runRand()-0.5)*RETREAT_VAR*2));
+  const back=Math.max(0,Math.round(hei*(RETREAT_HOME+(runRand()-0.5)*RETREAT_VAR*2)));
   const st=home!==null?byId(playSites,home):null;
-  if(st)st.hei=Math.min(heiMaxOf(st),st.hei+Math.max(0,back));
+  if(st){
+    st.hei=Math.min(heiMaxOf(st),st.hei+back);
+    /* **戻った兵のぶんだけ馬と鉄砲も蔵へ返り、兵糧と銭は持ち帰る**（§27.8）。
+       陣払い（`runWithdraw`）と同じ決まり。ここだけ荷ごと消えていた（§1.6）*/
+    const f=hei>0?back/hei:0;
+    runStoreSonae(home,(u.sonae||[]).map(x=>({k:x.k, hei:Math.floor(x.hei*f)})));
+    st.hyoro=Math.min(HYORO_MAX,(st.hyoro||0)+(u.hyoro||0));
+    st.kane =Math.min(KANE_MAX,(st.kane||0)+(u.kane||0));
+  }
   const cell=u.q.id, pw=isLink(u.power)?u.power.id:null;
   runDelUnit(unitId);
   let fate=null;
@@ -20735,7 +20858,7 @@ function runRetreat(unitId,byPowerId,byName){
     }
   }
   playStamp++;
-  return {back:Math.max(0,back), lost:hei-Math.max(0,back), fate};
+  return {back, lost:hei-back, fate};
 }
 
 /* 最後まで回して結果だけ返す。**人が関わらない戦はこちら**（§31.1）*/
@@ -20946,9 +21069,16 @@ function runCapture(bushouId,byPowerId,siteId,cell,byName,wasWar){
        浪人を経ないのは、その場で家中に入るからである */
     const st=(siteId!==null&&siteId!==undefined)
       ?siteId:(runRichestSite(byPowerId)||{}).id;
+    /* **召し抱える城の無い家（独立勢力・一揆）は、見逃す道へ落とす。**
+       バグ：先に浪人にしてから登用に失敗すると、隊も家も無い武将が表にだけ残った */
+    if(st===undefined||st===null){
+      runFreeBushou(bushouId,cell);
+      runTell(name+"、解き放たれる","捕縛",cell);
+      return {how:"見逃", name};
+    }
     const lv0=capRankLv(b);                       /* 捕らえる前の格（浪人にする前に控える）*/
     runRonin(bushouId,null);
-    if(st!==undefined&&st!==null&&runHire(bushouId,st,null)){
+    if(runHire(bushouId,st,null)){
       /* **戦の末に登用された者は、格が3つ下がる。いちばん下は足軽大将**（依頼）。大名は武将になる。
          格は勲功から出すので、勲功もその格の線に置く（置かないと次の昇進で元の格へ戻る）*/
       const lv=Math.max(CAPTIVE_RANK_MIN,lv0-CAPTIVE_RANK_DOWN);
@@ -20960,6 +21090,7 @@ function runCapture(bushouId,byPowerId,siteId,cell,byName,wasWar){
       runTell(name+"、"+(pw?pw.label:"敵方")+"に仕う","捕縛",cell);
       return {how, name};
     }
+    runRonin(bushouId,cell);                      /* 召し抱えられなかった。浪人として盤に出す */
     runTell(name+"、解き放たれる","捕縛",cell);
     return {how:"見逃", name};
   }
@@ -21237,10 +21368,10 @@ function runSuccession(powerId){
 }
 
 /* 壊滅。**武将は討たれるか、捕らえられるか、城へ帰る**（§26.6）。隊は盤から消える */
-function runRout(unitId,byId,byPowerId=null){
+function runRout(unitId,byUnitId,byPowerId=null){
   const u=byId(playUnits,unitId); if(!u)return false;
   const b=isLink(u.bushou)?u.bushou.id:null;
-  const by=byId?byId(playUnits,byId):null;
+  const by=byUnitId?byId(playUnits,byUnitId):null;
   /* **攻城で寄せ手が崩れたときは、城の主が捕らえる側である**（§26.6）。
      バグ：城方には隊が無いので捕らえる側が空になり、捕縛の判じが一度も走らなかった */
   const byPw=by&&isLink(by.power)?by.power.id:byPowerId;
@@ -22026,10 +22157,13 @@ function runIsFort(cellId){
 }
 /* 盤じゅうの支城の升。**建築物の並びから引く**（升は3kmの盤で4万を超えるので、升を舐めない）*/
 let fortIdsCat=null;
+let fortListMemo={stamp:-1, v:null};
 function runFortList(){
+  if(fortListMemo.stamp===playStamp)return fortListMemo.v;
   if(!fortIdsCat)fortIdsCat=new Set(BASE_OBJECTS.filter(b=>b.cat==="支城").map(b=>b.id));
   const out=[];
   for(const o of playObjects)if(isLink(o.label)&&fortIdsCat.has(o.label.id)&&isLink(o.q))out.push(o.q.id);
+  fortListMemo={stamp:playStamp, v:out};
   return out;
 }
 
@@ -22262,7 +22396,7 @@ function runDropCell(cellId,powerId){
   if(!fg)return false;
   const i=fg.cells.indexOf(cellId); if(i<0)return false;
   fg.cells.splice(i,1); fg.cellNum=fg.cells.length;
-  window.__trim=(window.__trim||0)+runDomainTrim(from);
+  runDomainTrim(from);
   runAddMind(fp,powerId,-MIND_TAKEN);            /* 剥がせば恨まれる */
   runProvoke(fp,powerId,MIND_TAKEN);
   playStamp++;
@@ -22676,7 +22810,7 @@ function runAbsorb(unitId,foeUnitId){
        国衆の 4500 を部将（3000）が率いたままにはしない。余りは散る */
     o.hei=Math.min(o.hei||0,unitHeiMax(o));
     /* **備えは新しい主の蔵から立てる**（§26.5）。独立勢力は蔵を持たない */
-    o.sonae=o.hei>0?runSonaeOf(home,o.hei,false):[];
+    o.sonae=o.hei>0?runSonaeOf(home,o.hei,true):[];   /* 蔵から引く。帰城で返るぶんが無から湧かない */
     o.hyoro=Math.min(CARRY_MAX.hyoro,eatOf(o.hei)*MARCH_MONTHS);
     o.work=null; o.occ=null; o.done=null; o.wait=0; playStamp++;
     /* **取り込んだ隊も城の指針に従う**（依頼・§28.4）。
@@ -22827,7 +22961,7 @@ function runWithdraw(unitId){
   st.hei=Math.min(heiMaxOf(st),st.hei+back);
   runStoreSonae(home,half);
   /* 兵糧と銭は持ち帰る。捨てて帰る謂れがない */
-  st.hyoro=(st.hyoro||0)+(u.hyoro||0);
+  st.hyoro=Math.min(HYORO_MAX,(st.hyoro||0)+(u.hyoro||0));
   st.kane =Math.min(KANE_MAX,(st.kane||0)+(u.kane||0));
   const b=isLink(u.bushou)?u.bushou.id:null;
   const nm=b!==null?(byId(playBushou,b)||{}).name:"";
@@ -23381,11 +23515,8 @@ const FORT_GAP=3;
 function runFortGap(cellId,exceptUnitId){
   for(const bs of BASE_SITES)
     if(runAIDist(cellId,bs.cell)<FORT_SITE_GAP)return false;
-  for(const o of playObjects){
-    const b=byId(BASE_OBJECTS,o.label.id);
-    if(!b||b.cat!=="支城")continue;
-    if(runAIDist(cellId,o.q.id)<FORT_GAP)return false;
-  }
+  for(const fc of runFortList())
+    if(runAIDist(cellId,fc)<FORT_GAP)return false;
   /* **建てかけの支城も数える**（§27.4）。建っている支城だけを見ていたため、
      **同じ月に二つの隊が隣り合う升で支城を起こし、どちらも成って
      隣り合った支城が立っていた。** 普請の間は盤に何も載らない（§24.6）ので、
@@ -23487,7 +23618,7 @@ function runNeedsRepair(siteId,mine){
   /* 普請に就いている隊が1つも残っていなければ（討たれた等）、その普請は途切れている。
      そのときは始める縛り（`runRepairTo`。Max は 900 未満）で見直す（依頼）*/
   if(st.fushin&&playUnits.some(u=>u.state!=="-"&&u.work&&u.work.fix===siteId))return true;
-  if(st.fushin&&runRepairTo(siteId)===null)st.fushin=null;   /* 途切れて、もう始められない */
+  if(st.fushin&&runRepairTo(siteId)===null){st.fushin=null; playStamp++;}   /* 途切れて、もう始められない */
   return runRepairTo(siteId)!==null;
 }
 /* 隣り合う、普請できる拠点。**普請は隣の升から行う**（§27.1）*/
@@ -23593,7 +23724,19 @@ function runAttackAt(unitId,cellId){
 const runBuildAt=(u,cellId)=>runBuildPlan(u,cellId,false);
 /* 銭を別にして、そこに手の入る余地があるか。**行き先はこちらで決める。**
    銭で行き先を決めると、月の変わり目ごとに行き先が入れ替わって歩き通しになる */
-const runWorkAt=(u,cellId)=>runBuildPlan(u,cellId,true);
+/* **問うだけ。籤を回さない**（§25.4・`runPlanAny` と同じ道）。
+   行き先選びは領内の升ごとに問うので、籤を回す `runBuildPlan` を通すと、
+   **同じ手の中で問うたびに答えが変わり**（行き先を見た升と歩く升が別になる）、
+   問うただけで盤の籤が進んで同じ巻物からの再現も崩れていた。
+   何を建てるかを籤で引くのは、実際に建てる `runBuildAt` の一度だけである */
+const runWorkAt=(u,cellId)=>{
+  const type=isLink(u.type)?linkValue(u.type):"";
+  const want0=AI_BUILD[type]; if(!want0)return null;
+  const site=runAIHome(u); if(site===null)return null;
+  let want=runWantOrder(runAIBuildOrder(want0,site),site);
+  if(u.fortAim===cellId&&want.includes("支城"))want=["支城"].concat(want.filter(c=>c!=="支城"));
+  return runPlanAt(type,site,cellId,true,u.id,want,true);
+};
 
 /* 行き先。**型で決まる。**
    作業の隊は自分の城の実効支配域で建てられる升へ、
@@ -23654,7 +23797,7 @@ function runOwnFortNear(powerId,cellId,n){
 /* 戦意で城攻めに出てよい段（§32.3。指針が上）*/
 /* （段の名は後で定めるので、並びは呼ぶときに作る）*/
 const seniSiegeShi=id=>[SHI_HEITEI,SHI_KIRI,SHI_KOKUSHU,SHI_IKUSA,SHI_SAKAE,SHI_HANTO,SHI_ENKOU].includes(id);
-function runSiegeAimAt(siteId){
+const runSiegeAimAt=memoStamp(function runSiegeAimAt0(siteId){
   const pw=runSiteOwner(siteId); if(!pw)return null;
   const sid=runAIShishin(siteId).id;
   if(!seniSiegeShi(sid))return null;
@@ -23673,7 +23816,7 @@ function runSiegeAimAt(siteId){
     if(hanto&&d<bdH){bdH=d;bestH=st.id;}
   }
   return best??bestH;
-}
+});
 /* **戦意の立つ相手**（§32.3）：戦意 `SENI_WAR` 以上で、同盟・休戦でなく、隣接大名か領内を踏んでいる家 */
 function runAngrySet(pw){
   const out=new Set(); if(!pw)return out;
@@ -23788,14 +23931,14 @@ function runAtWar(mine,op){
   return false;
 }
 /* 家の城それぞれの的を合わせたもの */
-function runSiegeAims(powerId){
+const runSiegeAims=memoStamp(function runSiegeAims0(powerId){
   const out=new Set();
   for(const st of playSites){
     if(runSiteOwner(st.id)!==powerId)continue;
     const a=runSiegeAimAt(st.id); if(a!==null)out.add(a);
   }
   return out;
-}
+});
 /* ------------------------------------------------------------
    **城攻めは、家を挙げて一つの城を囲む**（依頼・§32.3）
    ------------------------------------------------------------
@@ -23808,12 +23951,12 @@ function runCampaign(powerId){
   const pw=byId(playPowers,powerId); if(!pw||pw.kind!=="daimyo")return null;
   const g=playProgress[0]; const now=g?g.year*12+g.month:0;
   const aims=runSiegeAims(powerId);
-  if(!aims.size){pw.camp=null;return null;}
+  if(!aims.size){ if(pw.camp!==null&&pw.camp!==undefined){pw.camp=null; playStamp++;} return null;}
   if(pw.camp!==null&&pw.camp!==undefined&&aims.has(pw.camp)){
     /* **落ちないまま長く囲み続けない**（依頼）。期限で解き、しばらくその城は狙わない */
     if(now-(pw.campAt||now)<CAMP_MONTHS)return pw.camp;
     pw.campRest=pw.campRest||{}; pw.campRest[pw.camp]=now+CAMP_REST;
-    pw.camp=null; return null;
+    pw.camp=null; playStamp++; return null;
   }
   const rest=pw.campRest||{};
   const mine=playSites.filter(x=>runSiteOwner(x.id)===powerId)
@@ -23824,7 +23967,7 @@ function runCampaign(powerId){
     const bs=byId(BASE_SITES,sid); if(!bs)continue;
     for(const m of mine){const d=runAIDist(m.cell,bs.cell); if(d<bd){bd=d;best=sid;}}
   }
-  pw.camp=best; pw.campAt=now;
+  if(pw.camp!==best||pw.campAt!==now){pw.camp=best; pw.campAt=now; playStamp++;}
   return best;
 }
 const CAMP_NEAR=30;            // 狙う城からこの升数の内の拠点は、囲みに軍勢を出す
@@ -23857,10 +24000,14 @@ function runAIGoalSite(u){
    隊が並び、後ろの隊が城の隣に立てずに渋滞していた
    ------------------------------------------------------------ */
 function runSiegeRing(u,goal){
-  if(!isLink(u.type)||linkValue(u.type)!=="軍勢")return goal;
-  const bs=BASE_SITES.find(x=>x.cell===goal); if(!bs)return goal;
   const mine=isLink(u.power)?u.power.id:null;
-  const ow=runSiteOwner(bs.id); if(ow===mine)return goal;
+  const bs=BASE_SITES.find(x=>x.cell===goal);
+  /* **囲みの升は、城を目指しているあいだだけ持つ。** 追い払いや帰城に切り替わった隊の
+     古い `ring` が残ると、同じ家のほかの軍勢がその升を永久に避ける */
+  if(!isLink(u.type)||linkValue(u.type)!=="軍勢"||!bs||runSiteOwner(bs.id)===mine){
+    if(u.ring!==null&&u.ring!==undefined){u.ring=null; playStamp++;}
+    return goal;
+  }
   if(runAIDist(u.q.id,goal)<=1){u.ring=null;return goal;}
   const c=BASE_CELLS[goal-1]; if(!c)return goal;
   const op=isOpenUnit(u);
@@ -23920,7 +24067,18 @@ function runBuildRank(cat,cellId){
   }
   return 1;
 }
+/* **行き先は1手に1度だけ引く。** 同じ手の中で何度も問われる（`runAIHere`・`runAIAct`・
+   `runGunHere`・`runAIBlocker`…）ので、盤面が変わるまで答えを覚える。
+   行の欄には置かない（巻物に出さない）*/
+const aiGoalMemo=new WeakMap();
 function runAIGoal(u){
+  const hit=aiGoalMemo.get(u);
+  if(hit&&hit.stamp===playStamp&&hit.cell===u.q.id)return hit.goal;
+  const goal=runAIGoal0(u);
+  aiGoalMemo.set(u,{stamp:playStamp, cell:u.q.id, goal});
+  return goal;
+}
+function runAIGoal0(u){
   const type=isLink(u.type)?linkValue(u.type):"";
   const pw=isLink(u.power)?u.power.id:null;
   const here=u.q.id;
@@ -24006,15 +24164,18 @@ function runAIGoal(u){
       const cs0=runCampaign(pw);
       const top={foe:cs0!==null?runSiteOwner(cs0):null};
       if(top.foe){
-        const ix=runDomainIndex();
         let best=null,bd=1e9;
-        for(const pc of playCells){
-          if(pc.object==="-")continue;
-          const site=ix.get(pc.id); if(site===undefined||runSiteOwner(site)!==top.foe)continue;
+        /* 相手の拠点の実効支配域だけを舐める。盤ぜんぶ（5万升）を舐めない */
+        for(const st of playSites){
+          if(runSiteOwner(st.id)!==top.foe||!isLink(st.group))continue;
+          const g2=byId(playCellGroups,st.group.id); if(!g2)continue;
+          for(const cid of g2.cells){
+          const pc=playCells[cid-1]; if(!pc||pc.object==="-")continue;
           if(!runCanRavage(u.id,pc.id,true))continue;
           if(pc.id!==here&&!runCanStand(pc.id,u.state,pw,u.id,isOpenUnit(u)))continue;
           const d=runAIDist(here,pc.id);
           if(d<bd){bd=d;best=pc.id;}
+          }
         }
         if(best!==null)return best;
       }
@@ -24348,7 +24509,9 @@ function runDokuDanger(){
 }
 function runAIField(goal,budget,state,avoid){
   state=state==="sui"?"sui":"sagyo";
-  const key=goal+":"+budget+":"+state+(avoid?":a"+[...avoid].sort((a,b)=>a-b).join(","):"");
+  /* 歩き代（`budget`）は場の中身に効かない（重さは踏み代のまま数える）ので鍵に入れない。
+     入れると同じ場が歩き代ごとに別に入り、覚えを食い潰す */
+  const key=goal+":"+state+(avoid?":a"+[...avoid].sort((a,b)=>a-b).join(","):"");
   const hit=aiFieldCache.get(key);
   if(hit){                                       /* 使ったものを新しい側へ回す */
     aiFieldCache.delete(key); aiFieldCache.set(key,hit); return hit;
@@ -26700,7 +26863,10 @@ function runAIWant(siteId){
   /* **建築の隊は普請だけの隊ではない**（§27.1）。耐久度が満ちていても、
      支城と村を建てる仕事がある。**城を育てるのも建築の隊の仕事** */
   if(st.kane>=AI_COST["村"]*2)add("建築",tbl.建築);
-  if(st.taikyu<=TAIKYU_MAX-AI_REPAIR)add("建築",AI_W_FUSHIN);
+  /* **城の普請が残っているとき**（§27.1）。始めた普請か、指針の段がまだ上の段を許すとき。
+     バグ：耐久度が上限から 8 を割っただけで数えていたため、段の上限に届いた城からも
+     建築の隊が毎月出て、出ては戻るを繰り返していた */
+  if(!!st.fushin||runRepairTo(siteId)!==null)add("建築",AI_W_FUSHIN);
   /* **指針の段ごとに目指す拠点の段に届いていなければ、普請を厚くする**（依頼）*/
   if(taikyuLevel(st.taikyu)<shiGoalLv(runAIShishin(siteId).id))add("建築",AI_W_FUSHIN_GOAL);
   /* **俸禄不足のときは、兵糧不足の農業と同じく商業の重みを上げる**（依頼）*/
@@ -26931,7 +27097,7 @@ function runAIGate(powerId){
       /* **仕事の無い型は出さない**（依頼・§25.4）。
          城の普請が残っているなら、建築の隊には仕事がある（§27.1）*/
       if(AI_BUILD[t]&&!runAIHasWork(st.id,t)
-         &&!(t==="建築"&&st.taikyu<=TAIKYU_MAX-AI_REPAIR))continue;
+         &&!(t==="建築"&&(!!st.fushin||runRepairTo(st.id)!==null)))continue;
       /* ------------------------------------------------------------
          **蔵の米で食えぬときは、総出で田畑を開く**（依頼・§32.7 段2）
          ------------------------------------------------------------
@@ -27643,6 +27809,7 @@ function onLoadFile(file){
     catch(e){ loadPlay(keep); aiWhat="この巻物は読めなかった"; drawAI(); queueDraw(); return; }
     unitSel=null; siteOpen=null; sel=null; pickClear(); batEv=[];
     batStepStop(); onBatStop();
+    clearTimeout(tellTimer); tellTimer=0; tellNow=null; drawTell();   /* 前の盤の報せの札は捨てる */
     drawBattle();
     if(GLR){GLR.sig=""; GLR.spSig=""; GLR.fxSig="";}
     const pw=runNowPower();
