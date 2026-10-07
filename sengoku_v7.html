@@ -1815,6 +1815,20 @@ const hexSteps=(q1,r1,q2,r2)=>{
   const y1=-x1-r1, y2=-x2-r2;
   return (Math.abs(x1-x2)+Math.abs(y1-y2)+Math.abs(r1-r2))/2;
 };
+/* 升 (q,r) から n 歩のうちにある升（自分を含む）。**盤ぜんぶを舐めない。**
+   odd-r を立方座標に直して菱形を回り、歩数で切る */
+function hexWithin(q,r,n){
+  const out=[];
+  const x0=q-((r-(r&1))>>1), z0=r;
+  for(let dz=-n;dz<=n;dz++){
+    const rr=r+dz;
+    for(let dx=Math.max(-n,-n-dz);dx<=Math.min(n,n-dz);dx++){
+      const x=x0+dx, qq=x+((rr-(rr&1))>>1);
+      const c=cellOf(qq,rr); if(c)out.push(c);
+    }
+  }
+  return out;
+}
 /* 角の向きに合わせた隣の6升。並びは 北東・東・南東・南西・西・北西。
    角 i（真上から時計回り）は DIR6[(i+5)%6] と DIR6[i] の升と分け合い、
    角 i と角 i+1 のあいだの辺は DIR6[i] の升と接する。
@@ -6523,7 +6537,15 @@ function glRender(w,h,dpr){
   /* 倍率か視点か**地形の形**が変わったときだけ組み直す。
      引きずりでは組み直さない。隊が動いただけでも組み直さない（§10.2）*/
   /* 上から見る盤は国の持ち主で塗るので、盤面が変わるたびに組み直す（軽い）*/
-  const sig=view.z+","+view.cam+","+playLandStamp+(view.cam==="top"?","+playStamp:"");
+  /* ------------------------------------------------------------
+     **倍率では組み直さない。** 三角形は世界の単位（km）で持ち、倍率は
+     一様変数で掛けるだけなので（§10.2）、寄せても引いても形は変わらない。
+     倍率に依るのは、崖の舌を描くかどうかの段（`LOD_TONGUE`・§10.18）だけ。
+     線の幅の下限（画素）は、斜めの倍率の幅（50〜200%）では一度も効かない。
+     倍率を鍵に混ぜていたため、ボタンを押すたび・車輪を回すたびに
+     二百万の三角形を組み直し、寄せる操作がそのたびに止まっていた */
+  const lod=(R*P.s*1.02<LOD_TONGUE?"t":"")+(R*P.s*1.02<LOD_BAND?"b":"");
+  const sig=lod+","+view.cam+","+playLandStamp+(view.cam==="top"?","+playStamp:"");
   if(sig!==G.sig||!G.mesh){
     const a=performance.now();
     G.mesh=glBuildMesh(); G.sig=sig;
@@ -15822,10 +15844,11 @@ function runInKuni(cellId,powerId){
    **索引にして持つ。** 升ごとに34の拠点の領域を舐めると、
    統治力の段取り（毎月・拠点ごと・候補の升ごと）で盤が止まる。
    領主が変われば `playStamp` が動くので、そこで組み直す */
-let kuniIndex=null, kuniStamp=-1;
+let kuniIndex=null, kuniStamp="";
 function runKuniIndex(){
-  if(kuniStamp===playStamp&&kuniIndex)return kuniIndex;
-  kuniIndex=new Map(); kuniStamp=playStamp;
+  const sig=runOwnSig();
+  if(kuniStamp===sig&&kuniIndex)return kuniIndex;
+  kuniIndex=new Map(); kuniStamp=sig;
   for(const bs of BASE_SITES){
     const o=runSiteOwner(bs.id); if(!o)continue;
     const dom=BASE_CELLGROUPS[bs.domain-1]; if(!dom)continue;
@@ -15946,6 +15969,37 @@ const desertOf=(hei,hyoro)=>{
    `"農地"` は畑と水田のどちらでもよい */
 /* **索引にして持つ。** 望みを立てるたび、行き先を選ぶたびに領域を舐めると、
    自動進行が目に見えて遅くなる。盤が動けば組み直す */
+/* ------------------------------------------------------------
+   盤面が変わるまで答えを覚える（§2.2 引き手の延長）
+   ------------------------------------------------------------
+   **読むだけの問いに掛ける。** 鍵は引数そのもので、`playStamp` が進んだら
+   ぜんぶ捨てる。同じ手番のうちに同じ問いが升ごと・隊ごとに何百回も
+   立つので（「空いた升があるか」「禄はいくらか」「誰かが普請しているか」）、
+   そのたびに領域や隊の表を舐めると自動進行が目に見えて遅くなる。
+
+   **掛けてよいのは、プレイデータを書き換えず、籤も回さない関数だけ。**
+   書き換える関数に掛けると、二度目から何も起きなくなる。籤を回す関数に
+   掛けると、同じ問いに同じ答えしか出なくなる */
+function memoStamp(fn){
+  let m=new Map(), st=-1;
+  return function(a,b,c){
+    if(st!==playStamp){m=new Map(); st=playStamp;}
+    const k=c!==undefined?a+"|"+b+"|"+c:b!==undefined?a+"|"+b:a;
+    if(m.has(k))return m.get(k);
+    const v=fn.call(this,a,b,c); m.set(k,v); return v;
+  };
+}
+/* **持ち主の並びの印。** 拠点の持ち主が変わったときだけ変わる。国の索引や
+   隣の家の表は持ち主だけで決まるので、`playStamp` で捨てると、
+   隊が一歩動くたびに 5 万升を舐め直すことになる */
+let ownSigMemo={stamp:-1, sig:""};
+function runOwnSig(){
+  if(ownSigMemo.stamp===playStamp)return ownSigMemo.sig;
+  let sig="";
+  for(const bs of BASE_SITES)sig+=(runSiteOwner(bs.id)||0)+",";
+  ownSigMemo={stamp:playStamp, sig};
+  return sig;
+}
 let catIndex=null, catStamp=-1;
 function runCatIndex(){
   if(catStamp===playStamp&&catIndex)return catIndex;
@@ -15974,7 +16028,7 @@ function runCatIndex(){
 }
 /* **その拠点の国内（グレーゾーン）に、その分類の建物があるか**（依頼・§32.7 国造り）。
    数えるのは、同じ家の拠点の実効支配域に入っている升の建物だけ。建てかけも数える */
-function runHasCatKuni(siteId,cat){
+const runHasCatKuni=memoStamp(function runHasCatKuni0(siteId,cat){
   const bs=byId(BASE_SITES,siteId); if(!bs)return false;
   const dom=BASE_CELLGROUPS[bs.domain-1]; if(!dom)return runHasCat(siteId,cat);
   const own=runSiteOwner(siteId);
@@ -15990,7 +16044,7 @@ function runHasCatKuni(siteId,cat){
     if(cats.includes(u.work.cat))return true;
   }
   return false;
-}
+});
 function runHasCat(siteId,cat){
   const s2=runCatIndex().get(siteId);
   return !!s2&&s2.has(cat);
@@ -16013,7 +16067,7 @@ function runMachiBonus(cellId){
   }
   return false;
 }
-function runKaneParts(siteId){
+const runKaneParts=memoStamp(function runKaneParts0(siteId){
   const st=byId(playSites,siteId); if(!st)return {take:0,pay:0,men:[]};
   let take=0;
   if(isLink(st.group)){
@@ -16039,7 +16093,7 @@ function runKaneParts(siteId){
     if(r){pay+=Math.round(r.hei/ROKU_PER); men.push(bb.id);}
   }
   return {take,pay,men};
-}
+});
 
 /* 包囲されているか。**城に隣り合う升に、よその家の見える隊が立っている**（§26.4）。
    出入りが塞がれるので、その月は入りが無く、兵も戻らない */
@@ -16646,6 +16700,7 @@ function runSetSiteOwner(siteId,powerId){
   if(before&&before!==powerId&&st.fushin){
     st.fushin=null;
     for(const x of playUnits)if(x.work&&x.work.fix===siteId)x.work=null;
+    playStamp++;
   }
   if(before&&before!==powerId){runLoseJunno(siteId);runFallCheck(before);}
   /* **一揆が拠点を取れば、一揆の将が家を興す**（依頼・§21.4）*/
@@ -16671,12 +16726,19 @@ function runCastellan(siteId){
 }
 
 /* その拠点にいる武将。`busy` は既に1隊を率いているという意味 */
+/* 隊を率いている武将の ID。盤面が変わるまで使い回す */
+let ledMemo={stamp:-1, set:null};
+function runLedSet(){
+  if(ledMemo.stamp===playStamp)return ledMemo.set;
+  const set=new Set(); for(const u of playUnits)if(isLink(u.bushou))set.add(u.bushou.id);
+  ledMemo={stamp:playStamp, set}; return set;
+}
 function runBushouAt(siteId){
   const st=byId(playSites,siteId);
   if(!st||!isLink(st.bushou))return [];
   const g=byId(playBushouGroups,st.bushou.id);
   if(!g)return [];
-  const led=new Set(playUnits.filter(u=>isLink(u.bushou)).map(u=>u.bushou.id));
+  const led=runLedSet();
   /* **行をそのまま返し、`busy` だけを足す。**
      `{id,name,busy}` に削って返していたため、呼ぶ側から見ると
      **役職も適性も知謀も無い武将**になっていた。忍びを出せる城を
@@ -17252,17 +17314,29 @@ function runAddObject(cellId,label){
              wear:OBJ_WEAR};
   playObjects.push(row); pc.object=row.id;
   playStamp++;
+  /* **港が建てば水の道が繋がる**（§24.1）。踏み代が変わるので道の覚えを捨てる（§25.3）。
+     バグ：港が建っても、覚えが入れ替わるまで水の隊はそこを通れなかった */
+  if(b.cat==="港")aiFieldCache.clear();
   return row;
 }
 
 /* その升で、いま誰かが普請しているか（§24.6）。
    **二つの隊が同じ升を掘らないための問いである** */
-function runFushinAt(cellId,exceptUnitId){
+/* 升 → そこで普請している隊。盤面が変わるまで使い回す */
+let fushinIndex=null, fushinStamp=-1;
+function runFushinIndex(){
+  if(fushinStamp===playStamp&&fushinIndex)return fushinIndex;
+  fushinIndex=new Map(); fushinStamp=playStamp;
   for(const u of playUnits){
     if(u.state==="-"||!u.work)continue;
-    if(exceptUnitId!==undefined&&u.id===exceptUnitId)continue;
-    if(u.work.cell===cellId)return u;
+    const a=fushinIndex.get(u.work.cell);
+    if(a)a.push(u); else fushinIndex.set(u.work.cell,[u]);
   }
+  return fushinIndex;
+}
+function runFushinAt(cellId,exceptUnitId){
+  const a=runFushinIndex().get(cellId); if(!a)return null;
+  for(const u of a)if(exceptUnitId===undefined||u.id!==exceptUnitId)return u;
   return null;
 }
 
@@ -17293,7 +17367,7 @@ function runBuildTick(){
   }
   for(const [sid,us] of men){
     const st=byId(playSites,sid);
-    if(!st||!st.fushin){for(const u of us)u.work=null; continue;}
+    if(!st||!st.fushin){for(const u of us)u.work=null; playStamp++; continue;}
     /* ------------------------------------------------------------
        **普請に期間は無い**（依頼・§27.1）。毎月、普請している武将一人ひとりが
        耐久度を積み上げ、**耐久度が目当て（上げる先の帯のまん中、Max は上限）に
@@ -17569,7 +17643,8 @@ const shogyoRow=id=>byId(BASE_SHOGYO,id)||BASE_SHOGYO[0];
 let nearPowCache={stamp:-1, map:null};
 function runNearPowers(powerId){
   if(!powerId)return new Set();
-  if(nearPowCache.stamp!==playStamp){
+  const sig=runOwnSig();
+  if(nearPowCache.stamp!==sig){
     const map=new Map(), ix=runKuniIndex();
     const add=(a,b)=>{ if(!a||!b||a===b)return;
       if(!map.has(a))map.set(a,new Set()); map.get(a).add(b); };
@@ -17581,7 +17656,7 @@ function runNearPowers(powerId){
         if(ow2&&ow2!==ow){ add(ow,ow2); add(ow2,ow); }
       }
     }
-    nearPowCache={stamp:playStamp, map};
+    nearPowCache={stamp:sig, map};
   }
   return nearPowCache.map.get(powerId)||new Set();
 }
@@ -21456,10 +21531,12 @@ function runMakeDomain(siteId,fromRuin=false){
 function runDelObject(cellId){
   const pc=playCells[cellId-1]; if(!pc||pc.object==="-")return false;
   const i=playObjects.findIndex(o=>o.id===pc.object); if(i<0)return false;
+  const wasMinato=runIsMinato(cellId);
   idFree(objectIds,playObjects[i].id);
   playObjects.splice(i,1); idxDrop(playObjects);
   pc.object="-";
   playStamp++;
+  if(wasMinato)aiFieldCache.clear();           /* 港が消えれば水の道も切れる（§25.3）*/
   return true;
 }
 
@@ -21863,12 +21940,12 @@ function runSekiWorkInKuni(siteId,unitId){
   const dom=BASE_CELLGROUPS[bs.domain-1]; if(!dom)return false;
   return playUnits.some(u=>u.id!==unitId&&u.work&&u.work.cat==="関所"&&dom.cells.includes(u.work.cell));
 }
-function runSekiInKuni(siteId){
+const runSekiInKuni=memoStamp(function runSekiInKuni0(siteId){
   const bs=byId(BASE_SITES,siteId); if(!bs)return false;
   const dom=BASE_CELLGROUPS[bs.domain-1]; if(!dom)return false;
   for(const id of dom.cells)if(runIsSeki(id))return true;
   return false;
-}
+});
 /* ------------------------------------------------------------
    **NPC の関所の置き場**（依頼・§27.4・§32.7）
    ------------------------------------------------------------
@@ -22601,7 +22678,7 @@ function runAbsorb(unitId,foeUnitId){
     /* **備えは新しい主の蔵から立てる**（§26.5）。独立勢力は蔵を持たない */
     o.sonae=o.hei>0?runSonaeOf(home,o.hei,false):[];
     o.hyoro=Math.min(CARRY_MAX.hyoro,eatOf(o.hei)*MARCH_MONTHS);
-    o.work=null; o.occ=null; o.done=null; o.wait=0;
+    o.work=null; o.occ=null; o.done=null; o.wait=0; playStamp++;
     /* **取り込んだ隊も城の指針に従う**（依頼・§28.4）。
        城から隊を出すときと同じく、城の望み（`runAIWant`。指針の重みが掛かる）から引き、
        軍勢が当たらなければ城へ帰る。当たれば、出陣と同じ決まりで目的を持つ（§32.3）。
@@ -23678,10 +23755,8 @@ function runBadNeighbors(pw){
 function runFortFacing(fc,bad){
   if(!bad.size)return false;
   const c=BASE_CELLS[fc-1]; if(!c)return false;
-  for(const o of BASE_CELLS){
-    if(hexSteps(c.q,c.r,o.q,o.r)>CHUTON_SIDE)continue;
+  for(const o of hexWithin(c.q,c.r,CHUTON_SIDE))
     if(bad.has(runKuniOwner(o.id)))return true;
-  }
   return false;
 }
 function runChutonTarget(siteId){
@@ -24245,7 +24320,7 @@ function runAIGoal(u){
    行き先ごとに覚えておく。覚える数にも上限を置く。**踏み代が変わったら捨てる**
    （雪の印が変わった月・治水・読み込み）*/
 const AI_FIELD_MAX=2600;       // 1つの行き先で広げる升の数
-const AI_FIELD_KEEP=16;        // 覚えておく行き先の数
+const AI_FIELD_KEEP=48;        // 覚えておく行き先の数
 const aiFieldCache=new Map();
 /* `budget` は隊がひと月に踏める重さ。**これを越える升は通り道にしない。**
    重さ 6 の川は、渡れる升として数えると道が繋がってしまうが、
@@ -24278,15 +24353,24 @@ function runAIField(goal,budget,state,avoid){
   if(hit){                                       /* 使ったものを新しい側へ回す */
     aiFieldCache.delete(key); aiFieldCache.set(key,hit); return hit;
   }
+  /* 重さの小さい順に取り出す。**二分ヒープで持つ。**
+     束を頭から舐めて最小を探すと、広げる升の数の二乗で重くなる
+     （2600 升で 340 万回の比べ）。ヒープなら升の数 × log で済む */
   const dist=new Map([[goal,0]]);
-  /* 重さの小さい順に取り出す。升の重さは 1〜6 の刻みなので、
-     束を並べ替えるより、取り出すたびに最小を探すほうが速い規模である */
-  let front=[goal];
+  const hq=[goal], hd=[0];
+  const hpush=(id,d)=>{let i=hq.length; hq.push(id); hd.push(d);
+    while(i>0){const p=(i-1)>>1; if(hd[p]<=hd[i])break;
+      const t=hq[p];hq[p]=hq[i];hq[i]=t; const u=hd[p];hd[p]=hd[i];hd[i]=u; i=p;}};
+  const hpop=()=>{const top=hq[0], td=hd[0], li=hq.pop(), ld=hd.pop();
+    if(hq.length){hq[0]=li; hd[0]=ld; let i=0;
+      for(;;){const l=2*i+1,r=l+1; let m=i;
+        if(l<hq.length&&hd[l]<hd[m])m=l; if(r<hq.length&&hd[r]<hd[m])m=r;
+        if(m===i)break; const t=hq[m];hq[m]=hq[i];hq[i]=t; const u=hd[m];hd[m]=hd[i];hd[i]=u; i=m;}}
+    return [top,td];};
   let seen=1;
-  while(front.length&&seen<AI_FIELD_MAX){
-    let bi=0,bv=dist.get(front[0]);
-    for(let i=1;i<front.length;i++){const v=dist.get(front[i]); if(v<bv){bv=v;bi=i;}}
-    const id=front[bi]; front[bi]=front[front.length-1]; front.pop();
+  while(hq.length&&seen<AI_FIELD_MAX){
+    const [id,bv]=hpop();
+    if(dist.get(id)!==bv)continue;                /* 古い札。もっと近い道で取り出し済み */
     const c=BASE_CELLS[id-1]; if(!c)continue;
     for(const [dq,dr] of DIR6[c.r&1]){
       const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
@@ -24311,9 +24395,10 @@ function runAIField(goal,budget,state,avoid){
       const w=runStepCost(n.id,state)+(avoid&&avoid.has(n.id)&&n.id!==goal?DOKU_AVOID_COST:0);
       if(!(w>0)||!isFinite(w))continue;
       const nd=bv+w;
-      if(dist.has(n.id)&&dist.get(n.id)<=nd)continue;
-      if(!dist.has(n.id))seen++;
-      dist.set(n.id,nd); front.push(n.id);
+      const od=dist.get(n.id);
+      if(od!==undefined&&od<=nd)continue;
+      if(od===undefined)seen++;
+      dist.set(n.id,nd); hpush(n.id,nd);
     }
   }
   aiFieldCache.set(key,dist);
@@ -25252,7 +25337,7 @@ function runAIHere(u,name,type,mine,moved){
    ------------------------------------------------------------ */
 /* その分類を、いまその城の領内で建てられるか。
    **空いた升に新しく建てるか、建て替えるか、段を上げるか** */
-function runCanPutAny2(siteId,cat){
+const runCanPutAny2=memoStamp(function runCanPutAny20(siteId,cat){
   if(runCanPutAny(siteId,cat))return true;
   const st=byId(playSites,siteId);
   if(!st||!isLink(st.group))return false;
@@ -25265,7 +25350,7 @@ function runCanPutAny2(siteId,cat){
     if(i>=0&&i+1<steps.length)return true;       /* まだ段が上がる */
   }
   return false;
-}
+});
 /* ------------------------------------------------------------
    **続けるか帰るかは、毎度の籤で決まる**（依頼・§25.4）
    ------------------------------------------------------------
@@ -25710,7 +25795,7 @@ const runRuinFar=powerId=>
 /* よその家の軍勢が、自分の押さえている升に立っているか（§32.3）。
    **同盟の相手は数えない。** 通ってよいと約束したわけではないが、討ちはしない。
    `foeId` を渡せば、その家の軍勢だけを見る */
-function runIntruder(powerId,foeId){
+const runIntruder=memoStamp(function runIntruder0(powerId,foeId){
   const ix=runDomainIndex();
   for(const u of playUnits){
     if(!isLink(u.power)||!isLink(u.type))continue;
@@ -25743,7 +25828,7 @@ function runIntruder(powerId,foeId){
     if(site!==undefined&&runSiteOwner(site)===powerId)return u;
   }
   return null;
-}
+});
 
 /* ------------------------------------------------------------
    **踏まれたとき、その軍勢が迎え撃ちに戻るか**（依頼・§32.3）
@@ -26075,7 +26160,7 @@ function runTearOK(siteId,cellId){
   /* 開墾地も農地に数える。**開墾地は穫れる農地で、先へは育たない**（依頼）ので、ほかの農地と同じに扱う */
   return !(CAT_ICHI.includes(CAT_MIN(b.cat))&&runCatNum(siteId,CAT_MIN(b.cat))<=1);
 }
-function runCanPutAny(siteId,cat){
+const runCanPutAny=memoStamp(function runCanPutAny0(siteId,cat){
   const st=byId(playSites,siteId); if(!st||!isLink(st.group))return false;
   const g=byId(playCellGroups,st.group.id); if(!g)return false;
   for(const id of g.cells){
@@ -26084,10 +26169,10 @@ function runCanPutAny(siteId,cat){
     return true;
   }
   return false;
-}
+});
 /* **その分類を建てられる「空いた升」が領内にあるか**（依頼・§24.5）。
    建て替えは、これが一つも無いときの逃げ道である */
-function runCanPutFree(siteId,cat){
+const runCanPutFree=memoStamp(function runCanPutFree0(siteId,cat){
   const st=byId(playSites,siteId); if(!st||!isLink(st.group))return false;
   const g=byId(playCellGroups,st.group.id); if(!g)return false;
   for(const id of g.cells){
@@ -26095,9 +26180,9 @@ function runCanPutFree(siteId,cat){
     if(runCanPut(id,cat,siteId))return true;
   }
   return false;
-}
+});
 /* 領内にその分類がいくつあるか。**最後の1つを潰させないために数える** */
-function runCatNum(siteId,cat){
+const runCatNum=memoStamp(function runCatNum0(siteId,cat){
   const st=byId(playSites,siteId); if(!st||!isLink(st.group))return 0;
   const g=byId(playCellGroups,st.group.id); if(!g)return 0;
   let n=0;
@@ -26107,7 +26192,7 @@ function runCatNum(siteId,cat){
     if(CAT_MIN(b.cat)===cat)n++;
   }
   return n;
-}
+});
 /* **領内に、まだ建てる余地があるか**（依頼）。
    空いた升のうち、村・畑・町のどれかが建つものが1つでもあれば「余地あり」 */
 /* ------------------------------------------------------------
@@ -26223,7 +26308,7 @@ function runSpreadLeft(siteId){
    埋められる升 ＝ 建築物がある升（種類を問わない）＋ 空いていて村・畑・水田・町のどれかを建てられる升。
    段5に進んでも開発は続く（`OUT_WAR_SHARE`）*/
 const ROOM_FULL=0.5;
-function runRoomLeft(siteId){
+const runRoomLeft=memoStamp(function runRoomLeft0(siteId){
   const st=byId(playSites,siteId); if(!st||!isLink(st.group))return false;
   const g=byId(playCellGroups,st.group.id); if(!g)return false;
   let can=0, got=0;
@@ -26234,7 +26319,7 @@ function runRoomLeft(siteId){
     if(["村","畑","水田","町"].some(cat=>runCanPut(id,cat,siteId)))can++;
   }
   return can>0&&got<can*ROOM_FULL;
-}
+});
 /* **この拠点の、いまの行動指針**（依頼・§32.7）。
    画面もここを読む（§1.6）。見せている段と、重みを動かしている段が
    別のものであってはならない */
@@ -26496,15 +26581,15 @@ function runWorkGain(siteId){
   }
   return out;
 }
-function runAIRokuShort(siteId){
+const runAIRokuShort=memoStamp(function runAIRokuShort0(siteId){
   const st=byId(playSites,siteId); if(!st)return false;
   const kp=runKaneParts(siteId);
   /* 町と城からの月の入りが月の禄に足りず、かつ手元の銭が禄の2年ぶんに届かない（依頼）。
      **建てかけの町・港は、できあがったときの入りを足して比べる**（依頼）*/
   const take=kp.take+runWorkGain(siteId).reduce((a,g)=>a+g.kane,0);
   return kp.pay>0&&take<kp.pay&&(st.kane||0)<kp.pay*ROKU_WANT_MONTHS;
-}
-function runAIFeedShort(siteId){
+});
+const runAIFeedShort=memoStamp(function runAIFeedShort0(siteId){
   const st=byId(playSites,siteId); if(!st)return false;
   /* ------------------------------------------------------------
      **兵糧が足りないか**（依頼・§32.7 段2）
@@ -26535,7 +26620,7 @@ function runAIFeedShort(siteId){
     if(h<0)return true;
   }
   return st.hyoro+crop<eat*12*feedWantOf(siteId);
-}
+});
 
 function runAIWant(siteId){
   const st=byId(playSites,siteId); if(!st)return [];
