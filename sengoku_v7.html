@@ -794,7 +794,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.1.17";
+const VERSION="8.2.0";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -2143,27 +2143,6 @@ function snowOf(c){
    土手を描くかどうかは effect のビット2で決まる。
    節点は升1つにつき2つ（中心と、次の升との境の中点）並ぶので、
    湖から出る川は先頭に2つ余分が入るぶんだけずらす */
-let riverAt=new Map();
-function buildRiverAt(){
-  riverAt=new Map();
-  for(const ln of playLines){
-    if(ln.type!==3||!ln.cells)continue;
-    const off=ln.src?2:0;
-    ln.cells.forEach((cid,i)=>{ if(cid)riverAt.set(cid,{ln,node:off+2*i}); });
-  }
-}
-
-
-/* その行の区間だけを塗る。輪郭は全長ぶんで切り抜く */
-
-/* 2層目。**行を手前から奥へ回る。**
-   その行を控えの画布に描き、手前までに描いた形で隠れる分を落とし、
-   蓄積の下へ敷く。最後にその行の形を隠す側へ足す。
-   自分の行の形で自分を消さないよう、足すのは敷いたあと */
-
-/* 1行ぶん。描く → 手前までの形で隠れる分を落とす → 蓄積の下へ敷く →
-   その行の形を隠す側へ足す。**足すのは敷いたあと。**
-   自分の行の形で自分を消してしまわないため */
 
 
 /* いまの倍率とずらしで、km を画面の位置へ移す係数を出す。
@@ -2256,9 +2235,6 @@ function mountainSil(c,px,py,rad){
           fr:[apexX+(rn(3)-0.5)*w*0.30, base+rad*ys*0.12],
           half:sil.findIndex(p=>p[0]===apexX&&p[1]===apexY)};
 }
-/* 稜線をいまの path へ足す。塗りにもマスクにも同じ形を使う */
-
-
 /* 色を明るくしたり暗くしたり */
 const shade=(hex,f)=>{
   const n=parseInt(hex.slice(1),16), cl=v=>Math.round(Math.max(0,Math.min(255,v*f)));
@@ -2326,48 +2302,6 @@ function drawCells(){
   perf("frame",ms); perfFrames++; if(ms>16.7)perfSlow++;
   drawPerf();
 }
-
-/* ------------------------------------------------------------
-   1層目・2層目を焼く
-   ------------------------------------------------------------
-   **焼く範囲は画面のまわりだけ。盤面全体ではない。**
-   全体を覆う作りだと、面積が倍率の2乗で膨らむ。狭い盤でも升の半径が
-   大きくなると一辺が焼ける限度を超え、そこから先は毎フレーム全部を
-   塗り直すことになる。**寄せて遊ぶときこそ重い。**
-
-   画面＋前後 TER_MARGIN 画面ぶんを焼けば、大きさは倍率にも盤の広さにも
-   左右されない。パンして余白の端に近づいたときだけ焼き直す。
-   ------------------------------------------------------------ */
-
-
-/* ------------------------------------------------------------
-   分けて焼く
-   ------------------------------------------------------------
-   一度に焼くと15〜40msかかり、そのフレームが落ちる。**裏の画布へ
-   行を少しずつ焼き、焼き上がってから表と入れ替える。**
-   焼いているあいだは表を貼り続けるので絵が途切れない。
-
-   **形（maskRows）も同じ組で持ち、同時に入れ替える。** 別々に
-   入れ替えると、上の層が新しい形で古い地形を削り、建築物が消える。
-
-   **段の途中で置き場所を読み直してはいけない。** 焼いているあいだも
-   指は動くので、段ごとに今の位置を読むと帯ごとにずれた絵になる。
-   焼き始めた時点の原点を凍結して使う。
-   ------------------------------------------------------------ */
-
-
-/* ------------------------------------------------------------
-   1フレームぶん進める。焼き上がったら表と入れ替える。
-
-   **持ち時間を渡す。** 段を1つ進めるごとに時計を見て、使い切ったら
-   そこで止める。**引きずっているあいだは持ち時間を短くする。**
-   絵が仕上がるのが遅れても、指の追従を妨げないほうを取る。
-   ------------------------------------------------------------ */
-
-
-/* 升1つぶん。崖を立ててから面を塗り、同じ形をマスクへ控える */
-
-
 
 /* ------------------------------------------------------------
    表の一覧
@@ -3668,9 +3602,6 @@ function drawObject(key,make,px,py,rad,th,snow=0){
     if(rad>4&&!f.smooth){ctx.strokeStyle=OBJ_EDGE;ctx.lineWidth=lw;ctx.stroke();}
   }
 }
-/* 行ごとの置物。地形・河川・街道・山のあとに呼ぶ */
-/* --- ユニットのアニメーション。2フレームを全ユニット一斉に切り替える。
-       構造物と地形はそのままなので、毎拍で描き直すのはユニットの層だけ --- */
 
 /* 焼いた絵の覚え書き。倍率は段で丸めて、段ごとに1枚だけ焼く */
 const TEX_STEPS=[6,9,13.5,20,30,45,68,102,153];
@@ -3730,16 +3661,6 @@ function texOf(key,make,th,rad,snow=0){
   while(texCache.size>TEX_KEEP) texCache.delete(texCache.keys().next().value);
   return t;
 }
-/* 焼いたものを現在の倍率へ縮小して貼る */
-function blitObject(key,make,th,px,py,rad,snow=0){
-  const t=texOf(key,make,th,rad,snow);
-  if(!t){drawObject(key,make,px,py,rad,th,snow);return;}
-  const k=rad/t.step;
-  ctx.drawImage(t.cvs,0,0,t.cvs.width,t.cvs.height,
-    px+t.e.x0*rad-t.pad*k, py+t.e.y0*rad-t.pad*k, t.w*k, t.h*k);
-}
-
-
 /* 升に載っているユニットのうち、先頭の1つ。無ければ null */
 const unitAtCell=id=>{
   const p=playCells[id-1]; if(!p||p.group==="-")return null;
@@ -3766,28 +3687,6 @@ const objectAtCell=id=>{
   const p=playCells[id-1]; if(!p||p.object==="-")return null;
   return byId(playObjects,p.object)??null;
 };
-
-/* ------------------------------------------------------------
-   3層目・4層目も焼いて貼る
-   ------------------------------------------------------------
-   **建築物は動かない。ユニットも拍のときしか変わらない。**
-   倍率と向きが同じあいだは中身が変わらないので、地形と同じ窓へ焼いて
-   おき、パンでは貼る位置をずらすだけにする。
-
-   焼く原点は**地形と同じ**。同じずらしで貼れば、地形とマスクと置物が
-   必ず同じ座標に載る。
-   ------------------------------------------------------------ */
-/* ------------------------------------------------------------
-   3層目・4層目 ── 建築物とユニット
-   ------------------------------------------------------------
-   **行を手前から奥へ回る。** 各行を控えの画布に描き、手前までの
-   地形の形（occ）で隠れる分を落としてから、蓄積の下へ敷く。
-   ユニットは地形に加えて**手前の建築物**にも隠れる。
-
-   地形の形は1層目が焼いたときに行ごとに控えてある（maskRows）。
-   焼いた画布の座標なので、貼るときと同じずらしと拡大を掛けて使う。
-   ------------------------------------------------------------ */
-
 
 /* ============================================================
    手番
@@ -5912,7 +5811,18 @@ function snowMix(rgbv,v){
           Math.round(rgbv[2]+(255-rgbv[2])*t),255];
 }
 
+/* ------------------------------------------------------------
+   **組み直しは何フレームかに分けて行う。** 二百万の三角形を一息に組むと、雪の月替わりや
+   治水のたびに盤が1〜3秒止まる。行ごとに手を離せる作りにし（`glBuildMeshGen`）、
+   描く側が1フレームの持ち時間ぶんだけ進めて、組み上がるまでは前の三角形を貼り続ける
+   （§10.2「読み込みの遅さは問題にしない。指の追従だけを守る」）。
+   一息に組みたいとき（最初の1回・ヘッドレス）は `glBuildMesh` が最後まで回す */
 function glBuildMesh(){
+  const gen=glBuildMeshGen(); let st=gen.next();
+  while(!st.done)st=gen.next();
+  return st.value;
+}
+function* glBuildMeshGen(){
   const P0=drawPlace(), sRef=P0.s, ys=P0.ys, obl=P0.obl;
   const rad=R*sRef*1.02;                         /* 2D と同じ。継ぎ目を消すぶん */
   const color=new Map(BASE_TERRAIN.map(t=>[t.id,t.color]));
@@ -5967,28 +5877,77 @@ function glBuildMesh(){
     ln.cells.forEach((cid,i)=>{ if(!cid)return;
       (riv.get(cid)||riv.set(cid,[]).get(cid)).push({ln,node:off+2*i}); }); }
   const lc=new Map(), runs=[];
+  /* 一巡め：節点と幅を整える。
+     **支流は、ほかの川と升を分け合い始めた所で切る**（§10.15）。盤のデータでは支流が合流の升で
+     切れておらず、本流の升を数升なぞってから終わる。そのまま引くと帯が二重になり、端が本流を
+     突き抜ける。本流は「そこから先の升が多いほう」（同じなら海へ注ぐほう）。
+     **湖のそばから始まる川と、海や湖へ注ぐ川は、水の升の中心まで帯を伸ばす。** 岸の升で切ると、
+     持ち上がった湖の岸の壁の手前で川が途切れる */
+  const pre=new Map();
+  const waterNear=(x,y)=>{
+    const r0=Math.round(y/ROWH), q0=Math.round(x/COLW-((r0&1)?0.5:0));
+    let wc=null,wd=1e9;
+    const look=(q,r)=>{const c=cellRow.get((cellOf(q,r)||{}).id); if(!c||!c.wet)return;
+      const dd=(c.x-x)**2+(c.y-y)**2; if(dd<wd){wd=dd;wc=c;}};
+    look(q0,r0); for(const [dq,dr] of DIR6[r0&1])look(q0+dq,r0+dr);
+    return wc;
+  };
   for(const ln of playLines){
-    const nd=ln.nodes, N=nd.length; if(N<2)continue;
-    const Pp=nd.map(n=>{const g=ln.type===3||ln.type===4?surfG(n):n.g;
-      return [n.x*sRef, (n.y*ys)*sRef-g*sRef];});
-    const wid=widOf.get(ln);
-    /* **支流は本流の岸で止める**（§10.15）。合流の升の中心まで帯を張ると、
-       支流の端が本流の向こう岸へ突き抜ける。本流のその升での幅に合わせて細め、
-       端を本流の半幅ぶん手前へ引く */
-    if(ln.type===3&&ln.cells&&N>2){
-      const last=ln.cells[ln.cells.length-1];
-      const main=(riv.get(last)||[]).find(e=>e.ln!==ln);
-      if(main){
-        const mw=widOf.get(main.ln)[Math.min(main.node,main.ln.nodes.length-1)];
-        wid[N-1]=Math.min(wid[N-1],mw); wid[N-2]=Math.min(wid[N-2],mw);
-        const a=Pp[N-2], b=Pp[N-1], dx=b[0]-a[0], dy=b[1]-a[1], d=Math.hypot(dx,dy)||1;
-        const back=Math.min(d*0.9, mw*sRef/2);
-        Pp[N-1]=[b[0]-dx/d*back, b[1]-dy/d*back];
+    const nd0=ln.nodes, N0=nd0.length; if(N0<2)continue;
+    let nd=nd0.slice(), wid=widOf.get(ln).slice(), shift=0, trib=null;
+    if(ln.type===3&&ln.cells){
+      const off=ln.src?2:0;
+      for(let i=0;i<ln.cells.length;i++){
+        const cid=ln.cells[i]; if(!cid)continue;
+        const es=riv.get(cid)||[];
+        for(const e of es){
+          if(e.ln===ln||!e.ln.cells)continue;
+          /* 本流は升の多い（長い）ほう。同じなら海へ注ぐほう、それも同じなら番号の若いほう。
+             「そこから先の升」で比べると、河口まで並んで流れる二本のうち、本流のほうが
+             切られることがある（利根川と渡良瀬川）*/
+          const nO=e.ln.cells.length, nMe=ln.cells.length;
+          const main=nO>nMe||(nO===nMe&&((e.ln.dst!=="-"&&ln.dst==="-")||e.ln.id<ln.id));
+          if(!main)continue;
+          const cut=Math.min(nd.length-1,off+2*i);
+          nd=nd.slice(0,cut+1); wid=wid.slice(0,cut+1); trib=e.ln; break;
+        }
+        if(trib)break;
       }
     }
+    if(ln.type===3&&!trib&&ln.dst!=="-"&&nd.length>=2){   /* 注ぐ先の水の升まで */
+      const a=nd[nd.length-2], b=nd[nd.length-1], dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
+      const wc=waterNear(b.x+dx/d*R*0.9, b.y+dy/d*R*0.9);
+      if(wc){ nd.push({x:wc.x, y:wc.y, g:wc.g, water:true}); wid.push(wid[wid.length-1]); }
+    }
+    if(ln.type===3&&!ln.src&&nd.length>=2){                /* 湖のそばから始まる川 */
+      const a=nd[1], b=nd[0], dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
+      const wc=waterNear(b.x+dx/d*R*0.9, b.y+dy/d*R*0.9);
+      if(wc&&wc.type===T_LAKE){ nd.unshift({x:wc.x, y:wc.y, g:wc.g, water:true}); wid.unshift(wid[0]); shift=1; }
+    }
+    const N=nd.length;
+    const Pp=nd.map(n=>{const g=n.water?n.g:(ln.type===3||ln.type===4?surfG(n):n.g);
+      return [n.x*sRef, (n.y*ys)*sRef-g*sRef];});
     /* **川は曲線に開く**（§13）。街道は節点の `br`（橋）を添字で引くので折れ線のまま */
-    let P=Pp, I=null, Nn=N;
-    if(ln.type===3){ const sm=glSmooth(Pp,3); P=sm.P; I=sm.I; Nn=P.length; }
+    let P=Pp, I=null;
+    if(ln.type===3){ const sm=glSmooth(Pp,3); P=sm.P; I=sm.I; }
+    pre.set(ln,{nd,N,wid,P,I,shift,trib});
+  }
+  /* 二巡め：**支流の端は本流の流れの線の上に置く**（§10.15）。開いた本流の曲線は升の中心を
+     通らないので、中心へ向けて張ると端が届かなかったり突き抜けたりする。
+     本流の曲線のいちばん近い点を端にし、幅は本流のその場の幅に収める。端には継ぎ手を置く */
+  for(const ln of playLines){
+    const me=pre.get(ln); if(!me||!me.trib||me.N<3)continue;
+    const mp=pre.get(me.trib); if(!mp)continue;
+    const e=me.P[me.P.length-1];
+    let bi=0,bd=1e9;
+    for(let k=0;k<mp.P.length;k++){const d=(mp.P[k][0]-e[0])**2+(mp.P[k][1]-e[1])**2; if(d<bd){bd=d;bi=k;}}
+    const mwid=mp.I?(()=>{const f=mp.I[bi],i=Math.floor(f),t=f-i; return i+1<mp.N?mp.wid[i]*(1-t)+mp.wid[i+1]*t:mp.wid[i];})():mp.wid[bi];
+    me.P[me.P.length-1]=[mp.P[bi][0],mp.P[bi][1]];
+    me.wid[me.N-1]=Math.min(me.wid[me.N-1],mwid); me.wid[me.N-2]=Math.min(me.wid[me.N-2],mwid);
+  }
+  for(const ln of playLines){
+    const me=pre.get(ln); if(!me)continue;
+    const {nd,N,wid,P,I}=me, Nn=P.length;
     const widAt=k=>{ if(!I)return wid[k]; const f=I[k], i=Math.floor(f), t=f-i;
       return i+1<N?wid[i]*(1-t)+wid[i+1]*t:wid[i]; };
     const yWorld=k=>I?(()=>{const f=I[k],i=Math.floor(f),t=f-i; return i+1<N?nd[i].y*(1-t)+nd[i+1].y*t:nd[i].y;})():nd[k].y;
@@ -6007,7 +5966,7 @@ function glBuildMesh(){
     const at=t=>[Math.round(LAKE_RGB[0]+(dst[0]-LAKE_RGB[0])*t),
                  Math.round(LAKE_RGB[1]+(dst[1]-LAKE_RGB[1])*t),
                  Math.round(LAKE_RGB[2]+(dst[2]-LAKE_RGB[2])*t),255];
-    lc.set(ln,{P,L,Rt,at,N:Nn,I,hw:k=>widAt(k)*sRef/2,nx:k=>NX[k],ny:k=>NY[k],tOf:k=>(I?I[k]:k)/(N-1)});
+    lc.set(ln,{P,L,Rt,at,N:Nn,I,shift:me.shift,hw:k=>widAt(k)*sRef/2,nx:k=>NX[k],ny:k=>NY[k],tOf:k=>(I?I[k]:k)/(N-1)});
     const rowOf=y=>Math.max(0,Math.min(cellSpan.r1-cellSpan.r0,
       Math.round(y/ROWH)-cellSpan.r0));
     const segRow=j=>Math.max(rowOf(yWorld(j)),rowOf(yWorld(j+1)));
@@ -6028,7 +5987,9 @@ function glBuildMesh(){
        持ち主の無い国と国の外の陸は薄い灰色、山地は濃い灰色、海は濃紺、湖沼は明るい青。
        升の縁（グリッド）は描く。山・川・街道・建築物・ユニットは描かない。拠点には ★ と家の名を出す（`drawMapLabels`）*/
     const kix=runKuniIndex(), dix=runDomainIndex();
+    let nTop=0;
     for(const c of drawCache){                   /* 升。陰影を掛けない */
+      if(++nTop%4096===0)yield;
       const cx=c.x*sRef, cy=c.y*sRef, q=[];
       for(let i=0;i<6;i++){const a=Math.PI/180*(60*i-90);
         q.push(W([cx+rad*Math.cos(a), cy+rad*Math.sin(a)]));}
@@ -6058,6 +6019,7 @@ function glBuildMesh(){
 
   /* --- 一の巻き。地形だけを行の順に積む --- */
   for(let r=0;r<span;r++){
+    yield;
     const row=glRows[r]; const start=M.n;
     let ymin=1e9,ymax=-1e9;
     M.z=zOf(r);
@@ -6098,10 +6060,14 @@ function glBuildMesh(){
           if(rad<LOD_TONGUE){
             M.quad(W(A),W(B),W(B2),W(A2),glShade("#6b4a30",c.sh)); continue;
           }
+          /* **まず落差ぶんの壁を一枚張る。** 舌は壁の下へ垂らすだけにする。
+             舌の長さを落差より短くも振っていたため、舌の底と水面のあいだに
+             盤の外の色が覗く小さな穴が開いていた（崖の内角で目立つ）*/
+          M.quad(W(A),W(B),W(B2),W(A2),glShade("#6b4a30",c.sh*0.92));
           const N2=5,L2=(Q,S,t)=>[Q[0]+(S[0]-Q[0])*t,Q[1]+(S[1]-Q[1])*t];
           for(let k=0;k<N2;k++){                  /* 断面を舌のように垂らす */
             const t0=k/N2,t1=(k+1)/N2;
-            const jj=0.88+0.55*rnd3(c.q,c.r,i*11+k);
+            const jj=1.0+0.50*rnd3(c.q,c.r,i*11+k);
             const tA=L2(A,B,t0),tB=L2(A,B,t1),bA=L2(A2,B2,t0),bB=L2(A2,B2,t1);
             const mA=[tA[0]+(bA[0]-tA[0])*jj,tA[1]+(bA[1]-tA[1])*jj];
             const mB=[tB[0]+(bB[0]-tB[0])*jj,tB[1]+(bB[1]-tB[1])*jj];
@@ -6218,6 +6184,7 @@ function glBuildMesh(){
 
   /* --- 二の巻き。効果を行の順に積む --- */
   for(let r=0;r<span;r++){
+    if(r%4===3)yield;
     const row=glRows[r]; const start=M.n;
     /* **奥行きは自分の行のまま**（§10.3）。1行ぶん手前で積むと、
        真後ろの行の川や街道が手前の行の山の上に乗る */
@@ -6248,8 +6215,8 @@ function glBuildMesh(){
                  W([p1[0]-nx*h1,p1[1]-ny*h1]),W([p0[0]-nx*h0,p0[1]-ny*h0]),
                  c0,c1,c1,c0);
         }
-        for(let j=a;j<=b;j++){                     /* 継ぎ手。地面に寝かせた楕円 */
-          if(j===0||j===C.N-1)continue;
+        for(let j=a;j<=b;j++){                     /* 継ぎ手。地面に寝かせた楕円。端にも置く */
+
           const p=C.P[j], h=C.hw(j), ring=[];
           for(let i=0;i<=8;i++){const t=i/8*Math.PI*2;
             ring.push(W([p[0]+Math.cos(t)*h, p[1]+Math.sin(t)*h*ys]));}
@@ -6265,9 +6232,10 @@ function glBuildMesh(){
           const C=lc.get(e.ln); if(!C)continue;
           /* 節点の番号は元の並び。開いた並びでは、その範囲に当たる点を取る */
           let a,b;
-          if(C.I){ a=C.I.findIndex(f=>f>=e.node-1); b=C.I.findLastIndex(f=>f<=e.node+1);
+          const nn=e.node+(C.shift||0);
+          if(C.I){ a=C.I.findIndex(f=>f>=nn-1); b=C.I.findLastIndex(f=>f<=nn+1);
                    if(a<0)a=0; if(b<0)b=C.N-1; }
-          else { a=Math.max(0,e.node-1); b=Math.min(C.N-1,e.node+1); }
+          else { a=Math.max(0,nn-1); b=Math.min(C.N-1,nn+1); }
           if(b<=a)continue;
           /* **合流点では、相手の川筋に掛かる岸を落とす。** そのまま引くと
              片方の堤がもう片方の水面を横切る。落とした所で折れ線を切る */
@@ -6627,13 +6595,22 @@ function glRender(w,h,dpr){
   const lod=(R*P.s*1.02<LOD_TONGUE?"t":"")+(R*P.s*1.02<LOD_BAND?"b":"");
   const sig=lod+","+view.cam+","+playLandStamp+(view.cam==="top"?","+playStamp:"");
   if(sig!==G.sig||!G.mesh){
-    const a=performance.now();
-    G.mesh=glBuildMesh(); G.sig=sig;
-    perf("組み直し",performance.now()-a); perfBakes++;
-    g.bindBuffer(g.ARRAY_BUFFER,G.bPos);
-    g.bufferData(g.ARRAY_BUFFER,G.mesh.pos,g.STATIC_DRAW);
-    g.bindBuffer(g.ARRAY_BUFFER,G.bCol);
-    g.bufferData(g.ARRAY_BUFFER,G.mesh.col,g.STATIC_DRAW);
+    /* **前の三角形があるなら、分けて組む。** 1フレームの持ち時間（引きずっている間は短く）だけ
+       進め、組み上がったら差し替える。無いなら（最初の1回）一息に組む */
+    if(!G.build||G.build.sig!==sig){
+      G.build={sig, gen:glBuildMeshGen(), t0:performance.now()};
+    }
+    const B=G.build, budget=G.mesh?(dragAt?4:12):Infinity, a=performance.now();
+    let st;
+    do{ st=B.gen.next(); }while(!st.done&&performance.now()-a<budget);
+    if(st.done){
+      G.mesh=st.value; G.sig=sig; G.build=null;
+      perf("組み直し",performance.now()-B.t0); perfBakes++;
+      g.bindBuffer(g.ARRAY_BUFFER,G.bPos);
+      g.bufferData(g.ARRAY_BUFFER,G.mesh.pos,g.STATIC_DRAW);
+      g.bindBuffer(g.ARRAY_BUFFER,G.bCol);
+      g.bufferData(g.ARRAY_BUFFER,G.mesh.col,g.STATIC_DRAW);
+    }else queueDraw();                            /* 続きは次のフレームで */
   }
   /* 置物とユニットの並びは、盤面が変わるたびに作り直す。三角形は触らない */
   const spSig=view.z+","+view.cam+","+playStamp;
@@ -14469,6 +14446,50 @@ function runDelPower(id){
   return true;
 }
 
+/* 新しい武将の番号（テーブルID 18）。**後の世代の武将の番号は取っておく**（§19.8）。
+   次の番号は進行プレイデータが持ち、無ければ表と後の世代の最大から始める */
+function runNextBushouId(){
+  const g=playProgress[0];
+  if(!(g.bushouNext>0))g.bushouNext=Math.max(0,...playBushou.map(x=>x.id),...LATER_BUSHOU.map(x=>x.id))+1;
+  return g.bushouNext++;
+}
+
+/* ------------------------------------------------------------
+   ユニットの行の骨組み（テーブルID 9）
+   ------------------------------------------------------------
+   **欄はここ一か所で持つ**（§1.6・§30.1）。隊を足す道は4つある（城から出す・
+   浪人が立つ・独立勢力が旗を挙げる・一揆が起きる）が、どれもこの骨組みを使う。
+   欄を足すときはここへ足す。別々に書くと、保存した束に欄が現れたり消えたりする */
+function runUnitRow(f){
+  return {
+    id    : idTake(unitIds),
+    label : f.label,
+    type  : mkLink(5,f.type,"label"),
+    state : f.state,
+    power : f.power?mkLink(15,f.power,"label"):"-",
+    bushou: mkLink(18,f.bushou,"name"),
+    q     : mkLink(6,f.cell,"q"),
+    r     : mkLink(6,f.cell,"r"),
+    dir   : f.dir??"-",
+    hei   : f.hei||0,
+    hyoro : f.hyoro||0,                          /* 軍勢は出すときに城の兵糧を分けて持つ（§21.3）*/
+    kane  : 0,
+    sonae : f.sonae||[],                         /* 備えを立てるのは軍勢だけ（§26.5）*/
+    /* 抱えている普請と占拠（§24.6・§27.7）、成った印、待ち */
+    work : null, occ : null, done : null, wait : 0,
+    rest2: false,                                /* 支城で立て直している最中か（§27.4）*/
+    uma:0, teppo:0, toSite:null, toUnit:null, toMan:null,   /* 輸送の荷と行き先（§27.2）*/
+    haichi: null, haichiMan: false, jin: null,   /* 備えの席と陣立て（§31.3）*/
+    mission: null,                               /* 軍勢を出した目的（§32.3）*/
+    aim  : f.aim??null,                          /* 浪人の行き先（§19.2）*/
+    /* 援軍の請われた城・城へ帰る印・常駐する支城・混乱の解ける月・囲みの升・支城を築く升 */
+    aid  : null, back: false, toFort: null, konranTo: 0, ring: null, fortAim: null,
+    camp : null,                                 /* 前の月に立っていた升（§26.3）*/
+    exit : f.exit??null,                         /* 城から出た升と月（§25.3）*/
+    link:[],
+  };
+}
+
 /* ------------------------------------------------------------
    ユニット（テーブルID 9）とユニットグループ（テーブルID 10）
    ------------------------------------------------------------
@@ -14626,18 +14647,9 @@ function runRoninOut(bushouId,cell){
   }
   if(put===null)return null;
   const g=runGroupAt(put); if(!g)return null;
-  const row={
-    id:idTake(unitIds), label:"浪人 "+b.name, type:mkLink(5,tb.id,"label"),
-    state:stt==="sui"?"sui":"idou", power:"-", bushou:mkLink(18,bushouId,"name"),
-    q:mkLink(6,put,"q"), r:mkLink(6,put,"r"), dir:"-",
-    hei:0, hyoro:0, kane:0, sonae:[], work:null, occ:null, done:null, wait:0,
-    rest2:false, uma:0, teppo:0, toSite:null, toUnit:null, toMan:null,
-    haichi:null, haichiMan:false, jin:null, camp:null,
-    /* **盤に出た升と月**（依頼）。出たその月は歩かない（`runRoninTick`）*/
-    exit:{cell:put, at:runMonthKey()},
-    aim:null,                                    /* 行き先。{kind:"town"|"site", cell, site} */
-    link:[],
-  };
+  /* `exit`：盤に出た升と月（依頼）。出たその月は歩かない（`runRoninTick`）。`aim`：行き先 {kind:"town"|"site", cell, site} */
+  const row=runUnitRow({label:"浪人 "+b.name, type:tb.id, state:stt==="sui"?"sui":"idou",
+    power:null, bushou:bushouId, cell:put, exit:{cell:put, at:runMonthKey()}});
   playUnits.push(row);
   g.units.push(row.id); g.unitNum=g.units.length;
   playStamp++;
@@ -14724,15 +14736,8 @@ function runRaiseDokuritsu(u,cell){
   b.rank=mkLink(22,7,"label");                   /* 侍頭から */
   runDelUnit(u.id);
   const g=runGroupAt(cell); if(!g)return false;
-  const row={
-    id:idTake(unitIds), label:"独立勢力 "+myoji+"氏", type:mkLink(5,tb.id,"label"),
-    state:"sagyo", power:mkLink(15,id,"label"), bushou:mkLink(18,bid,"name"),
-    q:mkLink(6,cell,"q"), r:mkLink(6,cell,"r"), dir:"-",
-    hei:RONIN_FLAG_HEI, hyoro:0, kane:0, sonae:runSonaeFlat(RONIN_FLAG_HEI),
-    work:null, occ:null, done:null, wait:0, rest2:false,
-    uma:0, teppo:0, toSite:null, toUnit:null, toMan:null,
-    haichi:null, haichiMan:false, jin:null, camp:null, exit:null, aim:null, link:[],
-  };
+  const row=runUnitRow({label:"独立勢力 "+myoji+"氏", type:tb.id, state:"sagyo", power:id, bushou:bid,
+    cell, hei:RONIN_FLAG_HEI, sonae:runSonaeFlat(RONIN_FLAG_HEI)});
   playUnits.push(row); g.units.push(row.id); g.unitNum=g.units.length;
   runTell(b.name+"、支城にて旗を挙ぐ","家名",cell);
   playStamp++;
@@ -14869,8 +14874,7 @@ function runIkkiRise(siteId){
   const heiTop=IKKI_HEI[Math.max(0,Math.min(IKKI_HEI.length-1,Math.floor((st.junno||0)/10)))];
   const hei=IKKI_HEI_STEP*(1+Math.floor(runRand()*(heiTop/IKKI_HEI_STEP)));
   const name=runIkkiName(ezo);
-  if(!(g.bushouNext>0))g.bushouNext=Math.max(0,...playBushou.map(x=>x.id),...LATER_BUSHOU.map(x=>x.id))+1;
-  const bid=g.bushouNext++;
+  const bid=runNextBushouId();
   const id=runNewPowerId();
   playPowers.push({id, kind:"ikki", label:kind, toushu:mkLink(18,bid,"name"),
                    group:mkLink(19,id,"bushouNum"), colorUp:IKKI_COLOR, colorLow:IKKI_COLOR});
@@ -14883,16 +14887,9 @@ function runIkkiRise(siteId){
     ninja:false, rest:0, nou:sk(), shou:sk(), ken:sk(), tou:sk(), ...tekiOf(name,se), kunkou:0});
   playBushouGroups.push({id, bushouNum:1, bushou:[bid]});
   const gc=runGroupAt(cell); if(!gc)return null;
-  const row={
-    id:idTake(unitIds), label:kind+" "+name, type:mkLink(5,tb.id,"label"),
-    state:"sagyo", power:mkLink(15,id,"label"), bushou:mkLink(18,bid,"name"),
-    q:mkLink(6,cell,"q"), r:mkLink(6,cell,"r"), dir:"-",
-    hei, hyoro:eatOf(hei)*12, kane:0, sonae:runSonaeFlat(hei),
-    work:null, occ:null, done:null, wait:0, rest2:false,
-    uma:0, teppo:0, toSite:null, toUnit:null, toMan:null,
-    haichi:null, haichiMan:false, jin:null, camp:null, exit:null, aim:null, link:[],
-    ikki:siteId,
-  };
+  const row=runUnitRow({label:kind+" "+name, type:tb.id, state:"sagyo", power:id, bushou:bid,
+    cell, hei, hyoro:eatOf(hei)*12, sonae:runSonaeFlat(hei)});
+  row.ikki=siteId;                               /* 一揆の隊だけが持つ欄（§21.4）*/
   playUnits.push(row); gc.units.push(row.id); gc.unitNum=gc.units.length;
   runTell(st.name+"の領内で"+kind+"（"+name+"・兵"+hei+"）","一揆",cell);
   playStamp++;
@@ -15275,9 +15272,7 @@ function runHireWeak(siteId){
     if(!runNameTaken(n)){name=n;break;}
   }
   if(!name)return null;
-  /* **後の世代の武将の番号は取っておく**（§19.8）*/
-  if(!(g.bushouNext>0))g.bushouNext=Math.max(0,...playBushou.map(x=>x.id),...LATER_BUSHOU.map(x=>x.id))+1;
-  const id=g.bushouNext++;
+  const id=runNextBushouId();
   const se=Math.floor(runRand()*(HIRE_ABILITY_MAX+1));
   const sk=()=>1+Math.floor(runRand()*HIRE_SKILL_MAX);
   const row={id, name, myoji:"", shozoku:mkLink(15,owner,"label"), since:runNowMonthNo(), chusei:CHUSEI_HIRE,
@@ -18102,60 +18097,13 @@ function runAddUnit({type,site,bushou,cell,dir="-",state,keep}){
     if(hei<IKUSA_MIN)return null;                /* 連れる兵が足りない */
     st.hei-=hei;
   }
-  const row={
-    id    : idTake(unitIds),
-    label : (pw?pw.label+" ":"")+(tb?tb.label:""),
-    type  : mkLink(5,type,"label"),
-    state : stt,
-    power : pw?mkLink(15,power,"label"):"-",
-    bushou: mkLink(18,bushou,"name"),
-    q     : mkLink(6,target,"q"),
-    r     : mkLink(6,target,"r"),
-    dir,
-    hei,
-    /* **軍勢を出すときは、城の兵糧を分けて持たせる**（§21.3）。
-       持たせなければ、出た翌月には食う物が無い。
-       兵の数に応じて `MARCH_MONTHS` か月ぶん。城に無ければあるだけ */
-    hyoro:0, kane:0,
-    /* **備えを立てるのは軍勢だけ**（§26.5）。ほかの隊は兵を連れない */
-    /* **軍勢を出すときだけ蔵を食う**（§27.5）。連れ出した馬と鉄砲は城から出る。
-       城が自分で立てる備え（攻城の守り）は、蔵の物をそのまま使うので減らさない */
+  const row=runUnitRow({
+    label:(pw?pw.label+" ":"")+(tb?tb.label:""), type, state:stt, power:pw?power:null, bushou,
+    cell:target, dir, hei,
+    /* **軍勢を出すときだけ蔵を食う**（§27.5）。連れ出した馬と鉄砲は城から出る */
     sonae: hei>0?runSonaeOf(site,hei,true,stt==="sui"):[],
-    /* **抱えている普請と占拠**（§24.6・§27.7）。**行に欄として持つ。**
-       後から生やすと、保存した束に欄が現れたり消えたりする（§30.1）*/
-    work : null,
-    occ  : null,
-    done : null,
-    wait : 0,
-    /* **支城で立て直している最中か**（依頼・§27.4）。
-       戻りきるまでは支城を出ない */
-    rest2: false,
-    /* **輸送の荷と行き先**（依頼・§27.2）。馬と鉄砲も荷になる。
-       `toUnit` は届ける軍勢の番号、`toMan` はその軍勢を率いる武将（番号は
-       使い回されるので、両方で確かめる）。`toSite` は届ける城 */
-    uma:0, teppo:0, toSite:null, toUnit:null, toMan:null,
-    /* **備えの席**（依頼・§31.3）。陣立ての席の番を備えの順に並べたもの。
-       `haichiMan` は人が決めた印で、NPC の籤はこれを触らない。**席は非公開** */
-    haichi: null,
-    haichiMan: false,
-    /* **席の陣立て**（依頼・§31.3）。敵の向きが読めないときは四方（9）。
-       null なら兵科で決まる（`jinPick`）。席（`haichi`）はこの陣立ての席の番である */
-    jin  : null,
-    /* **軍勢を出した目的**（依頼・§32.3）。"siege"（城攻め）・"raid"（狼藉）・
-       "fort"（支城確保）・"guard"（追い払い）。null は目的を持たない（人の隊など）*/
-    mission: null,
-    aim  : null,                                 /* 浪人の行き先（§19.2）。ほかは null */
-    /* 援軍の請われた城・城へ帰る印・常駐する支城・混乱の解ける月・囲みの升・支城を築く升（§28.1・§32.3・§27.4）*/
-    aid  : null, back: false, toFort: null, konranTo: 0, ring: null, fortAim: null,
-    /* **前の月に立っていた升**（§26.3）。城攻めは、城の隣に着いた月には
-       始められない。着いてから1月かけて陣を敷く。
-       出したばかりの隊は前の月の升を持たないので、`null` にする */
-    camp : null,
-    /* **城から出た升と月**（依頼・§25.3）。城から隣の升へ出るのも1升の移動で、
-       その升の踏み代を持ち分から引く。出た升に立っているその月だけ効く */
     exit : {cell:target, at:runMonthKey()},
-    link:[],
-  };
+  });
   if(hei>0&&st){
     const want=eatOf(hei)*MARCH_MONTHS;
     const give=Math.min(want,st.hyoro);
