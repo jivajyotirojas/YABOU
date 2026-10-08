@@ -1,0 +1,59 @@
+# 版の印（タグ）とリリースを付ける。
+# main の sengoku_v7.html が変わるたびに、その VERSION の印がまだ無ければ v主版.副版.修正 の印を付け、
+# 前の印からの PR をまとめたリリースノートを作る。手で動かすとき（workflow_dispatch）は版とコミットを指定できる。
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [sengoku_v7.html]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版（例 8.2.0）。空なら sengoku_v7.html の VERSION"
+        required: false
+      sha:
+        description: "印を付けるコミット。空なら main の先頭"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 版を決める
+        id: ver
+        run: |
+          SHA="${{ inputs.sha }}"
+          [ -z "$SHA" ] && SHA=$(git rev-parse HEAD)
+          V="${{ inputs.version }}"
+          [ -z "$V" ] && V=$(git show "$SHA:sengoku_v7.html" | grep -oE 'const VERSION="[0-9.]+"' | grep -oE '[0-9.]+')
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "v$V" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "v$V はもうある"
+          fi
+
+      - name: 印を付けてリリースを作る
+        if: steps.ver.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          SHA: ${{ steps.ver.outputs.sha }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$SHA" -m "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" --target "$SHA" --title "$TAG" --generate-notes
