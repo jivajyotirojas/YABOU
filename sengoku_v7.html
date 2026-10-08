@@ -5950,9 +5950,28 @@ function* glBuildMeshGen(){
         if(best){ nd.push({x:best.c.x, y:best.c.y, g:best.c.g}); wid.push(wid[wid.length-1]); trib=best.ln; }
       }
     }
-    if(ln.type===3&&!trib&&nd.length>=2){                  /* 終点の先の水の升まで */
-      const wa=waterAhead(nd);
-      if(wa){ if(wa.drop){nd.pop(); wid.pop();} nd.push({x:wa.c.x, y:wa.c.y, g:wa.c.g, water:true}); wid.push(wid[wid.length-1]); }
+    /* **水へ入る所は、いちばん手前の升から真っ直ぐ入る。** 川の終わりの節点は、岸の升を
+       一つ経由してから水へ入る形（鬼怒川は河口の升へ下りてから湖へ戻る）になっていて、
+       そのまま結ぶと河口の手前でヘアピンになる。終わりの3升のうち、水の升に隣り合っていて
+       そこへ向かう折れが 90 度未満のいちばん手前の節点で切り、水の升の中心へ繋ぐ。
+       終点が陸なら、先（2升以内）の水の升を同じやり方で繋ぐ（鵡川・大野川） */
+    if(ln.type===3&&!trib&&nd.length>=2){
+      const cellAtNode=n=>cellNear(n.x,n.y);
+      let W=null;
+      const lc0=cellAtNode(nd[nd.length-1]); const lr0=lc0&&cellRow.get(lc0.id);
+      if(lr0&&lr0.wet){ W=lr0; while(nd.length>2&&(cellAtNode(nd[nd.length-1])||{}).id===W.id){nd.pop();wid.pop();} }
+      else { const wa=waterAhead(nd); if(wa){ if(wa.drop){nd.pop();wid.pop();} W=wa.c; } }
+      if(W){
+        let kk=nd.length-1;
+        for(let k=Math.max(1,nd.length-6);k<nd.length;k++){
+          const c=cellAtNode(nd[k]); if(!c||hexSteps(c.q,c.r,W.q,W.r)>1)continue;
+          const a=nd[k-1],b=nd[k], ux=b.x-a.x,uy=b.y-a.y,vx=W.x-b.x,vy=W.y-b.y;
+          const cos=(ux*vx+uy*vy)/((Math.hypot(ux,uy)*Math.hypot(vx,vy))||1);
+          if(cos>0){kk=k;break;}
+        }
+        nd=nd.slice(0,kk+1); wid=wid.slice(0,kk+1);
+        nd.push({x:W.x,y:W.y,g:W.g,water:true}); wid.push(wid[wid.length-1]);
+      }
     }
     if(ln.type===3&&!ln.src&&nd.length>=2){                /* 湖のそばから始まる川 */
       const rev=nd.slice().reverse(); const wa=waterAhead(rev);
@@ -5977,6 +5996,8 @@ function* glBuildMeshGen(){
     const e=me.P[me.P.length-1];
     let bi=0,bd=1e9;
     for(let k=0;k<mp.P.length;k++){const d=(mp.P[k][0]-e[0])**2+(mp.P[k][1]-e[1])**2; if(d<bd){bd=d;bi=k;}}
+    /* **本流の始まりに注ぐなら、本流の始点へ繋ぐ**（姫川の上流→下流）。脇へ寄せると Z 字の継ぎ目になる */
+    if(bi<=3)bi=0;
     /* **本流は合流から先、支流より細くならない。** 千曲川が注ぐ所から始まる信濃川は、
        始点の幅（いちばん細い）のままでは太い川が急に細くなる */
     const jn=Math.min(mp.N-1,Math.ceil(mp.I?mp.I[bi]:bi)), tw=me.wid[me.N-2];
