@@ -794,7 +794,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.2.0";
+const VERSION="8.2.1";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -5911,9 +5911,46 @@ function* glBuildMeshGen(){
     if(w1&&w1.cos>-0.2)return {c:w1.c,drop:0};
     return null;
   };
+  /* **並んで流れるだけの川は、くっつけて描かない**（§10.15）。渡良瀬川と利根川、鬼怒川と常陸川は
+     どちらも自力で海（湖）へ出る別の川だが、盤のデータでは数升を共有する。中心の節点をそのまま結ぶと
+     帯が重なり、合流して別れるように見える。**共有する升では、両方の節点を流れの軸と直角に、
+     それぞれ自分の側へ寄せる。** 自分の側は、共有区間へ入る前と出た後の節点が軸のどちら側にあるかで決める
+     （北から来て東へ抜ける川は北東側、西から来て南へ抜ける川は南西側）。寄せる幅は升の半径の 0.55 倍で（画面では縦が `ys` 倍に潰れ、曲線に開くとさらに寄るので、中心線の間隔は 1R ほどになる）、
+     帯の半幅（0.3R まで）を足しても升の内径（0.87R）にほぼ収まる。区間の両隣の節点は 2/3・1/3 と減らしながら寄せて、折れを和らげる */
+  const sideShift=new Map();                         /* ln → Map(節点番号 → [dx,dy]) */
+  {
+    const SH=R*0.55, SHY=SH*Math.min(1.4,1/ys);     /* 縦は画面で `ys` 倍に潰れるぶん大きく寄せる */
+    for(const ln of playLines){
+      if(ln.type!==3||!ln.cells||ln.dst==="-")continue;
+      const off=ln.src?2:0, nd0=ln.nodes;
+      let i=0;
+      while(i<ln.cells.length){
+        const other=(riv.get(ln.cells[i])||[]).find(e=>e.ln!==ln&&e.ln.cells&&e.ln.dst!=="-");
+        if(!other){i++;continue;}
+        let j=i; while(j+1<ln.cells.length&&(riv.get(ln.cells[j+1])||[]).some(e=>e.ln===other.ln))j++;
+        /* 区間 i..j の軸。1升だけなら前後の節点で向きを取る */
+        const nA=nd0[Math.min(nd0.length-1,off+2*i)], nB=nd0[Math.min(nd0.length-1,off+2*j)];
+        let ax=nB.x-nA.x, ay=nB.y-nA.y;
+        if(j===i){ const p=nd0[Math.max(0,off+2*i-1)], q=nd0[Math.min(nd0.length-1,off+2*i+1)]; ax=q.x-p.x; ay=q.y-p.y; }
+        const al=Math.hypot(ax,ay)||1; ax/=al; ay/=al;
+        const nx=-ay, ny=ax;                           /* 軸の左手 */
+        const sideOf=n=>{ const ex=n.x-nA.x, ey=n.y-nA.y; const c=ex*nx+ey*ny; return Math.abs(c)<R*0.2?0:Math.sign(c); };
+        const kIn=off+2*i-2, kOut=off+2*j+2;
+        let side=(kIn>=0?sideOf(nd0[kIn]):0)+(kOut<nd0.length?sideOf(nd0[kOut]):0);
+        if(side===0)side=ln.id<other.ln.id?1:-1;      /* 軸の上を出入りする川は番号で決める */
+        side=Math.sign(side);
+        const m=sideShift.get(ln)||sideShift.set(ln,new Map()).get(ln);
+        const put=(k,f)=>{ if(k<0||k>=nd0.length||m.has(k))return; m.set(k,[nx*SH*f*side, ny*SHY*f*side]); };
+        for(let k=off+2*i;k<=off+2*j;k++)put(k,1);
+        put(off+2*i-1,2/3); put(off+2*i-2,1/3); put(off+2*j+1,2/3); put(off+2*j+2,1/3);
+        i=j+1;
+      }
+    }
+  }
   for(const ln of playLines){
     const nd0=ln.nodes, N0=nd0.length; if(N0<2)continue;
     let nd=nd0.slice(), wid=widOf.get(ln).slice(), shift=0, trib=null;
+    { const m=sideShift.get(ln); if(m)for(const [k,[dx,dy]] of m)nd[k]={...nd[k],x:nd[k].x+dx,y:nd[k].y+dy}; }
     if(ln.type===3&&ln.cells&&ln.dst==="-"){
       const off=ln.src?2:0;
       for(let i=0;i<ln.cells.length;i++){
