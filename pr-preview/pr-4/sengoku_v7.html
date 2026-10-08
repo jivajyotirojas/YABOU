@@ -5878,35 +5878,52 @@ function* glBuildMeshGen(){
       (riv.get(cid)||riv.set(cid,[]).get(cid)).push({ln,node:off+2*i}); }); }
   const lc=new Map(), runs=[];
   /* 一巡め：節点と幅を整える。
-     **支流は、ほかの川と升を分け合い始めた所で切る**（§10.15）。盤のデータでは支流が合流の升で
-     切れておらず、本流の升を数升なぞってから終わる。そのまま引くと帯が二重になり、端が本流を
-     突き抜ける。本流は「そこから先の升が多いほう」（同じなら海へ注ぐほう）。
-     **湖のそばから始まる川と、海や湖へ注ぐ川は、水の升の中心まで帯を伸ばす。** 岸の升で切ると、
-     持ち上がった湖の岸の壁の手前で川が途切れる */
+     **川はどこかから海へ流れる。** 海や湖へ注ぐ川（`dst` のある川）は、どこで何と並んでも
+     **切らない**。渡良瀬川と利根川、常陸川と鬼怒川は、二升ほど並んで流れてからまた分かれ、
+     それぞれの河口へ出る。長さで切ると、河口の側が丸ごと消える。
+     **切るのは、ほかの川に注いで終わる川（`dst` の無い川）だけ**（§10.15）。盤のデータでは
+     その支流が合流の升で切れておらず、本流の升を数升なぞったり、脇で菱形を描いたりしてから
+     終わる（只見川・入間川）。ほかの川の升に初めて触れた所で切り、端を本流の線に乗せる。
+     **終点のすぐ先が水の升なら、その中心まで帯を伸ばす。** 岸の升で切ると、持ち上がった湖の
+     岸の壁の手前で川が途切れる。湖のそばから始まる川も同じ */
   const pre=new Map();
-  const waterNear=(x,y)=>{
-    const r0=Math.round(y/ROWH), q0=Math.round(x/COLW-((r0&1)?0.5:0));
-    let wc=null,wd=1e9;
-    const look=(q,r)=>{const c=cellRow.get((cellOf(q,r)||{}).id); if(!c||!c.wet)return;
-      const dd=(c.x-x)**2+(c.y-y)**2; if(dd<wd){wd=dd;wc=c;}};
-    look(q0,r0); for(const [dq,dr] of DIR6[r0&1])look(q0+dq,r0+dr);
-    return wc;
+  const cellNear=(x,y)=>{const r0=Math.round(y/ROWH), q0=Math.round(x/COLW-((r0&1)?0.5:0)); return cellOf(q0,r0);};
+  /* 終点の先の水の升。**流れの向きにいちばん沿う升を取る。** 2升先まで見る（大野川は海の2升手前で
+     終わっている）。終点の一つ手前の升のほうが向きに沿う水の升を持つなら、終点を捨ててそちらから
+     伸ばす（鬼怒川の河口が折り返しになっていた）*/
+  const waterAhead=(nd)=>{
+    const N=nd.length; if(N<2)return null;
+    const pick=(a,b)=>{                            /* a→b の向きで b から見た水の升と、向きのずれ */
+      const dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
+      const c0=cellNear(b.x,b.y); if(!c0)return null;
+      let best=null,bs=-2;
+      for(const c of hexWithin(c0.q,c0.r,2)){
+        const cr=cellRow.get(c.id); if(!cr||!cr.wet||c.id===c0.id)continue;
+        const ex=cr.x-b.x, ey=cr.y-b.y, el=Math.hypot(ex,ey)||1;
+        const cos=(ex*dx+ey*dy)/(el*d)-0.08*(el/COLW);  /* 向きの一致。遠いぶん少し割り引く */
+        if(cos>bs){bs=cos;best=cr;}
+      }
+      return best?{c:best,cos:bs}:null;
+    };
+    const w1=pick(nd[N-2],nd[N-1]);
+    const w2=N>=3?pick(nd[N-3],nd[N-2]):null;
+    if(w2&&(!w1||w1.cos<0.3)&&w2.cos>w1?.cos+0.2)return {c:w2.c,drop:1};
+    if(w1&&w1.cos>-0.2)return {c:w1.c,drop:0};
+    return null;
   };
   for(const ln of playLines){
     const nd0=ln.nodes, N0=nd0.length; if(N0<2)continue;
     let nd=nd0.slice(), wid=widOf.get(ln).slice(), shift=0, trib=null;
-    if(ln.type===3&&ln.cells){
+    if(ln.type===3&&ln.cells&&ln.dst==="-"){
       const off=ln.src?2:0;
       for(let i=0;i<ln.cells.length;i++){
         const cid=ln.cells[i]; if(!cid)continue;
         const es=riv.get(cid)||[];
         for(const e of es){
           if(e.ln===ln||!e.ln.cells)continue;
-          /* 本流は升の多い（長い）ほう。同じなら海へ注ぐほう、それも同じなら番号の若いほう。
-             「そこから先の升」で比べると、河口まで並んで流れる二本のうち、本流のほうが
-             切られることがある（利根川と渡良瀬川）*/
+          /* 本流は、海へ注ぐ川か、同じく注がない川なら升の多い（長い）ほう。同じなら番号の若いほう */
           const nO=e.ln.cells.length, nMe=ln.cells.length;
-          const main=nO>nMe||(nO===nMe&&((e.ln.dst!=="-"&&ln.dst==="-")||e.ln.id<ln.id));
+          const main=e.ln.dst!=="-"||nO>nMe||(nO===nMe&&e.ln.id<ln.id);
           if(!main)continue;
           const cut=Math.min(nd.length-1,off+2*i);
           nd=nd.slice(0,cut+1); wid=wid.slice(0,cut+1); trib=e.ln; break;
@@ -5914,15 +5931,51 @@ function* glBuildMeshGen(){
         if(trib)break;
       }
     }
-    if(ln.type===3&&!trib&&ln.dst!=="-"&&nd.length>=2){   /* 注ぐ先の水の升まで */
-      const a=nd[nd.length-2], b=nd[nd.length-1], dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
-      const wc=waterNear(b.x+dx/d*R*0.9, b.y+dy/d*R*0.9);
-      if(wc){ nd.push({x:wc.x, y:wc.y, g:wc.g, water:true}); wid.push(wid[wid.length-1]); }
+    /* **升を共有していなくても、終点の近く（3升以内）にほかの川があれば、そこへ注ぐ**（§10.15）。
+       千曲川は信濃川の2升手前で、姫川の上流は下流の1升手前で終わっている。
+       支流→本流→海の鎖が切れていては、川がどこへ流れるのか分からない */
+    if(ln.type===3&&ln.cells&&ln.dst==="-"&&!trib){
+      const last=cellRow.get(ln.cells[ln.cells.length-1]);
+      if(last){
+        let best=null,bd=1e9;
+        for(const c of hexWithin(last.q,last.r,3)){
+          for(const e of (riv.get(c.id)||[])){
+            if(e.ln===ln||!e.ln.cells)continue;
+            const nO=e.ln.cells.length, nMe=ln.cells.length;
+            if(!(e.ln.dst!=="-"||nO>nMe||(nO===nMe&&e.ln.id<ln.id)))continue;
+            const cr=cellRow.get(c.id); const d=(cr.x-last.x)**2+(cr.y-last.y)**2;
+            if(d<bd){bd=d;best={ln:e.ln,c:cr};}
+          }
+        }
+        if(best){ nd.push({x:best.c.x, y:best.c.y, g:best.c.g}); wid.push(wid[wid.length-1]); trib=best.ln; }
+      }
+    }
+    /* **水へ入る所は、いちばん手前の升から真っ直ぐ入る。** 川の終わりの節点は、岸の升を
+       一つ経由してから水へ入る形（鬼怒川は河口の升へ下りてから湖へ戻る）になっていて、
+       そのまま結ぶと河口の手前でヘアピンになる。終わりの3升のうち、水の升に隣り合っていて
+       そこへ向かう折れが 90 度未満のいちばん手前の節点で切り、水の升の中心へ繋ぐ。
+       終点が陸なら、先（2升以内）の水の升を同じやり方で繋ぐ（鵡川・大野川） */
+    if(ln.type===3&&!trib&&nd.length>=2){
+      const cellAtNode=n=>cellNear(n.x,n.y);
+      let W=null;
+      const lc0=cellAtNode(nd[nd.length-1]); const lr0=lc0&&cellRow.get(lc0.id);
+      if(lr0&&lr0.wet){ W=lr0; while(nd.length>2&&(cellAtNode(nd[nd.length-1])||{}).id===W.id){nd.pop();wid.pop();} }
+      else { const wa=waterAhead(nd); if(wa){ if(wa.drop){nd.pop();wid.pop();} W=wa.c; } }
+      if(W){
+        let kk=nd.length-1;
+        for(let k=Math.max(1,nd.length-6);k<nd.length;k++){
+          const c=cellAtNode(nd[k]); if(!c||hexSteps(c.q,c.r,W.q,W.r)>1)continue;
+          const a=nd[k-1],b=nd[k], ux=b.x-a.x,uy=b.y-a.y,vx=W.x-b.x,vy=W.y-b.y;
+          const cos=(ux*vx+uy*vy)/((Math.hypot(ux,uy)*Math.hypot(vx,vy))||1);
+          if(cos>0){kk=k;break;}
+        }
+        nd=nd.slice(0,kk+1); wid=wid.slice(0,kk+1);
+        nd.push({x:W.x,y:W.y,g:W.g,water:true}); wid.push(wid[wid.length-1]);
+      }
     }
     if(ln.type===3&&!ln.src&&nd.length>=2){                /* 湖のそばから始まる川 */
-      const a=nd[1], b=nd[0], dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||1;
-      const wc=waterNear(b.x+dx/d*R*0.9, b.y+dy/d*R*0.9);
-      if(wc&&wc.type===T_LAKE){ nd.unshift({x:wc.x, y:wc.y, g:wc.g, water:true}); wid.unshift(wid[0]); shift=1; }
+      const rev=nd.slice().reverse(); const wa=waterAhead(rev);
+      if(wa&&wa.c.type===T_LAKE&&!wa.drop){ nd.unshift({x:wa.c.x, y:wa.c.y, g:wa.c.g, water:true}); wid.unshift(wid[0]); shift=1; }
     }
     const N=nd.length;
     const Pp=nd.map(n=>{const g=n.water?n.g:(ln.type===3||ln.type===4?surfG(n):n.g);
@@ -5935,17 +5988,29 @@ function* glBuildMeshGen(){
   /* 二巡め：**支流の端は本流の流れの線の上に置く**（§10.15）。開いた本流の曲線は升の中心を
      通らないので、中心へ向けて張ると端が届かなかったり突き抜けたりする。
      本流の曲線のいちばん近い点を端にし、幅は本流のその場の幅に収める。端には継ぎ手を置く */
-  for(const ln of playLines){
+  /* 深い支流から順に。支流が本流を太らせ、その本流がさらに先の本流を太らせる（奈良井川→犀川→千曲川→信濃川）*/
+  const depth0=ln=>{let d=0,cur=pre.get(ln); while(cur&&cur.trib&&d<16){d++; cur=pre.get(cur.trib);} return d;};
+  for(const ln of playLines.slice().sort((a,b)=>depth0(b)-depth0(a))){
     const me=pre.get(ln); if(!me||!me.trib||me.N<3)continue;
     const mp=pre.get(me.trib); if(!mp)continue;
     const e=me.P[me.P.length-1];
     let bi=0,bd=1e9;
     for(let k=0;k<mp.P.length;k++){const d=(mp.P[k][0]-e[0])**2+(mp.P[k][1]-e[1])**2; if(d<bd){bd=d;bi=k;}}
+    /* **本流の始まりに注ぐなら、本流の始点へ繋ぐ**（姫川の上流→下流）。脇へ寄せると Z 字の継ぎ目になる */
+    if(bi<=3)bi=0;
+    /* **本流は合流から先、支流より細くならない。** 千曲川が注ぐ所から始まる信濃川は、
+       始点の幅（いちばん細い）のままでは太い川が急に細くなる */
+    const jn=Math.min(mp.N-1,Math.ceil(mp.I?mp.I[bi]:bi)), tw=me.wid[me.N-2];
+    for(let k=jn;k<mp.N;k++)if(mp.wid[k]<tw)mp.wid[k]=tw;
     const mwid=mp.I?(()=>{const f=mp.I[bi],i=Math.floor(f),t=f-i; return i+1<mp.N?mp.wid[i]*(1-t)+mp.wid[i+1]*t:mp.wid[i];})():mp.wid[bi];
     me.P[me.P.length-1]=[mp.P[bi][0],mp.P[bi][1]];
     me.wid[me.N-1]=Math.min(me.wid[me.N-1],mwid); me.wid[me.N-2]=Math.min(me.wid[me.N-2],mwid);
+    /* **支流の下流の色は、注ぐ先の本流のその場の色**。湖の色のまま濃い本流に突き当たると段が出る */
+    me.endCol={ln:me.trib, t:(mp.I?mp.I[bi]:bi)/(mp.N-1)};
   }
-  for(const ln of playLines){
+  /* 本流を先に、支流を後に。支流の下流の色は本流の色から取るので、本流が先に要る */
+  const depthOf=ln=>{let d=0,cur=pre.get(ln); while(cur&&cur.trib&&d<16){d++; cur=pre.get(cur.trib);} return d;};
+  for(const ln of playLines.slice().sort((a,b)=>depthOf(a)-depthOf(b))){
     const me=pre.get(ln); if(!me)continue;
     const {nd,N,wid,P,I}=me, Nn=P.length;
     const widAt=k=>{ if(!I)return wid[k]; const f=I[k], i=Math.floor(f), t=f-i;
@@ -5962,7 +6027,8 @@ function* glBuildMeshGen(){
       L.push([P[k][0]+nx*hw,P[k][1]+ny*hw]);
       Rt.push([P[k][0]-nx*hw,P[k][1]-ny*hw]);
     }
-    const dst=ln.dst==="-"?LAKE_RGB:hex2rgb(color.get(ln.dst)||"#33719a");
+    let dst=ln.dst==="-"?LAKE_RGB:hex2rgb(color.get(ln.dst)||"#33719a");
+    if(me.endCol){ const C0=lc.get(me.endCol.ln); if(C0)dst=C0.at(me.endCol.t).slice(0,3); }
     const at=t=>[Math.round(LAKE_RGB[0]+(dst[0]-LAKE_RGB[0])*t),
                  Math.round(LAKE_RGB[1]+(dst[1]-LAKE_RGB[1])*t),
                  Math.round(LAKE_RGB[2]+(dst[2]-LAKE_RGB[2])*t),255];
@@ -6498,13 +6564,13 @@ function glCreate(){
     precision mediump float; in vec4 vCol; out vec4 o;
     void main(){ o=vCol; }`);
   const pTex=link(`#version 300 es
-    in vec2 aPos; in vec2 aUV;
-    uniform vec2 uRes; uniform vec2 uOff; uniform float uS; uniform float uZ;
+    in vec3 aPos; in vec2 aUV;
+    uniform vec2 uRes; uniform vec2 uOff; uniform float uS;
     out vec2 vUV;
     void main(){
-      vec2 p=aPos*uS+uOff;
+      vec2 p=aPos.xy*uS+uOff;
       vec2 n=p/uRes*2.0-1.0;
-      gl_Position=vec4(n.x,-n.y,uZ,1.0);
+      gl_Position=vec4(n.x,-n.y,aPos.z,1.0);   /* 奥行きは板ごとに持つ（行で決まる）*/
       vUV=aUV;
     }`,`#version 300 es
     precision mediump float; in vec2 vUV; uniform sampler2D uTex; out vec4 o;
@@ -6529,8 +6595,8 @@ function glCreate(){
   const bQuad=g.createBuffer();
   g.bindBuffer(g.ARRAY_BUFFER,bQuad);
   const lp=g.getAttribLocation(pTex,"aPos"), lu=g.getAttribLocation(pTex,"aUV");
-  g.enableVertexAttribArray(lp); g.vertexAttribPointer(lp,2,g.FLOAT,false,16,0);
-  g.enableVertexAttribArray(lu); g.vertexAttribPointer(lu,2,g.FLOAT,false,16,8);
+  g.enableVertexAttribArray(lp); g.vertexAttribPointer(lp,3,g.FLOAT,false,20,0);
+  g.enableVertexAttribArray(lu); g.vertexAttribPointer(lu,2,g.FLOAT,false,20,12);
   g.bindVertexArray(null);
 
   const vaoX=g.createVertexArray(); g.bindVertexArray(vaoX);
@@ -6550,9 +6616,9 @@ function glCreate(){
     uF:{res:g.getUniformLocation(pFlat,"uRes"),off:g.getUniformLocation(pFlat,"uOff"),
         s:g.getUniformLocation(pFlat,"uS")},
     uT:{res:g.getUniformLocation(pTex,"uRes"),off:g.getUniformLocation(pTex,"uOff"),
-        s:g.getUniformLocation(pTex,"uS"),z:g.getUniformLocation(pTex,"uZ")},
+        s:g.getUniformLocation(pTex,"uS")},
     mesh:null, sig:"", fx:null, fxSig:"", fxN:0, fxUnder:0,
-    tex:new Map(), quad:new Float32Array(16)};
+    tex:new Map(), batch:new Map(), quad:new Float32Array(30)};
 }
 
 /* 型録の絵を GL の絵札にする。中身は canvas 2D で焼いたものをそのまま使う */
@@ -6671,6 +6737,14 @@ function glRender(w,h,dpr){
   if(rad>=TEX_MIN){
     g.useProgram(G.pTex); g.bindVertexArray(G.vaoT);
     g.uniform2f(G.uT.res,w,h); g.uniform2f(G.uT.off,ox,oy); g.uniform1f(G.uT.s,S);
+    /* ------------------------------------------------------------
+       **同じ絵札の板はまとめて1回で貼る。** 板を1枚ずつ `bufferData` と `drawArrays` で
+       貼ると、寄せた盤で建物が数百あるとき、描画命令がそのぶん積み上がって
+       引きずりのフレームが重くなる。絵札（型録の焼き）ごとに板の頂点を集め、
+       絵札の数だけ描く。奥行きは板の頂点に持つ（行で決まる）ので、行をまたいで
+       まとめても重なりは深さ緩衝が作る（§10.3）
+       ------------------------------------------------------------ */
+    const batch=G.batch; batch.clear();
     const put=(o,key,make,z)=>{
       const th=o.dir==="-"?OBJ_TH:dirTh(o.dir);
       const t=texOf(key,make,th,rad,o.sn||0); if(!t)return;
@@ -6678,14 +6752,17 @@ function glRender(w,h,dpr){
       const x0=o.x+t.e.x0*R-t.pad*kk, y0=o.y+t.e.y0*R-t.pad*kk;
       const x1=x0+t.w*kk, y1=y0+t.h*kk;
       if(x1*S+ox<-4||x0*S+ox>w+4||y1*S+oy<-4||y0*S+oy>h+4)return;
-      const q=G.quad;
-      q[0]=x0;q[1]=y0;q[2]=0;q[3]=0;   q[4]=x1;q[5]=y0;q[6]=1;q[7]=0;
-      q[8]=x0;q[9]=y1;q[10]=0;q[11]=1; q[12]=x1;q[13]=y1;q[14]=1;q[15]=1;
-      g.uniform1f(G.uT.z,z);
-      g.bindBuffer(g.ARRAY_BUFFER,G.bQuad);
-      g.bufferData(g.ARRAY_BUFFER,q,g.DYNAMIC_DRAW);
-      g.bindTexture(g.TEXTURE_2D,glTex(t));
-      g.drawArrays(g.TRIANGLE_STRIP,0,4); calls++;
+      let b=batch.get(t); if(!b){b={t,v:[]}; batch.set(t,b);}
+      b.v.push(x0,y0,z,0,0, x1,y0,z,1,0, x0,y1,z,0,1,  x1,y0,z,1,0, x1,y1,z,1,1, x0,y1,z,0,1);
+    };
+    const flush=()=>{
+      for(const b of batch.values()){
+        g.bindBuffer(g.ARRAY_BUFFER,G.bQuad);
+        g.bufferData(g.ARRAY_BUFFER,new Float32Array(b.v),g.DYNAMIC_DRAW);
+        g.bindTexture(g.TEXTURE_2D,glTex(b.t));
+        g.drawArrays(g.TRIANGLES,0,b.v.length/5); calls++;
+      }
+      batch.clear();
     };
     g.depthMask(true);                            /* 三 建築物。奥行きを書く */
     /* 上から見る盤（国の色分けの図）では建築物を描かない（依頼）*/
@@ -6696,6 +6773,7 @@ function glRender(w,h,dpr){
          使い回され、向きを変えても絵が直らない。** 焼くときの傾きは鍵の外にある */
       for(const o of sp)put(o,"s:"+o.key+":"+o.dir,OBJECTS[o.key],z);
     }
+    flush();
     g.depthMask(false);                           /* 四 ユニット。書かない */
     /* 上から見る盤（国の色分けの図）ではユニットも描かない（依頼）*/
     if(view.cam!=="top")for(let r=0;r<Sp.units.length;r++){
@@ -6707,6 +6785,7 @@ function glRender(w,h,dpr){
                        ...hatenaSolids(u.dir==="-"?OBJ_TH:dirTh(u.dir),u.sui)]
                  :()=>UNITS[u.uk](uFrame,u.up,u.lo),z);
     }
+    flush();
   }
   /* 五 カーソルと、選ばせている升の白い丸。いちばん上に出す。深さは見ない */
   if(G.fxN>G.fxUnder){
@@ -14372,7 +14451,7 @@ function loadPlay(play){
   bushouGroupIds.free=[];
   playStamp++; playLandStamp++;
   indexCells();               /* 付属品の索引と盤の端を作り直す */
-  aiFieldCache.clear();       /* 道の覚えは前の盤のもの（§25.3）。バグ：読み込んでも古い隔たりを使っていた */
+  runFieldsDrop();       /* 道の覚えは前の盤のもの（§25.3）。バグ：読み込んでも古い隔たりを使っていた */
   /* **読み込みは盤を書き換えない**（依頼・§1.3）。飛び地の切り詰め・勲功の上限・大名の位の直しは
      月替わり（`runTurnNext`）で行い、始めの建物の寿命は最初の朽ち（`runWearTick`）で引く */
   drawCache=null;             /* 描く側の控えも作り直す */
@@ -15927,7 +16006,11 @@ function runInKuni(cellId,powerId){
 let kuniIndex=null, kuniStamp="";
 function runKuniIndex(){
   const sig=runOwnSig();
-  if(kuniStamp===sig&&kuniIndex)return kuniIndex;
+  if(kuniStamp===sig&&kuniIndex){
+    if(VERIFY){ const w=new Map(); for(const bs of BASE_SITES){const o=runSiteOwner(bs.id); if(!o)continue; const dom=BASE_CELLGROUPS[bs.domain-1]; if(!dom)continue; for(const id of dom.cells)if(!w.has(id))w.set(id,o);}
+      verifySame("runKuniIndex",[...kuniIndex].length+":"+[...kuniIndex].slice(0,50).join(","),[...w].length+":"+[...w].slice(0,50).join(",")); }
+    return kuniIndex;
+  }
   kuniIndex=new Map(); kuniStamp=sig;
   for(const bs of BASE_SITES){
     const o=runSiteOwner(bs.id); if(!o)continue;
@@ -16060,12 +16143,17 @@ const desertOf=(hei,hyoro)=>{
    **掛けてよいのは、プレイデータを書き換えず、籤も回さない関数だけ。**
    書き換える関数に掛けると、二度目から何も起きなくなる。籤を回す関数に
    掛けると、同じ問いに同じ答えしか出なくなる */
+/* **検査の目印**（作り手の道具）。真にすると、覚え書きと索引が返す答えを、
+   そのつど素朴に計算し直した答えと突き合わせ、食い違いを `VERIFY_BAD` に積む。
+   遊ぶときは偽。ヘッドレスの検査から立てる */
+let VERIFY=false; const VERIFY_BAD=[];
+const verifySame=(name,a,b)=>{ if(JSON.stringify(a)!==JSON.stringify(b)&&VERIFY_BAD.length<50)VERIFY_BAD.push(name+": "+JSON.stringify(a).slice(0,120)+" vs "+JSON.stringify(b).slice(0,120)); };
 function memoStamp(fn){
   let m=new Map(), st=-1;
   return function(a,b,c){
     if(st!==playStamp){m=new Map(); st=playStamp;}
     const k=c!==undefined?a+"|"+b+"|"+c:b!==undefined?a+"|"+b:a;
-    if(m.has(k))return m.get(k);
+    if(m.has(k)){ const v=m.get(k); if(VERIFY)verifySame(fn.name+"("+k+")",v,fn.call(this,a,b,c)); return v; }
     const v=fn.call(this,a,b,c); m.set(k,v); return v;
   };
 }
@@ -17405,7 +17493,7 @@ function runAddObject(cellId,label){
   playStamp++;
   /* **港が建てば水の道が繋がる**（§24.1）。踏み代が変わるので道の覚えを捨てる（§25.3）。
      バグ：港が建っても、覚えが入れ替わるまで水の隊はそこを通れなかった */
-  if(b.cat==="港")aiFieldCache.clear();
+  if(b.cat==="港")runFieldsDrop();
   return row;
 }
 
@@ -17424,9 +17512,12 @@ function runFushinIndex(){
   return fushinIndex;
 }
 function runFushinAt(cellId,exceptUnitId){
-  const a=runFushinIndex().get(cellId); if(!a)return null;
-  for(const u of a)if(exceptUnitId===undefined||u.id!==exceptUnitId)return u;
-  return null;
+  const a=runFushinIndex().get(cellId);
+  let got=null;
+  if(a)for(const u of a)if(exceptUnitId===undefined||u.id!==exceptUnitId){got=u;break;}
+  if(VERIFY){ let w=null; for(const u of playUnits){ if(u.state==="-"||!u.work)continue; if(exceptUnitId!==undefined&&u.id===exceptUnitId)continue; if(u.work.cell===cellId){w=u;break;} }
+    verifySame("runFushinAt("+cellId+")",got&&got.id,w&&w.id); }
+  return got;
 }
 
 /* 普請を進める（§24.6）。**抱えている隊が、その升に立っている月だけ進む。**
@@ -17557,11 +17648,18 @@ const ymAdd=(n)=>{const g=playProgress[0]; if(!g)return 0;
   return y*100+m;};
 
 /* 結ばれているか。**自分どうしは常に真**（同じ家は争わない）*/
+/* 同盟は家の組で引く。**表を舐めない。** 行を足す・消す所で索引を捨てる */
+let allyIndex=null;
 function runIsAlly(a,b){
   if(!a||!b)return false;
   if(a===b)return true;
-  return playAlliances.some(x=>
-    (x.a.id===a&&x.b.id===b)||(x.a.id===b&&x.b.id===a));
+  if(!allyIndex||allyIndex.rows!==playAlliances){
+    allyIndex=new Set(); allyIndex.rows=playAlliances;
+    for(const x of playAlliances)allyIndex.add(mindKey(x.a.id,x.b.id));
+  }
+  const v=allyIndex.has(mindKey(a,b));
+  if(VERIFY)verifySame("runIsAlly",v,playAlliances.some(x=>(x.a.id===a&&x.b.id===b)||(x.a.id===b&&x.b.id===a)));
+  return v;
 }
 
 /* 結ぶ。**期限つき**。同じ組が二重に並ばないようにする。
@@ -17574,14 +17672,14 @@ function runAddAlly(a,b,months,asked){
   const row={id:idTake(allyIds), a:mkLink(15,a,"label"), b:mkLink(15,b,"label"),
              until:ymAdd(months)};
   if(asked){ row.shiseiA="弱腰"; row.shiseiB="普通"; }
-  playAlliances.push(row);
+  playAlliances.push(row); allyIndex=null;
   playStamp++;
   return row;
 }
 
 function runDelAlly(id){
   const i=playAlliances.findIndex(x=>x.id===id); if(i<0)return false;
-  playAlliances.splice(i,1); idxDrop(playAlliances); idFree(allyIds,id);
+  playAlliances.splice(i,1); idxDrop(playAlliances); allyIndex=null; idFree(allyIds,id);
   playStamp++;
   return true;
 }
@@ -17690,8 +17788,18 @@ const MIND_ENVOY=15, MIND_TRY=0, MIND_HEAL=1;
    奪われたときの重さが違う */
 const MIND_TAKEN=20, MIND_TAKEN_KUNI=10;
 
-const findMind=(a,b)=>playMind.find(x=>
-  (x.a.id===a&&x.b.id===b)||(x.a.id===b&&x.b.id===a))||null;
+/* 友好の行は家の組で引く。**表を舐めない。** 行を足す・消す所で索引を捨てる */
+let mindIndex=null;
+const mindKey=(a,b)=>a<b?a*100000+b:b*100000+a;
+const findMind=(a,b)=>{
+  if(!mindIndex||mindIndex.rows!==playMind){
+    mindIndex=new Map(); mindIndex.rows=playMind;
+    for(const x of playMind)mindIndex.set(mindKey(x.a.id,x.b.id),x);
+  }
+  const v=mindIndex.get(mindKey(a,b))||null;
+  if(VERIFY)verifySame("findMind",v&&v.id,(playMind.find(x=>(x.a.id===a&&x.b.id===b)||(x.a.id===b&&x.b.id===a))||{}).id??null);
+  return v;
+};
 
 /* ------------------------------------------------------------
    所業ベースデータ（テーブルID 34）── 友好の下がり方（依頼・§32.2）
@@ -17837,7 +17945,7 @@ function runAddMind(a,b,n){
   if(!r){
     r={id:idTake(mindIds), a:mkLink(15,a,"label"), b:mkLink(15,b,"label"),
        mind:MIND_BASE};
-    playMind.push(r);
+    playMind.push(r); mindIndex=null;
   }
   r.mind=Math.max(MIND_MIN,Math.min(MIND_MAX,r.mind+n));
   playStamp++;
@@ -17863,7 +17971,7 @@ function runHealMind(){
       r.mind+=r.mind>MIND_BASE?-MIND_HEAL:MIND_HEAL;
     if(!live||r.mind===MIND_BASE){
       const i=playMind.indexOf(r);
-      if(i>=0){idFree(mindIds,r.id);playMind.splice(i,1); idxDrop(playMind);}
+      if(i>=0){idFree(mindIds,r.id);playMind.splice(i,1); idxDrop(playMind); mindIndex=null;}
     }
   }
   playStamp++;
@@ -18027,7 +18135,7 @@ function runSnowTick(month){
     const e=(pc.effect&~48)|snowBits(c,month,ox,oy)|(keep?(pc.effect&16):0);
     if(e!==pc.effect){pc.effect=e; n++;}
   }
-  if(n){ playStamp++; playLandStamp++; aiFieldCache.clear(); }
+  if(n){ playStamp++; playLandStamp++; runFieldsDrop(); }
   return n;
 }
 /* 月ごとの朽ち。**覚えが尽きた建築物の段が落ちる** */
@@ -19503,7 +19611,6 @@ function runBattleOpen(atkId,defId,siteId){
       if(o.state==="sui")continue;                 /* 水の上の隊は城攻めに加わらない（依頼）*/
       if(runKonranNow(o))continue;                 /* 混乱している軍勢も加わらない（依頼）*/
       if(runAIDist(o.q.id,bs.cell)!==1)continue;
-      if(!runCampReady(o))continue;                /* 着いた月には攻められない（§26.3）。二隊めも同じ */
       if(!a2||(o.hei||0)>(a2.hei||0))a2=o;
     }
     if(a2){
@@ -21071,6 +21178,7 @@ function runFreeBushou(bushouId,cell){
   runLeaveGroups(bushouId);
   b.site=mkLink(20,home.id,"name");
   runJoinGroups(bushouId,pid,home.id);
+  playStamp++;                      /* 詰め先が変わった（禄の計算・詰めの索引が読む）*/
   runPutIdou(bushouId,home.id,cell);
   return true;
 }
@@ -21615,7 +21723,7 @@ function runDelObject(cellId){
   playObjects.splice(i,1); idxDrop(playObjects);
   pc.object="-";
   playStamp++;
-  if(wasMinato)aiFieldCache.clear();           /* 港が消えれば水の道も切れる（§25.3）*/
+  if(wasMinato)runFieldsDrop();           /* 港が消えれば水の道も切れる（§25.3）*/
   return true;
 }
 
@@ -21852,7 +21960,7 @@ function runLevee(cellId){
   if(!(pc.effect&4)||(pc.effect&2))return false;  /* 川が無い／もう盛ってある */
   pc.effect|=2;
   /* 踏み代が変わるので、道の覚えを捨てる（§25.3）。バグ：夏に盛った土手が、覚えが入れ替わるまで道に効かなかった */
-  playStamp++; playLandStamp++; aiFieldCache.clear();
+  playStamp++; playLandStamp++; runFieldsDrop();
   return true;
 }
 /* **治水は4か月かかる仕事である**（依頼・§24.4）。ほかの普請と同じく、
@@ -22107,7 +22215,10 @@ function runIsFort(cellId){
 let fortIdsCat=null;
 let fortListMemo={stamp:-1, v:null};
 function runFortList(){
-  if(fortListMemo.stamp===playStamp)return fortListMemo.v;
+  if(fortListMemo.stamp===playStamp){
+    if(VERIFY){ const w=[]; for(const o of playObjects)if(isLink(o.label)&&fortIdsCat.has(o.label.id)&&isLink(o.q))w.push(o.q.id); verifySame("runFortList",fortListMemo.v,w); }
+    return fortListMemo.v;
+  }
   if(!fortIdsCat)fortIdsCat=new Set(BASE_OBJECTS.filter(b=>b.cat==="支城").map(b=>b.id));
   const out=[];
   for(const o of playObjects)if(isLink(o.label)&&fortIdsCat.has(o.label.id)&&isLink(o.q))out.push(o.q.id);
@@ -22720,6 +22831,7 @@ function runAbsorb(unitId,foeUnitId){
         +(runMind(mine,foe)-MIND_BASE)/120
         -runAbsorbFar(unitId,foeUnitId)));
   st.kane=Math.max(0,st.kane-Math.round(cost*0.2));   /* 話を持ちかけるだけで要る */
+  playStamp++;                                         /* 蔵が減った（俸禄不足の判じが読む）*/
   if(runRand()>odds){runAddMind(mine,foe,MIND_TRY);return {ok:false};}
   st.kane=Math.max(0,st.kane-Math.round(cost*0.8));
   /* **武将が家中に入る。** 詰め先は申し入れた隊の出た城 */
@@ -24021,7 +24133,10 @@ function runBuildRank(cat,cellId){
 const aiGoalMemo=new WeakMap();
 function runAIGoal(u){
   const hit=aiGoalMemo.get(u);
-  if(hit&&hit.stamp===playStamp&&hit.cell===u.q.id)return hit.goal;
+  if(hit&&hit.stamp===playStamp&&hit.cell===u.q.id){
+    if(VERIFY)verifySame("runAIGoal(u"+u.id+")",hit.goal,runAIGoal0(u));
+    return hit.goal;
+  }
   const goal=runAIGoal0(u);
   aiGoalMemo.set(u,{stamp:playStamp, cell:u.q.id, goal});
   return goal;
@@ -24429,7 +24544,7 @@ function runAIGoal0(u){
    行き先ごとに覚えておく。覚える数にも上限を置く。**踏み代が変わったら捨てる**
    （雪の印が変わった月・治水・読み込み）*/
 const AI_FIELD_MAX=2600;       // 1つの行き先で広げる升の数
-const AI_FIELD_KEEP=48;        // 覚えておく行き先の数
+const AI_FIELD_KEEP=256;       // 覚えておく行き先の数（場は 2600 升まで。隊の数ぶんあっても軽い）
 const aiFieldCache=new Map();
 /* `budget` は隊がひと月に踏める重さ。**これを越える升は通り道にしない。**
    重さ 6 の川は、渡れる升として数えると道が繋がってしまうが、
@@ -24455,6 +24570,32 @@ function runDokuDanger(){
   }
   return out;
 }
+/* ------------------------------------------------------------
+   踏み代の表と隣の表。**場を広げる内側では、関数を呼ばず配列を引く。**
+   `runStepCost` は升ごとに地形・港・雪・治水を見る問いで、場を広げるたびに
+   升×6回呼ぶと、そこだけで自動進行の3分の1を食っていた。
+   表は踏み代が変わるとき（`runFieldsDrop`）に捨てる。隣の表は盤に一度だけ作る
+   ------------------------------------------------------------ */
+let stepTable={sagyo:null, sui:null};
+let nb6Table=null, nb6Cells=null;
+function runNb6(){
+  if(nb6Table&&nb6Cells===BASE_CELLS)return nb6Table;
+  const n=BASE_CELLS.length, t=new Int32Array((n+1)*6);
+  for(const c of BASE_CELLS){
+    const D=DIR6[c.r&1];
+    for(let d=0;d<6;d++){const k=cellOf(c.q+D[d][0],c.r+D[d][1]); t[c.id*6+d]=k?k.id:0;}
+  }
+  nb6Table=t; nb6Cells=BASE_CELLS; return t;
+}
+function runStepTable(state){
+  let t=stepTable[state];
+  if(t&&t.length===BASE_CELLS.length+1)return t;
+  t=new Float64Array(BASE_CELLS.length+1);          /* 倍精度。単精度だと 1.2 が丸まり、場の値が元と食い違う */
+  for(const c of BASE_CELLS){const w=runStepCost(c.id,state); t[c.id]=isFinite(w)&&w>0?w:0;}
+  stepTable[state]=t; return t;
+}
+/* 道の覚えをぜんぶ捨てる。踏み代が変わったとき（雪・治水・港・読み込み。§25.3）*/
+function runFieldsDrop(){ aiFieldCache.clear(); stepTable={sagyo:null, sui:null}; }
 function runAIField(goal,budget,state,avoid){
   state=state==="sui"?"sui":"sagyo";
   /* 歩き代（`budget`）は場の中身に効かない（重さは踏み代のまま数える）ので鍵に入れない。
@@ -24479,12 +24620,12 @@ function runAIField(goal,budget,state,avoid){
         if(m===i)break; const t=hq[m];hq[m]=hq[i];hq[i]=t; const u=hd[m];hd[m]=hd[i];hd[i]=u; i=m;}}
     return [top,td];};
   let seen=1;
+  const NB=runNb6(), ST=runStepTable(state);
   while(hq.length&&seen<AI_FIELD_MAX){
     const [id,bv]=hpop();
     if(dist.get(id)!==bv)continue;                /* 古い札。もっと近い道で取り出し済み */
-    const c=BASE_CELLS[id-1]; if(!c)continue;
-    for(const [dq,dr] of DIR6[c.r&1]){
-      const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
+    for(let d=0;d<6;d++){
+      const nid=NB[id*6+d]; if(!nid)continue;
       /* ------------------------------------------------------------
          **どんなに重い升へも、一歩は踏み出せる**（依頼・§25.3）
          ------------------------------------------------------------
@@ -24503,13 +24644,36 @@ function runAIField(goal,budget,state,avoid){
          隊は手近な升を措いて川を渡りに行き、実測（12年）で
          **畑が165から87、村が141から56まで落ちた**
          ------------------------------------------------------------ */
-      const w=runStepCost(n.id,state)+(avoid&&avoid.has(n.id)&&n.id!==goal?DOKU_AVOID_COST:0);
-      if(!(w>0)||!isFinite(w))continue;
+      const w0=ST[nid]; if(!(w0>0))continue;
+      const w=w0+(avoid&&avoid.has(nid)&&nid!==goal?DOKU_AVOID_COST:0);
       const nd=bv+w;
-      const od=dist.get(n.id);
+      const od=dist.get(nid);
       if(od!==undefined&&od<=nd)continue;
       if(od===undefined)seen++;
-      dist.set(n.id,nd); hpush(n.id,nd);
+      dist.set(nid,nd); hpush(nid,nd);
+    }
+  }
+  if(VERIFY){                                    /* 元の素朴な広げ方と突き合わせる */
+    const d2=new Map([[goal,0]]); let front=[goal], seen2=1;
+    while(front.length&&seen2<AI_FIELD_MAX){
+      let bi=0,bv2=d2.get(front[0]);
+      for(let i=1;i<front.length;i++){const v=d2.get(front[i]); if(v<bv2){bv2=v;bi=i;}}
+      const id=front[bi]; front[bi]=front[front.length-1]; front.pop();
+      const c=BASE_CELLS[id-1]; if(!c)continue;
+      for(const [dq,dr] of DIR6[c.r&1]){
+        const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
+        const w=runStepCost(n.id,state)+(avoid&&avoid.has(n.id)&&n.id!==goal?DOKU_AVOID_COST:0);
+        if(!(w>0)||!isFinite(w))continue;
+        const nd=bv2+w;
+        if(d2.has(n.id)&&d2.get(n.id)<=nd)continue;
+        if(!d2.has(n.id))seen2++;
+        d2.set(n.id,nd); front.push(n.id);
+      }
+    }
+    /* 広げる数の上限に掛かった場では、取り出す順の違いで縁が少し違いうる。上限に掛からなかった場だけ厳密に比べる */
+    if(seen<AI_FIELD_MAX&&seen2<AI_FIELD_MAX){
+      let bad=0; for(const [k,v] of dist)if(Math.abs((d2.get(k)??-1)-v)>1e-9)bad++;
+      if(bad||dist.size!==d2.size)verifySame("runAIField("+key+")",dist.size+"/"+bad,d2.size+"/0");
     }
   }
   aiFieldCache.set(key,dist);
@@ -25902,6 +26066,28 @@ const runKaitaku=powerId=>{
    開拓88の家は25升先の更地まで見る */
 const runRuinFar=powerId=>
   Math.round(AI_RUIN_FAR*(0.5+runKaitaku(powerId)/100));
+/* **城の近くに、建築の隊が起こしに行ける更地があるか**（§21.1・§27.1）。
+   `runAIGoal0` の「無主の拠点を起こしに行く」段と同じ判じ（無主・`runRuinFar` 内・
+   陸の踏み代で城の門まで通じる）。建築の隊を出す門（`runAIGate`）と城の望み
+   （`runAIWant`）がこれを見る。
+   バグ（8.2.0）：建築の隊を出す門を「普請が残っている城」に絞ったとき、
+   領内に建てる升の尽きた城からは、港を建てる隊も更地を起こしに行く隊も
+   二度と出なくなっていた（旧版は耐久度が上限から 8 を割っていれば常に出せた）*/
+const runRuinNear=memoStamp(function runRuinNear0(siteId){
+  const pw=runSiteOwner(siteId); if(!pw)return false;
+  const hs=byId(playSites,siteId), hb=byId(BASE_SITES,siteId);
+  if(!hs||!hb||hs.taikyu<TAIKYU_URGENT)return false;
+  const gates=runGates(siteId); if(!gates.length)return false;
+  const far=runRuinFar(pw), budget=UNIT_MOVE["建築"]||6;
+  for(const st of playSites){
+    if(runSiteOwner(st.id))continue;
+    const bs=byId(BASE_SITES,st.id); if(!bs)continue;
+    if(runAIDist(hb.cell,bs.cell)>far)continue;
+    const f=runAIField(bs.cell,budget,"sagyo");
+    if(gates.some(g=>f.has(g)))return true;
+  }
+  return false;
+});
 
 /* よその家の軍勢が、自分の押さえている升に立っているか（§32.3）。
    **同盟の相手は数えない。** 通ってよいと約束したわけではないが、討ちはしない。
@@ -26815,6 +27001,9 @@ function runAIWant(siteId){
      バグ：耐久度が上限から 8 を割っただけで数えていたため、段の上限に届いた城からも
      建築の隊が毎月出て、出ては戻るを繰り返していた */
   if(!!st.fushin||runRepairTo(siteId)!==null)add("建築",AI_W_FUSHIN);
+  /* **港の建つ升か、起こしに行ける更地があるとき**も建築の隊に仕事がある
+     （§24.1・§21.1）。旧版は普請の重みが常に付いていたので、この二つの道が開いていた */
+  if(runAIMinatoWant(siteId)!==null||runRuinNear(siteId))add("建築",AI_W_FUSHIN);
   /* **指針の段ごとに目指す拠点の段に届いていなければ、普請を厚くする**（依頼）*/
   if(taikyuLevel(st.taikyu)<shiGoalLv(runAIShishin(siteId).id))add("建築",AI_W_FUSHIN_GOAL);
   /* **俸禄不足のときは、兵糧不足の農業と同じく商業の重みを上げる**（依頼）*/
@@ -27044,8 +27233,11 @@ function runAIGate(powerId){
       }
       /* **仕事の無い型は出さない**（依頼・§25.4）。
          城の普請が残っているなら、建築の隊には仕事がある（§27.1）*/
+      /* 築港（§24.1）と更地起こし（§21.1）も建築の隊の仕事。港適地は陸の仕事
+         （`runAIHasWork`）に数えられないので、ここで別に見る */
       if(AI_BUILD[t]&&!runAIHasWork(st.id,t)
-         &&!(t==="建築"&&(!!st.fushin||runRepairTo(st.id)!==null)))continue;
+         &&!(t==="建築"&&(!!st.fushin||runRepairTo(st.id)!==null
+                         ||minato!==null||runRuinNear(st.id))))continue;
       /* ------------------------------------------------------------
          **蔵の米で食えぬときは、総出で田畑を開く**（依頼・§32.7 段2）
          ------------------------------------------------------------
