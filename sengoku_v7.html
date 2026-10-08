@@ -795,7 +795,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.2.3";
+const VERSION="8.3.0";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -16737,8 +16737,9 @@ function runCarryPlan(siteId){
     return bd>=1e9?null:bd;
   };
   const myFoe=foeDist(bs.cell);
-  const bad=runIntruder(pw,null);
-  const trod=bad?runDomainOwnerSite(bad.q.id):null;
+  /* **踏まれている城はすべて届け先に数え、前線より先に選ぶ**（依頼・8.3.0・§27.2）。
+     8.2.3 までは最初に見つけた踏んだ隊の城だけだった */
+  const trodSet=runTrodSites(pw);
   let best=null,bv=0;
   /* 一 遠くに出た軍勢 */
   for(const o of playUnits){
@@ -16762,7 +16763,8 @@ function runCarryPlan(siteId){
     if(o.id===siteId||runSiteOwner(o.id)!==pw)continue;
     const ob=byId(BASE_SITES,o.id); if(!ob)continue;
     const d=foeDist(ob.cell);
-    const front=(d!==null&&myFoe!==null&&d<myFoe)||trod===o.id;
+    const trod=trodSet.has(o.id);
+    const front=(d!==null&&myFoe!==null&&d<myFoe)||trod;
     const short=runAIFeedShort(o.id);
     if(!front&&!short)continue;
     const cargo={hyoro:0,hei:0,kane:0,uma:0,teppo:0};
@@ -16776,7 +16778,7 @@ function runCarryPlan(siteId){
     }
     const tot=CARRY_KEYS.reduce((n,k)=>n+cargo[k],0);
     if(tot<CARRY_MIN)continue;
-    const v=tot/(1+runAIDist(bs.cell,ob.cell));
+    const v=tot/(1+runAIDist(bs.cell,ob.cell))*(trod?AI_W_GUARD_HELP:1);
     if(v>bv){bv=v;best={to:"site",id:o.id,cargo};}
   }
   return best;
@@ -26352,6 +26354,58 @@ const runRuinNear=memoStamp(function runRuinNear0(siteId){
 /* よその家の軍勢が、自分の押さえている升に立っているか（§32.3）。
    **同盟の相手は数えない。** 通ってよいと約束したわけではないが、討ちはしない。
    `foeId` を渡せば、その家の軍勢だけを見る */
+/* **踏み込んできた隊か**（§32.3）。`runIntruder`・`runIntruderFor`・`runGuardShort` が同じ物差しを使う */
+function runIsIntruderUnit(u,powerId){
+  if(!isLink(u.power)||!isLink(u.type)||u.state==="-")return false;
+  const p=u.power.id;
+  if(p===powerId||runIsAlly(p,powerId)||runIsTruce(p,powerId))return false;
+  if(linkValue(u.type)!=="軍勢")return false;
+  const pr=byId(playPowers,p);
+  return !!pr&&(pr.kind==="daimyo"||pr.kind==="ikki");
+}
+/* ------------------------------------------------------------
+   **踏まれている城と、そのうち軍勢を出せない城**（依頼・8.3.0・§32.3）
+   ------------------------------------------------------------
+   `runTrodSites`：領内を踏まれている自分の城の集合（踏んだ隊の立つ升を域に持つ城）。
+   `runGuardShort`：そのうち、**軍勢を出せない城**。人が足りない（出せる武将が城に残す1人以下）か、
+   兵が足りない（留守＋軍勢1隊ぶんに届かない）か。
+   踏まれているのに軍勢を出せない城は、よその城が人（移動の隊）と兵・馬・鉄砲・兵糧（輸送の隊）を
+   運び込んで立て直す。軍勢を送れないまま札が「追い払え」と言い続けるだけでは、何も起きない
+   ------------------------------------------------------------ */
+const runTrodSites=memoStamp(function runTrodSites0(powerId){
+  const ix=runDomainIndex(), out=new Set();
+  for(const u of playUnits){
+    if(!runIsIntruderUnit(u,powerId))continue;
+    const site=ix.get(u.q.id);
+    if(site!==undefined&&runSiteOwner(site)===powerId)out.add(site);
+  }
+  return out;
+});
+const runGuardShort=memoStamp(function runGuardShort0(powerId){
+  const out=new Map();
+  for(const site of runTrodSites(powerId)){
+    const st=byId(playSites,site); if(!st)continue;
+    const free=runBushouAt(site).filter(m=>!m.busy).length;
+    const men=free<=AI_KEEP, hei=st.hei<garrisonOf(st)+IKUSA_MIN;
+    if(men||hei)out.set(site,{men,hei});
+  }
+  return out;
+});
+/* **人を移す先。** 踏まれていて人の足りない自分の城のうち、いちばん近いもの。無ければ null */
+function runGuardMoveTo(powerId,fromSiteId){
+  if(!powerId)return null;
+  const gs=runGuardShort(powerId); if(!gs.size)return null;
+  if(gs.has(fromSiteId))return null;                /* 自分も踏まれているなら、人は出さない */
+  const fb=byId(BASE_SITES,fromSiteId); if(!fb)return null;
+  let best=null,bd=Infinity;
+  for(const [site,need] of gs){
+    if(!need.men)continue;
+    const bs=byId(BASE_SITES,site); if(!bs)continue;
+    const d=runAIDist(fb.cell,bs.cell);
+    if(d<bd){bd=d;best=site;}
+  }
+  return best;
+}
 const runIntruder=memoStamp(function runIntruder0(powerId,foeId){
   const ix=runDomainIndex();
   for(const u of playUnits){
@@ -26390,12 +26444,12 @@ const runIntruder=memoStamp(function runIntruder0(powerId,foeId){
 /* ------------------------------------------------------------
    **踏まれたとき、その軍勢が迎え撃ちに戻るか**（依頼・§32.3）
    ------------------------------------------------------------
-   領内に入った敵の軍勢のうち、**いまの状態で `INTRUDER_BACK_MONTHS`（3か月）のうちに
+   領内に入った敵の軍勢のうち、**いまの状態で `INTRUDER_BACK_MONTHS`（6か月。8.3.0 までは 3か月。依頼）のうちに
    着ける見込みのあるもの**だけを相手にする。いちばん近いものを返す。
    見込みは踏み代で測る（`runAIField`。雪・治水・街道を含むいまの踏み代）。
    遠く離れた軍勢まで呼び戻すと、城攻めも占拠も途中で捨てて、着く前に相手が去る。
    ------------------------------------------------------------ */
-const INTRUDER_BACK_MONTHS=3;
+const INTRUDER_BACK_MONTHS=6;
 function runIntruderFor(u,powerId){
   const ix=runDomainIndex();
   const budget=moveOf(u), lim=budget*INTRUDER_BACK_MONTHS;
@@ -26985,6 +27039,7 @@ const AI_W_SEKI=3.0;           // 仲の悪い家との境に関所を建てる�
 /* **仲直りの使い。** 重み 3.0 で、討つ気の無い城だけが出す（依頼・§32.7）*/
 const AI_W_NAKA=3.0;           // 仲直りの使い
 const AI_W_SONO=1.0;           // 輸送・移動・忍びなど、場が呼ぶもの
+const AI_W_GUARD_HELP=3.0;     // 踏まれて軍勢を出せない城へ、人と荷を運ぶ重み（追い払いの軍勢と同じ倍。依頼・8.3.0）
 /* **段は重みに偏りを与えるだけ**（依頼）。**決め打ちにはしない。**
    決め打ちにすると、その段の手が打てない城は何もしないまま年を越す。
    偏りなら、たまたま別の手も出る */
@@ -27310,7 +27365,10 @@ function runAIWant(siteId){
      誰も詰めていない城だけを見ていたため、**5人詰めた城の隣に1人の城があっても、
      人は動かなかった。** 武将は増えないので（§19）、**居どころの偏りは
      そのまま家の働きの偏りになる。** */
-  if(runThinSite(pw,st.id)!==null)add("移動",AI_W_SONO);
+  /* **踏まれていて人の足りない城があれば、そこへ人を移す**（依頼・8.3.0・§27.2）。
+     軍勢を出せない城に人を送り、立て直す。重みは追い払いの軍勢と同じ倍 */
+  if(runGuardMoveTo(pw,st.id)!==null)add("移動",AI_W_SONO*AI_W_GUARD_HELP);
+  else if(runThinSite(pw,st.id)!==null)add("移動",AI_W_SONO);
 
   /* **いまの段のぶんだけ、重みに偏りを与える**（依頼・§32.7）。
      足し引きではなく倍で掛けるので、**0 になる手は無い。**
@@ -27615,7 +27673,7 @@ function runAIGate(powerId){
     const bs=byId(BASE_SITES,st.id);
     /* **人を移す隊の行き先は、出す前に決める**（§27.2）。
        出したあとに数え直すと、出た城のほうが薄くなって行き先が消える */
-    const moveTo=(label==="移動")?runThinSite(powerId,st.id):null;
+    const moveTo=(label==="移動")?(runGuardMoveTo(powerId,st.id)??runThinSite(powerId,st.id)):null;
     const u=runAddUnit({type:tb.id, site:st.id, bushou:pick.id,
                         cell, dir:runDirTo(bs.cell,cell),
                         state:sea?"sui":undefined});
