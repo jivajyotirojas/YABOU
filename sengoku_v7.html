@@ -794,7 +794,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.2.1";
+const VERSION="8.2.2";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -5740,23 +5740,17 @@ function glSmooth(pts,n){
 }
 
 /* 街道の一区間と、そこに架かる橋 */
-function glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged,ys){
-  const nd=ln.nodes, Pp=C.P, N=C.N, Wd=R*0.20;
-  const hw=Wd*sRef/2, core=0.5;                  /* 芯は幅の半分 */
+function glRoadSpan(M,W,C,a,b,sRef,ys){
+  const P=C.P, N=C.N, hw=C.hw(), core=0.5;       /* 芯は幅の半分 */
   const edge=[255,255,255,0], mid=[255,255,255,255];
   /* **川と同じで、節点の中割りは使わない。** 区間ごとにその区間の法線で
-     帯を張り、節点には円い継ぎ手を置く。中割りで岸を取ると、曲がりの
-     きついところで内岸が行き違い、継ぎ目に切れ込みが出る */
+     帯を張り、点には円い継ぎ手を置く。中割りで岸を取ると、曲がりの
+     きついところで内岸が行き違い、継ぎ目に切れ込みが出る。
+     **橋の所でも切らない。** 橋は後の層で上から隠す（§10.13）*/
   for(let j=a;j<b;j++){
-    /* **橋が架かるのは節点 j から j+1 の1区間だけ。** 両隣まで飛ばすと、
-       橋の手前と先で街道が二重に途切れる */
-    if(nd[j].br)continue;
-    const p0=Pp[j], p1=Pp[j+1];
-    /* **帯は地面に寝かせる。** 法線は世界の向きで取り、縦の成分に斜めの圧縮（`ys`）を掛ける。
-       画面の向きで等幅に張ると、東西に走る帯の下縁が手前の行の升の頂点より下まで届き、
-       そこが手前の面に隠されて升の間隔で欠けた */
-    const dx=nd[j+1].x-nd[j].x, dy=nd[j+1].y-nd[j].y, d=Math.hypot(dx,dy)||1;
-    const nx=-dy/d, ny=dx/d*ys;
+    const p0=P[j], p1=P[j+1];
+    let nx=C.nx(j)+C.nx(j+1), ny=C.ny(j)+C.ny(j+1);
+    const nl=Math.hypot(nx,ny/ys)||1; nx/=nl; ny/=nl;
     const at=(p,k)=>W([p[0]+nx*hw*k, p[1]+ny*hw*k]);
     for(const sg of [1,-1]){
       M.quad(at(p0,sg),at(p1,sg),at(p1,sg*core),at(p0,sg*core),
@@ -5767,31 +5761,90 @@ function glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged,ys){
   }
   for(let j=a;j<=b;j++){                         /* 継ぎ手。芯のぶんだけ */
     if(j===0||j===N-1)continue;
-    if(nd[j].br||(nd[j-1]&&nd[j-1].br))continue; /* 橋の口には置かない */
-    const p=Pp[j], ring=[];
+    const p=P[j], ring=[];
     for(let i=0;i<=8;i++){const t=i/8*Math.PI*2;
       ring.push(W([p[0]+Math.cos(t)*hw*core, p[1]+Math.sin(t)*hw*core*ys]));}
     M.fan(W(p),ring,mid);
   }
-  for(let j=a;j<b;j++){
-    if(!nd[j].br)continue;
-    const key=ln.id+"|"+j; if(bridged.has(key))continue; bridged.add(key);
-    const p0=Pp[j],p1=Pp[j+1];
-    const dx=p1[0]-p0[0],dy=p1[1]-p0[1],d=Math.hypot(dx,dy)||1;
-    const dxw=nd[j+1].x-nd[j].x,dyw=nd[j+1].y-nd[j].y,dw=Math.hypot(dxw,dyw)||1;
-    const nx=-dyw/dw,ny=dxw/dw*ys,bw=Math.max(1.6,Wd*sRef/2*1.45);
-    M.quad(W([p0[0]+nx*bw,p0[1]+ny*bw]),W([p1[0]+nx*bw,p1[1]+ny*bw]),
-           W([p1[0]-nx*bw,p1[1]-ny*bw]),W([p0[0]-nx*bw,p0[1]-ny*bw]),
-           hex2rgb("#a3763f").concat(255));
-    for(let k=0;k<=5;k++){                       /* 板の継ぎ目 */
-      const t=k/5,mx=p0[0]+dx*t,my=p0[1]+dy*t;
-      M.seg(W([mx+nx*bw,my+ny*bw]),W([mx-nx*bw,my-ny*bw]),
-            Math.max(0.6,rad*0.045)/sRef/2,hex2rgb("#6b4a26").concat(255));
+}
+
+/* ------------------------------------------------------------
+   橋（§10.13）。街道の線を弧長で切り出した点列 `pts`（P＝描画座標、w＝世界、nx/ny＝法線）に沿って積む。
+   ------------------------------------------------------------
+   頂点色の三角形だけで「物」に見える最小の構成：**板・手前へ落ちる厚み（側面）・両縁の欄干・水面の影**。
+   崖の側面で立体を見せるこの盤の作法に合わせ、橋も地面に貼った色ではなく厚みを持つ。
+   板目の継ぎ目は間隔が 3px を割る倍率（100% 未満）では描かない。板が泥色に潰れる。
+   端の柱は 150% 以上でだけ。重ね順は 影 → たもと → 板 → 板目 → 厚み → 欄干 → 柱 */
+function glBridge(M,W,b,sRef,rad,ys){
+  const pts=b.pts; if(pts.length<2)return;
+  const px=R*sRef;                               /* 1R が何 px か（組んだ倍率で）*/
+  const bw=Math.max(1.6,0.14*R*sRef);            /* 板の半幅（街道の 1.4 倍）*/
+  const DECK=px<24?[154,107,56,255]:[168,121,63,255], SEAM=[122,85,48,255], SIDE=[91,58,24,255],
+        RAIL=[230,207,156,255], POST=[77,50,23,255], STONE=[163,155,134,255], SHADOW=[11,34,56,95];
+  const off=(q,k,dy)=>[q.P[0]+q.nx*k, q.P[1]+q.ny*k+(dy||0)];
+  const band=(k0,k1,col,dy)=>{                   /* 点列に沿った帯。区間ごとに quad、点に継ぎ手 */
+    for(let i=0;i<pts.length-1;i++){
+      const a=pts[i], c=pts[i+1];
+      M.quad(W(off(a,k0,dy)),W(off(c,k0,dy)),W(off(c,k1,dy)),W(off(a,k1,dy)),col);
     }
-    for(const sg of [1,-1])                      /* 欄干 */
-      M.seg(W([p0[0]+nx*bw*sg,p0[1]+ny*bw*sg]),
-            W([p1[0]+nx*bw*sg,p1[1]+ny*bw*sg]),
-            Math.max(0.9,rad*0.075)/sRef/2,hex2rgb("#c99a5c").concat(255));
+    for(let i=1;i<pts.length-1;i++){             /* 折れの外側の楔を埋める */
+      const q=pts[i], ring=[]; const r0=(k0-k1)/2, cx=(k0+k1)/2;
+      for(let t=0;t<=8;t++){const th=t/8*Math.PI*2;
+        ring.push(W([q.P[0]+q.nx*cx+Math.cos(th)*Math.abs(r0), q.P[1]+q.ny*cx+(dy||0)+Math.sin(th)*Math.abs(r0)*ys]));}
+      M.fan(W([q.P[0]+q.nx*cx,q.P[1]+q.ny*cx+(dy||0)]),ring,col);
+    }
+  };
+  /* 影。板と同じ形を画面で下へずらし、少し広く。厚みより下まで落とさないと厚みに隠れる */
+  const th=Math.max(1,0.05*px);
+  band(bw+0.02*px,-(bw+0.02*px),SHADOW,th+0.04*px);
+  /* たもと。両端の 0.12R を石の台にする */
+  const endCap=(q0,q1,col,wmul)=>{
+    const dx=q1.P[0]-q0.P[0], dy=q1.P[1]-q0.P[1], d=Math.hypot(dx,dy)||1;
+    const L=Math.min(d,0.12*px), e=[q0.P[0]+dx/d*L, q0.P[1]+dy/d*L];
+    const nx=q0.nx, ny=q0.ny, k=bw*wmul;
+    M.quad(W([q0.P[0]+nx*k,q0.P[1]+ny*k]),W([e[0]+nx*k,e[1]+ny*k]),W([e[0]-nx*k,e[1]-ny*k]),W([q0.P[0]-nx*k,q0.P[1]-ny*k]),col);
+  };
+  if(px>=24){ endCap(pts[0],pts[1],STONE,1.2); endCap(pts[pts.length-1],pts[pts.length-2],STONE,1.2); }
+  /* 板 */
+  band(bw,-bw,DECK);
+  /* 板目。弧長 0.12R ごとに、その場の法線で直角に */
+  if(px>=40){
+    const step=0.12*px, hwS=Math.max(0.35,0.01*px)/sRef;
+    let acc=step/2;
+    for(let i=0;i<pts.length-1;i++){
+      const a=pts[i], c=pts[i+1]; const dx=c.P[0]-a.P[0], dy=c.P[1]-a.P[1], d=Math.hypot(dx,dy)||1;
+      let s=acc;
+      while(s<d){ const t=s/d, mx=a.P[0]+dx*t, my=a.P[1]+dy*t, nx=a.nx*(1-t)+c.nx*t, ny=a.ny*(1-t)+c.ny*t;
+        M.seg(W([mx+nx*bw*0.92,my+ny*bw*0.92]),W([mx-nx*bw*0.92,my-ny*bw*0.92]),hwS,SEAM); s+=step; }
+      acc=s-d;
+    }
+  }
+  /* 厚み。手前（画面の下）を向く縁だけ、縁を下へ写した四角で埋める。端の辺も同じ */
+  for(let i=0;i<pts.length-1;i++){
+    const a=pts[i], c=pts[i+1];
+    for(const sg of [1,-1]){
+      if(sg*(a.ny+c.ny)<=0)continue;             /* 法線の縦成分が正＝手前向き */
+      const e0=off(a,sg*bw), e1=off(c,sg*bw);
+      M.quad(W(e0),W(e1),W([e1[0],e1[1]+th]),W([e0[0],e0[1]+th]),SIDE);
+    }
+  }
+  for(const [q,o] of [[pts[0],pts[1]],[pts[pts.length-1],pts[pts.length-2]]]){
+    if(q.P[1]-o.P[1]<=0)continue;                /* 端が手前を向くときだけ */
+    const e0=off(q,bw), e1=off(q,-bw);
+    M.quad(W(e0),W(e1),W([e1[0],e1[1]+th]),W([e0[0],e0[1]+th]),SIDE);
+  }
+  /* 欄干。両縁に沿う明るい線。50% では 1px に満たず灰色の滲みになるだけなので描かない */
+  if(px>=24){
+    const hwR=Math.max(0.5,0.02*px)/sRef;
+    for(const sg of [1,-1]){
+      const q=pts.map(p=>W(off(p,sg*(bw+0.01*px))));
+      M.path(q,hwR,RAIL);
+    }
+  }
+  /* 柱。四隅に */
+  if(px>=48){
+    const rr=0.045*px/sRef;
+    for(const q of [pts[0],pts[pts.length-1]])for(const sg of [1,-1])M.disc(W(off(q,sg*(bw+0.01*px))),rr,POST,6);
   }
 }
 
@@ -5835,8 +5888,7 @@ function* glBuildMeshGen(){
   const R0=cellSpan.r0, span=cellSpan.r1-R0+1;
   const glRows=[];
   for(const c of drawCache)(glRows[c.r-R0]||(glRows[c.r-R0]=[])).push(c);
-  const terAt=[], effAt=[], roadAt=[];
-  const bridged=new Set();
+  const terAt=[], effAt=[], roadAt=[], bridgeAt=[];
   /* 行の奥行き。手前の行ほど小さい */
   const zOf=r=>1-2*(r+1)/(span+2);
 
@@ -5948,6 +6000,7 @@ function* glBuildMeshGen(){
     }
   }
   for(const ln of playLines){
+    if(ln.type===4)continue;                     /* 街道は川が決まってから（後段）*/
     const nd0=ln.nodes, N0=nd0.length; if(N0<2)continue;
     let nd=nd0.slice(), wid=widOf.get(ln).slice(), shift=0, trib=null;
     { const m=sideShift.get(ln); if(m)for(const [k,[dx,dy]] of m)nd[k]={...nd[k],x:nd[k].x+dx,y:nd[k].y+dy}; }
@@ -6015,12 +6068,13 @@ function* glBuildMeshGen(){
       if(wa&&wa.c.type===T_LAKE&&!wa.drop){ nd.unshift({x:wa.c.x, y:wa.c.y, g:wa.c.g, water:true}); wid.unshift(wid[0]); shift=1; }
     }
     const N=nd.length;
-    const Pp=nd.map(n=>{const g=n.water?n.g:(ln.type===3||ln.type===4?surfG(n):n.g);
+    const Pp=nd.map(n=>{const g=n.water?n.g:(ln.type===3?surfG(n):n.g);
       return [n.x*sRef, (n.y*ys)*sRef-g*sRef];});
-    /* **川は曲線に開く**（§13）。街道は節点の `br`（橋）を添字で引くので折れ線のまま */
-    let P=Pp, I=null;
-    if(ln.type===3){ const sm=glSmooth(Pp,3); P=sm.P; I=sm.I; }
-    pre.set(ln,{nd,N,wid,P,I,shift,trib});
+    /* **川は曲線に開く**（§13）。`Pw` は同じ曲線の世界座標（km）。二次曲線は座標に線形なので
+       `P` と点ごとに対応する。橋の交点と岸寄せは世界座標で測る */
+    let P=Pp, I=null, Pw=nd.map(n=>[n.x,n.y]);
+    if(ln.type===3){ const sm=glSmooth(Pp,3); P=sm.P; I=sm.I; Pw=glSmooth(Pw,3).P; }
+    pre.set(ln,{nd,N,wid,P,I,Pw,shift,trib});
   }
   /* 二巡め：**支流の端は本流の流れの線の上に置く**（§10.15）。開いた本流の曲線は升の中心を
      通らないので、中心へ向けて張ると端が届かなかったり突き抜けたりする。
@@ -6041,19 +6095,21 @@ function* glBuildMeshGen(){
     for(let k=jn;k<mp.N;k++)if(mp.wid[k]<tw)mp.wid[k]=tw;
     const mwid=mp.I?(()=>{const f=mp.I[bi],i=Math.floor(f),t=f-i; return i+1<mp.N?mp.wid[i]*(1-t)+mp.wid[i+1]*t:mp.wid[i];})():mp.wid[bi];
     me.P[me.P.length-1]=[mp.P[bi][0],mp.P[bi][1]];
+    me.Pw[me.Pw.length-1]=[mp.Pw[bi][0],mp.Pw[bi][1]];
     me.wid[me.N-1]=Math.min(me.wid[me.N-1],mwid); me.wid[me.N-2]=Math.min(me.wid[me.N-2],mwid);
     /* **支流の下流の色は、注ぐ先の本流のその場の色**。湖の色のまま濃い本流に突き当たると段が出る */
     me.endCol={ln:me.trib, t:(mp.I?mp.I[bi]:bi)/(mp.N-1)};
   }
   /* 本流を先に、支流を後に。支流の下流の色は本流の色から取るので、本流が先に要る */
   const depthOf=ln=>{let d=0,cur=pre.get(ln); while(cur&&cur.trib&&d<16){d++; cur=pre.get(cur.trib);} return d;};
+  /* 行の番号。**区間は両端のうち手前（y の大きい）側の行に入れる**（§10.13）*/
+  const rowOf=y=>Math.max(0,Math.min(cellSpan.r1-cellSpan.r0, Math.round(y/ROWH)-cellSpan.r0));
   for(const ln of playLines.slice().sort((a,b)=>depthOf(a)-depthOf(b))){
     const me=pre.get(ln); if(!me)continue;
-    const {nd,N,wid,P,I}=me, Nn=P.length;
+    const {nd,N,wid,P,I,Pw}=me, Nn=P.length;
     const widAt=k=>{ if(!I)return wid[k]; const f=I[k], i=Math.floor(f), t=f-i;
       return i+1<N?wid[i]*(1-t)+wid[i+1]*t:wid[i]; };
-    const yWorld=k=>I?(()=>{const f=I[k],i=Math.floor(f),t=f-i; return i+1<N?nd[i].y*(1-t)+nd[i+1].y*t:nd[i].y;})():nd[k].y;
-    const xWorld=k=>I?(()=>{const f=I[k],i=Math.floor(f),t=f-i; return i+1<N?nd[i].x*(1-t)+nd[i+1].x*t:nd[i].x;})():nd[k].x;
+    const yWorld=k=>Pw[k][1], xWorld=k=>Pw[k][0];   /* 開いた曲線そのものの世界座標 */
     /* 帯は地面に寝かせる。法線は世界の向きで取り、縦の成分に `ys` を掛ける（`glRoadSpan` と同じ）*/
     const L=[],Rt=[],NX=[],NY=[];
     for(let k=0;k<Nn;k++){
@@ -6069,14 +6125,169 @@ function* glBuildMeshGen(){
     const at=t=>[Math.round(LAKE_RGB[0]+(dst[0]-LAKE_RGB[0])*t),
                  Math.round(LAKE_RGB[1]+(dst[1]-LAKE_RGB[1])*t),
                  Math.round(LAKE_RGB[2]+(dst[2]-LAKE_RGB[2])*t),255];
-    lc.set(ln,{P,L,Rt,at,N:Nn,I,shift:me.shift,hw:k=>widAt(k)*sRef/2,nx:k=>NX[k],ny:k=>NY[k],tOf:k=>(I?I[k]:k)/(N-1)});
-    const rowOf=y=>Math.max(0,Math.min(cellSpan.r1-cellSpan.r0,
-      Math.round(y/ROWH)-cellSpan.r0));
+    lc.set(ln,{P,Pw,L,Rt,at,N:Nn,I,shift:me.shift,hw:k=>widAt(k)*sRef/2,nx:k=>NX[k],ny:k=>NY[k],tOf:k=>(I?I[k]:k)/(N-1)});
     const segRow=j=>Math.max(rowOf(yWorld(j)),rowOf(yWorld(j+1)));
     let j=0;
     while(j<Nn-1){ const r=segRow(j); let k=j;
       while(k+1<Nn-1&&segRow(k+1)===r)k++;
       (runs[r]||(runs[r]=[])).push({ln,a:j,b:k+1}); j=k+1; }
+  }
+  /* ------------------------------------------------------------
+     **街道と橋**（§10.13・§13）。川が決まってから回す。
+     ------------------------------------------------------------
+     ・**川に沿って走る街道は岸へ寄せる。** 川の升を通る節点で、街道の向きが川の向きとほぼ平行なら、
+       川の中心線から（川の半幅＋街道の半幅＋少し）離れるまで、川と直角に寄せる。側は連続する区間で
+       一つに決める（節点ごとに決めると蛇行で左右へ飛び、川を何度もまたぐ）。
+     ・**街道も川と同じく曲線に開く。** 橋を節点の添字で引かなくなったので折れ線に留める理由が無い。
+     ・**橋は街道の中心線と川の中心線の交点ごとに置く。** 升の印（`bridge`・`br`）は使わない。
+       長さは交点での川幅 ÷ sin（交差角）＋両端のたもと。街道の弧長で窓が重なる交点は一枚にまとめる
+       （蛇行の首を二度渡る所、支流の継ぎ目）。板は街道の線を弧長で切り出した帯なので、折れにも沿う。
+     ・街道の帯は切らない。橋が後の層で上から隠す */
+  const bridgeRuns=[];
+  {
+    const roadHw=R*0.10;                                     /* 街道の半幅（幅 0.20R）*/
+    const rivSegsNear=r=>{ const out=[];                     /* 行 r の近く（r−1..r+1）の川の小区間 */
+      for(let rr=r-1;rr<=r+1;rr++)for(const run of (runs[rr]||[])){
+        if(run.ln.type!==3)continue; const C=lc.get(run.ln); if(!C)continue;
+        for(let k=run.a;k<run.b;k++)out.push({C,k}); }
+      return out; };
+    const nearest=(x,y)=>{                                   /* 最寄りの川の小区間。符号付き距離（接線の左手が正）*/
+      let best=null;
+      for(const {C,k} of rivSegsNear(rowOf(y))){
+        const A=C.Pw[k],B=C.Pw[k+1]; const vx=B[0]-A[0],vy=B[1]-A[1],L2=vx*vx+vy*vy||1e-9;
+        let t=((x-A[0])*vx+(y-A[1])*vy)/L2; t=Math.max(0,Math.min(1,t));
+        const dx=x-(A[0]+vx*t), dy=y-(A[1]+vy*t), d2=dx*dx+dy*dy;
+        if(!best||d2<best.d2){ const L=Math.sqrt(L2); const nx=-vy/L,ny=vx/L;
+          best={d2,d:dx*nx+dy*ny,vx:vx/L,vy:vy/L,nx,ny,hw:(C.hw(k)*(1-t)+C.hw(k+1)*t)/sRef}; }
+      }
+      return best; };
+    const cellAt=(x,y)=>{ const c=cellNear(x,y); return c?cellRow.get(c.id):null; };
+    const bad=cr=>!cr||cr.wet||cr.mtn;
+    let nRoad=0;
+    for(const ln of playLines){
+      if(ln.type!==4||ln.nodes.length<2)continue;
+      if((++nRoad&3)===0)yield;                            /* 数本ごとに手を離す（時間分割）*/
+      const nd=ln.nodes.map(n=>({x:n.x,y:n.y,g:n.g}));
+      const N=nd.length;
+      /* ---- 岸へ寄せる ---- */
+      const info=nd.map(n=>nearest(n.x,n.y));
+      const near=nd.map((n,j)=>{ const b=info[j]; if(!b)return false;
+        const a=nd[Math.max(0,j-1)], c=nd[Math.min(N-1,j+1)];
+        const ux=c.x-a.x, uy=c.y-a.y, ul=Math.hypot(ux,uy)||1;
+        const cos=Math.abs((ux*b.vx+uy*b.vy)/ul);
+        return cos>0.8&&Math.abs(b.d)<b.hw+roadHw+0.35*R; });
+      const delta=new Float64Array(N);
+      let j=0;
+      while(j<N){
+        if(!near[j]){j++;continue;}
+        let k=j; while(k+1<N&&near[k+1]){           /* 符号が反転し、両側とも 0.15R を超えるなら本当の横断。そこで切る */
+          const d0=info[k].d, d1=info[k+1].d;
+          if(Math.sign(d0)!==Math.sign(d1)&&Math.abs(d0)>=0.3*R&&Math.abs(d1)>=0.3*R)break;
+          k++; }
+        let sum=0; for(let i=j;i<=k;i++)if(Math.abs(info[i].d)>=0.1*R)sum+=info[i].d;
+        let side=Math.sign(sum);
+        if(!side){ const b=info[j], want=b.hw+roadHw+0.05*R;   /* 川の真上。空いている側へ */
+          const L=cellAt(nd[j].x+b.nx*want,nd[j].y+b.ny*want), Rr=cellAt(nd[j].x-b.nx*want,nd[j].y-b.ny*want);
+          side=bad(L)&&!bad(Rr)?-1:1; }
+        for(let i=j;i<=k;i++){
+          const b=info[i]; let dl=Math.max(-0.6*R,Math.min(0.6*R,side*(b.hw+roadHw+0.05*R)-b.d));
+          const cc=cellAt(nd[i].x,nd[i].y);                    /* 辺の中点の節点は升の足元に収める */
+          const edgeNode=!cc||Math.hypot(cc.x-nd[i].x,cc.y-nd[i].y)>0.25*R;
+          if(edgeNode)dl=Math.max(-0.4*R,Math.min(0.4*R,dl));
+          for(let tries=0;tries<3&&bad(cellAt(nd[i].x+b.nx*dl,nd[i].y+b.ny*dl));tries++)dl/=2;
+          delta[i]=dl;
+          nd[i]={x:nd[i].x+b.nx*dl, y:nd[i].y+b.ny*dl, g:nd[i].g};
+        }
+        /* 両隣は 2/3・1/3 と減らしながら寄せる（並走する川と同じ流儀）*/
+        for(const [i,f,src] of [[j-1,2/3,j],[j-2,1/3,j],[k+1,2/3,k],[k+2,1/3,k]]){
+          if(i<0||i>=N||near[i]||delta[i])continue; const b=info[src]; const dl=delta[src]*f;
+          if(bad(cellAt(nd[i].x+b.nx*dl,nd[i].y+b.ny*dl)))continue;
+          nd[i]={x:nd[i].x+b.nx*dl, y:nd[i].y+b.ny*dl, g:nd[i].g}; }
+        j=k+1;
+      }
+      for(const n of nd)n.g=surfG(n);                        /* 高さは面から */
+      /* ---- 曲線に開く ---- */
+      const Pp=nd.map(n=>[n.x*sRef,(n.y*ys)*sRef-n.g*sRef]);
+      const sm=glSmooth(Pp,3), P=sm.P, I=sm.I, Pw=glSmooth(nd.map(n=>[n.x,n.y]),3).P, Nn=P.length;
+      const NX=[],NY=[],S=[0];
+      for(let k=0;k<Nn;k++){
+        const a=Pw[Math.max(0,k-1)], b=Pw[Math.min(Nn-1,k+1)];
+        const tx=b[0]-a[0], ty=b[1]-a[1], len=Math.hypot(tx,ty)||1;
+        NX.push(-ty/len); NY.push(tx/len*ys);
+        if(k)S.push(S[k-1]+Math.hypot(Pw[k][0]-Pw[k-1][0],Pw[k][1]-Pw[k-1][1]));
+      }
+      const hwP=roadHw*sRef;
+      lc.set(ln,{P,Pw,N:Nn,I,S,hw:()=>hwP,nx:k=>NX[k],ny:k=>NY[k]});
+      const segRow=k=>Math.max(rowOf(Pw[k][1]),rowOf(Pw[k+1][1]));
+      { let a=0; while(a<Nn-1){ const r=segRow(a); let k=a;
+          while(k+1<Nn-1&&segRow(k+1)===r)k++;
+          (runs[r]||(runs[r]=[])).push({ln,a,b:k+1}); a=k+1; } }
+      /* ---- 交点に橋 ---- */
+      const X=[];
+      for(let k=0;k<Nn-1;k++){
+        const p=Pw[k], q=Pw[k+1], rx=q[0]-p[0], ry=q[1]-p[1], rl=Math.hypot(rx,ry)||1e-9;
+        const lastR=k===Nn-2;
+        for(const {C,k:m} of rivSegsNear(segRow(k))){
+          const A=C.Pw[m], B=C.Pw[m+1], sx=B[0]-A[0], sy=B[1]-A[1], den=rx*sy-ry*sx;
+          if(Math.abs(den)<1e-9)continue;
+          const ex=A[0]-p[0], ey=A[1]-p[1];
+          const s=(ex*sy-ey*sx)/den, t=(ex*ry-ey*rx)/den;
+          if(s<0||(lastR?s>1:s>=1)||t<0||(m===C.N-2?t>1:t>=1))continue;
+          const Xx=p[0]+rx*s, Xy=p[1]+ry*s;
+          const cr=cellAt(Xx,Xy); if(!cr||cr.wet)continue;     /* 水の升の中の延長は渡らない */
+          const sl=Math.hypot(sx,sy)||1e-9, sin=Math.abs(den)/(rl*sl);
+          if(sin<0.25)continue;                                /* 浅すぎる交差は「沿っている」*/
+          const hwR=(C.hw(m)*(1-t)+C.hw(m+1)*t)/sRef;
+          const h=hwR/Math.max(0.4,sin)+0.14*R;
+          const s0=S[k]+s*rl;
+          X.push({lo:s0-h,hi:s0+h,w:hwR});
+        }
+      }
+      X.sort((a,b)=>a.lo-b.lo);
+      /* 窓が重なる（隙間 0.3R 以内）交点は一枚に。**隙間が 1R 以内で、その間の街道がずっと川の帯の中に
+         あるとき**（蛇行の首・合流部）も一枚にする。二枚の板の間に白い帯が水の上を走るより、
+         長い一枚の橋のほうが読める */
+      const inWater=(sa,sb)=>{ for(let k=0;k<Nn;k++){ if(S[k]<=sa||S[k]>=sb)continue;
+          const b=nearest(Pw[k][0],Pw[k][1]); if(!b||Math.abs(b.d)>=b.hw+roadHw)return false; } return true; };
+      const merged=[];
+      for(const x of X){ const last=merged[merged.length-1];
+        if(last&&(x.lo<=last.hi+0.3*R||(x.lo<=last.hi+1.0*R&&inWater(last.hi,x.lo)))){
+          last.hi=Math.max(last.hi,x.hi); last.w=Math.max(last.w,x.w); }
+        else merged.push({...x}); }
+      const at=(sv)=>{ let k=0; while(k<Nn-2&&S[k+1]<sv)k++;
+        const t=(sv-S[k])/((S[k+1]-S[k])||1);
+        return {P:[P[k][0]+(P[k+1][0]-P[k][0])*t, P[k][1]+(P[k+1][1]-P[k][1])*t],
+                w:[Pw[k][0]+(Pw[k+1][0]-Pw[k][0])*t, Pw[k][1]+(Pw[k+1][1]-Pw[k][1])*t],
+                nx:(NX[k]+NX[k+1])/2, ny:(NY[k]+NY[k+1])/2, k}; };
+      for(const b of merged){
+        let lo=Math.max(0,b.lo), hi=Math.min(S[Nn-1],b.hi);
+        /* 板の端は水の升に入れない（湖口・河口で板が水へ伸びて桟橋に見える）*/
+        for(let i=0;i<10&&lo<hi;i++){ const c=cellAt(...at(lo).w); if(!c||!c.wet)break; lo+=0.05*R; }
+        for(let i=0;i<10&&lo<hi;i++){ const c=cellAt(...at(hi).w); if(!c||!c.wet)break; hi-=0.05*R; }
+        if(hi-lo<0.3*R)continue;
+        /* **橋の所は街道そのものを直線にする。** 板の中で街道が折れると、板が「く」の字や台形になる。
+           木の橋が曲がるのはいちばん不自然。[lo−0.1R, hi+0.1R] に入る開いた点を弦へ射影する
+           （`runs` は添字で引くので、点を動かすだけで帯も直る）*/
+        { const e0=at(Math.max(0,lo-0.1*R)), e1=at(Math.min(S[Nn-1],hi+0.1*R));
+          const ux=e1.w[0]-e0.w[0], uy=e1.w[1]-e0.w[1], ul=Math.hypot(ux,uy)||1;
+          const vx=e1.P[0]-e0.P[0], vy=e1.P[1]-e0.P[1], vl2=vx*vx+vy*vy||1;
+          const nx=-uy/ul, ny=ux/ul*ys;
+          for(let k=0;k<Nn;k++){ if(S[k]<=lo-0.1*R||S[k]>=hi+0.1*R)continue;
+            const tw=((Pw[k][0]-e0.w[0])*ux+(Pw[k][1]-e0.w[1])*uy)/(ul*ul);
+            Pw[k]=[e0.w[0]+ux*tw, e0.w[1]+uy*tw];
+            const tp=((P[k][0]-e0.P[0])*vx+(P[k][1]-e0.P[1])*vy)/vl2;
+            P[k]=[e0.P[0]+vx*tp, e0.P[1]+vy*tp];
+            NX[k]=nx; NY[k]=ny; }
+        }
+        /* 弧長 [lo,hi] で街道の線を切り出す。両端は補間、中は開いた点のまま */
+        const a0=at(lo), a1=at(hi), pts=[a0];
+        for(let k=a0.k+1;k<=a1.k;k++)if(S[k]>lo&&S[k]<hi)pts.push({P:P[k],w:Pw[k],nx:NX[k],ny:NY[k],k});
+        pts.push(a1);
+        let my=-1e9; for(const q of pts)my=Math.max(my,q.w[1]);
+        const r=rowOf(my+0.14*R);
+        (bridgeRuns[r]||(bridgeRuns[r]=[])).push({ln,pts,w:b.w});
+      }
+    }
   }
   /* --- 上から見るとき。**別の道を通る。**
      升は平らに並べるだけで、陰影も崖も持ち上げも無く、隠れもしない。深さを使わない --- */
@@ -6383,16 +6594,22 @@ function* glBuildMeshGen(){
      川と同じ行に混ぜると、次の行の川の継ぎ手が前の行の橋の上に乗る */
   for(let r=0;r<span;r++){
     const start=M.n; M.z=zOf(r);
-    for(const {ln,a,b} of (runs[r]||[])){          /* 街道と橋 */
+    for(const {ln,a,b} of (runs[r]||[])){          /* 街道 */
       if(ln.type!==4)continue;
       const C=lc.get(ln); if(!C)continue;
-      glRoadSpan(M,W,C,ln,a,b,sRef,rad,bridged,ys);
+      glRoadSpan(M,W,C,a,b,sRef,ys);
     }
     roadAt[r]={start,count:M.n-start};
   }
+  /* **橋は街道のさらに後の層。** 同じ層に混ぜると、行をまたぐ橋の手前の端を次の行の街道の帯が塗る */
+  for(let r=0;r<span;r++){
+    const start=M.n; M.z=zOf(r);
+    for(const b of (bridgeRuns[r]||[]))glBridge(M,W,b,sRef,rad,ys);
+    bridgeAt[r]={start,count:M.n-start};
+  }
 
   return {pos:M.pos(), col:M.col(),
-          terAt, effAt, roadAt, zOf, depth:true, sRef, cam:view.cam};
+          terAt, effAt, roadAt, bridgeAt, zOf, depth:true, sRef, cam:view.cam};
 }
 
 /* ------------------------------------------------------------
@@ -6752,7 +6969,8 @@ function glRender(w,h,dpr){
 
   g.depthMask(true);  flat(Mh.terAt);             /* 一 地形。奥行きを書く */
   g.depthMask(false); flat(Mh.effAt);             /* 二 効果。書かない */
-  if(Mh.roadAt)flat(Mh.roadAt);                   /*   街道と橋は川の後 */
+  if(Mh.roadAt)flat(Mh.roadAt);                   /*   街道は川の後 */
+  if(Mh.bridgeAt)flat(Mh.bridgeAt);               /*   橋は街道の後 */
   /* 二の二 範囲（既定範囲・実効支配域・不可侵の縁）。**建物とユニットの下**（依頼）。深さは見ない */
   const fxSig=sel+"|"+view.z+"|"+view.cam+"|"+(pickCells?pickCells.size:0)
              +"|"+pickMode+"|"+playStamp;
