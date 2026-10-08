@@ -16006,7 +16006,11 @@ function runInKuni(cellId,powerId){
 let kuniIndex=null, kuniStamp="";
 function runKuniIndex(){
   const sig=runOwnSig();
-  if(kuniStamp===sig&&kuniIndex)return kuniIndex;
+  if(kuniStamp===sig&&kuniIndex){
+    if(VERIFY){ const w=new Map(); for(const bs of BASE_SITES){const o=runSiteOwner(bs.id); if(!o)continue; const dom=BASE_CELLGROUPS[bs.domain-1]; if(!dom)continue; for(const id of dom.cells)if(!w.has(id))w.set(id,o);}
+      verifySame("runKuniIndex",[...kuniIndex].length+":"+[...kuniIndex].slice(0,50).join(","),[...w].length+":"+[...w].slice(0,50).join(",")); }
+    return kuniIndex;
+  }
   kuniIndex=new Map(); kuniStamp=sig;
   for(const bs of BASE_SITES){
     const o=runSiteOwner(bs.id); if(!o)continue;
@@ -16139,12 +16143,17 @@ const desertOf=(hei,hyoro)=>{
    **掛けてよいのは、プレイデータを書き換えず、籤も回さない関数だけ。**
    書き換える関数に掛けると、二度目から何も起きなくなる。籤を回す関数に
    掛けると、同じ問いに同じ答えしか出なくなる */
+/* **検査の目印**（作り手の道具）。真にすると、覚え書きと索引が返す答えを、
+   そのつど素朴に計算し直した答えと突き合わせ、食い違いを `VERIFY_BAD` に積む。
+   遊ぶときは偽。ヘッドレスの検査から立てる */
+let VERIFY=false; const VERIFY_BAD=[];
+const verifySame=(name,a,b)=>{ if(JSON.stringify(a)!==JSON.stringify(b)&&VERIFY_BAD.length<50)VERIFY_BAD.push(name+": "+JSON.stringify(a).slice(0,120)+" vs "+JSON.stringify(b).slice(0,120)); };
 function memoStamp(fn){
   let m=new Map(), st=-1;
   return function(a,b,c){
     if(st!==playStamp){m=new Map(); st=playStamp;}
     const k=c!==undefined?a+"|"+b+"|"+c:b!==undefined?a+"|"+b:a;
-    if(m.has(k))return m.get(k);
+    if(m.has(k)){ const v=m.get(k); if(VERIFY)verifySame(fn.name+"("+k+")",v,fn.call(this,a,b,c)); return v; }
     const v=fn.call(this,a,b,c); m.set(k,v); return v;
   };
 }
@@ -17503,9 +17512,12 @@ function runFushinIndex(){
   return fushinIndex;
 }
 function runFushinAt(cellId,exceptUnitId){
-  const a=runFushinIndex().get(cellId); if(!a)return null;
-  for(const u of a)if(exceptUnitId===undefined||u.id!==exceptUnitId)return u;
-  return null;
+  const a=runFushinIndex().get(cellId);
+  let got=null;
+  if(a)for(const u of a)if(exceptUnitId===undefined||u.id!==exceptUnitId){got=u;break;}
+  if(VERIFY){ let w=null; for(const u of playUnits){ if(u.state==="-"||!u.work)continue; if(exceptUnitId!==undefined&&u.id===exceptUnitId)continue; if(u.work.cell===cellId){w=u;break;} }
+    verifySame("runFushinAt("+cellId+")",got&&got.id,w&&w.id); }
+  return got;
 }
 
 /* 普請を進める（§24.6）。**抱えている隊が、その升に立っている月だけ進む。**
@@ -17645,7 +17657,9 @@ function runIsAlly(a,b){
     allyIndex=new Set(); allyIndex.rows=playAlliances;
     for(const x of playAlliances)allyIndex.add(mindKey(x.a.id,x.b.id));
   }
-  return allyIndex.has(mindKey(a,b));
+  const v=allyIndex.has(mindKey(a,b));
+  if(VERIFY)verifySame("runIsAlly",v,playAlliances.some(x=>(x.a.id===a&&x.b.id===b)||(x.a.id===b&&x.b.id===a)));
+  return v;
 }
 
 /* 結ぶ。**期限つき**。同じ組が二重に並ばないようにする。
@@ -17782,7 +17796,9 @@ const findMind=(a,b)=>{
     mindIndex=new Map(); mindIndex.rows=playMind;
     for(const x of playMind)mindIndex.set(mindKey(x.a.id,x.b.id),x);
   }
-  return mindIndex.get(mindKey(a,b))||null;
+  const v=mindIndex.get(mindKey(a,b))||null;
+  if(VERIFY)verifySame("findMind",v&&v.id,(playMind.find(x=>(x.a.id===a&&x.b.id===b)||(x.a.id===b&&x.b.id===a))||{}).id??null);
+  return v;
 };
 
 /* ------------------------------------------------------------
@@ -22199,7 +22215,10 @@ function runIsFort(cellId){
 let fortIdsCat=null;
 let fortListMemo={stamp:-1, v:null};
 function runFortList(){
-  if(fortListMemo.stamp===playStamp)return fortListMemo.v;
+  if(fortListMemo.stamp===playStamp){
+    if(VERIFY){ const w=[]; for(const o of playObjects)if(isLink(o.label)&&fortIdsCat.has(o.label.id)&&isLink(o.q))w.push(o.q.id); verifySame("runFortList",fortListMemo.v,w); }
+    return fortListMemo.v;
+  }
   if(!fortIdsCat)fortIdsCat=new Set(BASE_OBJECTS.filter(b=>b.cat==="支城").map(b=>b.id));
   const out=[];
   for(const o of playObjects)if(isLink(o.label)&&fortIdsCat.has(o.label.id)&&isLink(o.q))out.push(o.q.id);
@@ -24113,7 +24132,10 @@ function runBuildRank(cat,cellId){
 const aiGoalMemo=new WeakMap();
 function runAIGoal(u){
   const hit=aiGoalMemo.get(u);
-  if(hit&&hit.stamp===playStamp&&hit.cell===u.q.id)return hit.goal;
+  if(hit&&hit.stamp===playStamp&&hit.cell===u.q.id){
+    if(VERIFY)verifySame("runAIGoal(u"+u.id+")",hit.goal,runAIGoal0(u));
+    return hit.goal;
+  }
   const goal=runAIGoal0(u);
   aiGoalMemo.set(u,{stamp:playStamp, cell:u.q.id, goal});
   return goal;
@@ -24628,6 +24650,29 @@ function runAIField(goal,budget,state,avoid){
       if(od!==undefined&&od<=nd)continue;
       if(od===undefined)seen++;
       dist.set(nid,nd); hpush(nid,nd);
+    }
+  }
+  if(VERIFY){                                    /* 元の素朴な広げ方と突き合わせる */
+    const d2=new Map([[goal,0]]); let front=[goal], seen2=1;
+    while(front.length&&seen2<AI_FIELD_MAX){
+      let bi=0,bv2=d2.get(front[0]);
+      for(let i=1;i<front.length;i++){const v=d2.get(front[i]); if(v<bv2){bv2=v;bi=i;}}
+      const id=front[bi]; front[bi]=front[front.length-1]; front.pop();
+      const c=BASE_CELLS[id-1]; if(!c)continue;
+      for(const [dq,dr] of DIR6[c.r&1]){
+        const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
+        const w=runStepCost(n.id,state)+(avoid&&avoid.has(n.id)&&n.id!==goal?DOKU_AVOID_COST:0);
+        if(!(w>0)||!isFinite(w))continue;
+        const nd=bv2+w;
+        if(d2.has(n.id)&&d2.get(n.id)<=nd)continue;
+        if(!d2.has(n.id))seen2++;
+        d2.set(n.id,nd); front.push(n.id);
+      }
+    }
+    /* 広げる数の上限に掛かった場では、取り出す順の違いで縁が少し違いうる。上限に掛からなかった場だけ厳密に比べる */
+    if(seen<AI_FIELD_MAX&&seen2<AI_FIELD_MAX){
+      let bad=0; for(const [k,v] of dist)if(Math.abs((d2.get(k)??-1)-v)>1e-9)bad++;
+      if(bad||dist.size!==d2.size)verifySame("runAIField("+key+")",dist.size+"/"+bad,d2.size+"/0");
     }
   }
   aiFieldCache.set(key,dist);
