@@ -28,6 +28,24 @@ PR を作ると、その PR の中身だけを載せたページが別の URL �
 
 不具合・追加の提案・仕様書の直しの3種類の雛形がある。PR の本文に `Closes #番号` と書くと、マージしたときにその Issue が閉じる。
 
+決めきれていない決まり・データ・描画の件は、`question` の札を付けた Issue にして、
+マイルストーン「[8.3 決めごとの整理](https://github.com/jivajyotirojas/YABOU/milestone/1)」にまとめてある（`QUESTIONS.md` に一覧）。
+決まったら仕様書かコードを直し、その PR で閉じる。
+
+## 版とリリース
+
+版は `sengoku_v7.html` の `VERSION`（`主版.副版.修正`。仕様書 §1.7）で、画面の右上・読み込み画面・タブ名に出る。
+`main` の `sengoku_v7.html` が変わると GitHub Actions（`.github/workflows/release.yml`）が、その版の印（`v8.2.3` のようなタグ）を付け、
+前の版からの PR をまとめた [Releases](https://github.com/jivajyotirojas/YABOU/releases) を作る。
+過去の版に印を付けるときは、Actions の「Release」を手で動かして版とコミットを指定する。
+
+## 流れ
+
+1. 直したいことを Issue にする（既にあれば番号を控える）
+2. `main` から枝を切り、直して、`VERSION` を上げ、仕様書も直す
+3. PR を作る。プレビューの URL で遊んで確かめる。本文に `Closes #番号`
+4. マージすると、公開ページ・リリース・Issue の閉じが全部自動で進む
+
 ## ライセンス
 
 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja)（表示 - 非営利 - 継承）。
