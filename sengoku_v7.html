@@ -24589,7 +24589,7 @@ function runNb6(){
 function runStepTable(state){
   let t=stepTable[state];
   if(t&&t.length===BASE_CELLS.length+1)return t;
-  t=new Float32Array(BASE_CELLS.length+1);
+  t=new Float64Array(BASE_CELLS.length+1);          /* 倍精度。単精度だと 1.2 が丸まり、場の値が元と食い違う */
   for(const c of BASE_CELLS){const w=runStepCost(c.id,state); t[c.id]=isFinite(w)&&w>0?w:0;}
   stepTable[state]=t; return t;
 }
