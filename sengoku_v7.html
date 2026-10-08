@@ -19611,7 +19611,6 @@ function runBattleOpen(atkId,defId,siteId){
       if(o.state==="sui")continue;                 /* 水の上の隊は城攻めに加わらない（依頼）*/
       if(runKonranNow(o))continue;                 /* 混乱している軍勢も加わらない（依頼）*/
       if(runAIDist(o.q.id,bs.cell)!==1)continue;
-      if(!runCampReady(o))continue;                /* 着いた月には攻められない（§26.3）。二隊めも同じ */
       if(!a2||(o.hei||0)>(a2.hei||0))a2=o;
     }
     if(a2){
@@ -21179,6 +21178,7 @@ function runFreeBushou(bushouId,cell){
   runLeaveGroups(bushouId);
   b.site=mkLink(20,home.id,"name");
   runJoinGroups(bushouId,pid,home.id);
+  playStamp++;                      /* 詰め先が変わった（禄の計算・詰めの索引が読む）*/
   runPutIdou(bushouId,home.id,cell);
   return true;
 }
@@ -22831,6 +22831,7 @@ function runAbsorb(unitId,foeUnitId){
         +(runMind(mine,foe)-MIND_BASE)/120
         -runAbsorbFar(unitId,foeUnitId)));
   st.kane=Math.max(0,st.kane-Math.round(cost*0.2));   /* 話を持ちかけるだけで要る */
+  playStamp++;                                         /* 蔵が減った（俸禄不足の判じが読む）*/
   if(runRand()>odds){runAddMind(mine,foe,MIND_TRY);return {ok:false};}
   st.kane=Math.max(0,st.kane-Math.round(cost*0.8));
   /* **武将が家中に入る。** 詰め先は申し入れた隊の出た城 */
@@ -26065,6 +26066,28 @@ const runKaitaku=powerId=>{
    開拓88の家は25升先の更地まで見る */
 const runRuinFar=powerId=>
   Math.round(AI_RUIN_FAR*(0.5+runKaitaku(powerId)/100));
+/* **城の近くに、建築の隊が起こしに行ける更地があるか**（§21.1・§27.1）。
+   `runAIGoal0` の「無主の拠点を起こしに行く」段と同じ判じ（無主・`runRuinFar` 内・
+   陸の踏み代で城の門まで通じる）。建築の隊を出す門（`runAIGate`）と城の望み
+   （`runAIWant`）がこれを見る。
+   バグ（8.2.0）：建築の隊を出す門を「普請が残っている城」に絞ったとき、
+   領内に建てる升の尽きた城からは、港を建てる隊も更地を起こしに行く隊も
+   二度と出なくなっていた（旧版は耐久度が上限から 8 を割っていれば常に出せた）*/
+const runRuinNear=memoStamp(function runRuinNear0(siteId){
+  const pw=runSiteOwner(siteId); if(!pw)return false;
+  const hs=byId(playSites,siteId), hb=byId(BASE_SITES,siteId);
+  if(!hs||!hb||hs.taikyu<TAIKYU_URGENT)return false;
+  const gates=runGates(siteId); if(!gates.length)return false;
+  const far=runRuinFar(pw), budget=UNIT_MOVE["建築"]||6;
+  for(const st of playSites){
+    if(runSiteOwner(st.id))continue;
+    const bs=byId(BASE_SITES,st.id); if(!bs)continue;
+    if(runAIDist(hb.cell,bs.cell)>far)continue;
+    const f=runAIField(bs.cell,budget,"sagyo");
+    if(gates.some(g=>f.has(g)))return true;
+  }
+  return false;
+});
 
 /* よその家の軍勢が、自分の押さえている升に立っているか（§32.3）。
    **同盟の相手は数えない。** 通ってよいと約束したわけではないが、討ちはしない。
@@ -26978,6 +27001,9 @@ function runAIWant(siteId){
      バグ：耐久度が上限から 8 を割っただけで数えていたため、段の上限に届いた城からも
      建築の隊が毎月出て、出ては戻るを繰り返していた */
   if(!!st.fushin||runRepairTo(siteId)!==null)add("建築",AI_W_FUSHIN);
+  /* **港の建つ升か、起こしに行ける更地があるとき**も建築の隊に仕事がある
+     （§24.1・§21.1）。旧版は普請の重みが常に付いていたので、この二つの道が開いていた */
+  if(runAIMinatoWant(siteId)!==null||runRuinNear(siteId))add("建築",AI_W_FUSHIN);
   /* **指針の段ごとに目指す拠点の段に届いていなければ、普請を厚くする**（依頼）*/
   if(taikyuLevel(st.taikyu)<shiGoalLv(runAIShishin(siteId).id))add("建築",AI_W_FUSHIN_GOAL);
   /* **俸禄不足のときは、兵糧不足の農業と同じく商業の重みを上げる**（依頼）*/
@@ -27207,8 +27233,11 @@ function runAIGate(powerId){
       }
       /* **仕事の無い型は出さない**（依頼・§25.4）。
          城の普請が残っているなら、建築の隊には仕事がある（§27.1）*/
+      /* 築港（§24.1）と更地起こし（§21.1）も建築の隊の仕事。港適地は陸の仕事
+         （`runAIHasWork`）に数えられないので、ここで別に見る */
       if(AI_BUILD[t]&&!runAIHasWork(st.id,t)
-         &&!(t==="建築"&&(!!st.fushin||runRepairTo(st.id)!==null)))continue;
+         &&!(t==="建築"&&(!!st.fushin||runRepairTo(st.id)!==null
+                         ||minato!==null||runRuinNear(st.id))))continue;
       /* ------------------------------------------------------------
          **蔵の米で食えぬときは、総出で田畑を開く**（依頼・§32.7 段2）
          ------------------------------------------------------------
