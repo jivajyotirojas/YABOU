@@ -1960,7 +1960,7 @@ let drawRows=[];                 // 同じものを行ごとに束ねたもの
    陰は隣との高さの差から決める。光は北西のやや上から差す */
 const MT_A=T_MTNA, MT_B=T_MTNB;
 const HARBOR=T_HARBOR, SEA_COLOR=colorOfTerrain(T_SEA);
-const SHADE_MIN=0.90, SHADE_MAX=1.08;           // 升の陰影の幅（8.4.0。それまでは 0.55〜1.35）
+const SHADE_MIN=0.86, SHADE_MAX=1.12;           // 升の陰影の幅（8.4.0。それまでは 0.55〜1.35）
 /* 角の色を混ぜる家族は 水／山／それ以外の陸 の3つ。陸どうしは、同じ地形なら等分、別の地形なら半分の重みで混ぜる
    （別の地形との境は 1/3 升幅の勾配になり、升の縁が「貼った色紙」に見えなくなる。1 升幅の地形は半分の重みで残る）*/
 function drawPrepare(){
@@ -1975,7 +1975,7 @@ function drawPrepare(){
     /* **陰影の幅は狭く、升ごとの乱数は掛けない**（§10.21・8.4.0）。
        0.55〜1.35 の幅と升ごとの ±7% の揺らぎは、同じ平原の隣り合う升を別の色紙に見せていた
        （マス感の最大の原因）。揺らぎは画素の紙の目（連続ノイズ）に替える */
-    const lit=0.97+0.13*((-c.gx*LX-c.gy*LY+LZ)/nl);
+    const lit=0.96+0.18*((-c.gx*LX-c.gy*LY+LZ)/nl);
     const sh=Math.max(SHADE_MIN,Math.min(SHADE_MAX,lit));
     const wet=wetOf.get(c.type);
     const mtn=c.type===MT_A||c.type===MT_B;
@@ -2512,6 +2512,7 @@ const OBJ_KAKI =[0xa8,0x5f,0x33];               // 輸送の身体。柿渋の�
 const OBJ_SEISO=[0xd8,0xd2,0xc4];               // 外交の素襖。白
 const OBJ_SEISO2=[0xb0,0xa8,0x98];              // 外交の袴と袖。素襖より暗い
 const OBJ_SHINOB=[0x2a,0x31,0x3c];              // 忍びの装束。黒紺
+const OBJ_SHINOB2=[0x4a,0x52,0x60];             // 忍びの手足。胴より一段明るく、輪郭を割る
 const OBJ_HITATA=[0x3c,0x4a,0x5a];               // 直垂。鉄紺（青の例外は兵の直垂だけ）
 const OBJ_HAKAMA=[0x33,0x40,0x4f];               // 袴
 const OBJ_EBOSHI=[0x25,0x23,0x28];              // 立烏帽子。黒
@@ -2525,7 +2526,7 @@ const OBJ_HEI =[0x5a,0x56,0x4e];               // 兵の身体。暖灰
 const OBJ_HEI2 =[0x3e,0x3a,0x35];               // 陣笠
 const OBJ_KAO  =[0xd8,0xb0,0x8c];               // 顔。肌の色
 const OBJ_UMA  =[0x6b,0x4f,0x35];               // 馬
-const OBJ_FUNE =[0x5a,0x46,0x30];               // 船体
+const OBJ_FUNE =[0x6b,0x54,0x38];               // 船体
 const OBJ_DECK =[0x7a,0x62,0x44];               // 甲板
 const OBJ_YAKATA=[0xdd,0xd3,0xbd];               // 屋形の壁。漆喰
 const OBJ_YANE =[0x3f,0x3a,0x35];               // 屋形の庇・屋根。墨（暖）
@@ -2599,6 +2600,21 @@ function oRoof(x0,z0,x1,z1,hb,ht,order,body,keel){
     {n:[0,-dh/nl,-dz/nl],pts:[[x0,z0,ht],[x1,z0,ht],[x1,zm,hb],[x0,zm,hb]]},
     {n:[-1,0,0],pts:[[x0,z0,ht],[x0,z1,ht],[x0,zm,hb]]},
     {n:[1,0,0] ,pts:[[x1,z0,ht],[x1,z1,ht],[x1,zm,hb]]},
+  ]};
+}
+/* 寄棟の屋根。底の長方形から、x に沿う短い棟へ 4 面で登る。`rx`・`rz` は棟の両端を底の縁から内へ寄せる量
+   （rz を z の半分にすると棟は 1 本の線、rx=rz=0 なら平らな板）。天守の段ごとの庇（高さの低い寄棟）と
+   最上段の屋根、屋敷・館の入母屋の代わりに使う（8.4.0）*/
+function oHip(x0,z0,x1,z1,hb,ht,rx,rz,order,body){
+  body=body||OBJ_YANE;
+  const ax=x0+rx, bx=x1-rx, az=z0+rz, bz=z1-rz, dh=ht-hb;
+  const nS=Math.hypot(rz,dh)||1, nE=Math.hypot(rx,dh)||1;
+  return {order,body,faces:[
+    {n:[0,-dh/nS,rz/nS],pts:[[x0,z0,hb],[x1,z0,hb],[bx,az,ht],[ax,az,ht]]},   /* 手前の斜面 */
+    {n:[0, dh/nS,rz/nS],pts:[[x0,z1,hb],[x1,z1,hb],[bx,bz,ht],[ax,bz,ht]]},   /* 奥の斜面 */
+    {n:[-dh/nE,0,rx/nE],pts:[[x0,z0,hb],[x0,z1,hb],[ax,bz,ht],[ax,az,ht]]},   /* 左の斜面 */
+    {n:[ dh/nE,0,rx/nE],pts:[[x1,z0,hb],[x1,z1,hb],[bx,bz,ht],[bx,az,ht]]},   /* 右の斜面 */
+    {n:[0,0,1],pts:[[ax,az,ht],[bx,az,ht],[bx,bz,ht],[ax,bz,ht]]},              /* 棟の天面（線に近い）*/
   ]};
 }
 /* 低い塀。4本の細い箱を1つの立体にまとめる。天守の土台と同じ order に
@@ -2770,13 +2786,21 @@ const WALL_RING=()=>oRing(0.68,0.59,0.09,0.17,0);
 /* 支城の柵。城の塀とは別物なので、寸法も色もここだけで持つ。
    どちらかを直しても、もう片方には及ばない */
 const SAKU_RING=()=>oRing(0.50,0.44,0.06,0.12,0,OBJ_TORIDE);
+/* 塀の笠木。白い塀の上に黒い瓦の帯を 4 辺に載せる（8.4.0）*/
+const WALL_CAP=()=>[ oRoof(-0.74,-0.65,0.74,-0.57,0.14,0.20,0,OBJ_YANE), oRoof(-0.74,0.57,0.74,0.65,0.14,0.20,0,OBJ_YANE),
+                     oSpin(oRoof(-0.65,-0.74,0.65,-0.66,0.14,0.20,0,OBJ_YANE),Math.PI/2), oSpin(oRoof(-0.65,0.66,0.65,0.74,0.14,0.20,0,OBJ_YANE),Math.PI/2) ];
+/* 立体を拡大縮小する（原点中心。法線はそのまま）*/
+function oScale(sd,k,kh){ kh=kh??k; return {order:sd.order,body:sd.body,smooth:sd.smooth,faces:sd.faces.map(f=>({n:f.n,pts:f.pts.map(([x,z,h])=>[x*k,z*k,h*kh])}))}; }
+/* 天守の一層：白い壁と、壁より外へ出た黒い庇（寄棟の帯）。庇の黒い横縞が入ると、段が箱の積み重ねに見えない */
+const KESHO=(x,z,hb,ht,e=0.07)=>[ oBox(-x,-z,x,z,hb,ht,0,OBJ_BODY), oHip(-x-e,-z-e,x+e,z+e,ht,ht+0.06,e+0.02,e+0.02,0,OBJ_YANE) ];
+/* 千鳥破風。屋根の正面に小さな切妻を一つ */
 const OBJECTS={
   /* 拠点の段階（RANKS の k と対応）*/
   vacant :()=>[],                                        // 更地は何も建たない
   /* 屋敷。豆腐のままだと箱にしか見えないので、総高 0.42 を壁と切妻屋根に
      割った。外形と高さは前と同じで、上の 0.13 が屋根に変わっただけ */
   yashiki:()=>[ oBox (-0.46,-0.36,0.46,0.36,0,   0.29,0),
-                oRoof(-0.50,-0.40,0.50,0.40,0.29,0.42,1,OBJ_YANE) ],
+                oHip (-0.52,-0.42,0.52,0.42,0.29,0.44,0.22,0.36,1,OBJ_YANE) ],   // 寄棟の屋根
   /* 館。3棟のコの字に、棟ごとの屋根を載せる。左右の棟は稜の向きが
      90度違うので、oRoof を oSpin で回して置く。総高 0.52 は前と同じ */
   yakata :()=>{
@@ -2792,57 +2816,91 @@ const OBJECTS={
   },
   /* 城。足元を石垣（oDai）にして、天守をその上へ載せる。段数・総高・塀は
      前のまま。石垣は裾が広がるぶんだけ外へ出るが、塀の内側には収まる */
-  castle1:()=>{ const a=0.36,H=0.72,s=0.24;
-    return [WALL_RING(), oDai(-a-0.09,-a*0.86-0.09,a+0.09,a*0.86+0.09,0,s,0.09,0,OBJ_ISHI),
-            oBox(-a,-a*0.86,a,a*0.86,s,H,0),
-            oRoof(-a*1.18,-a*1.18,a*1.18,a*1.18,H,H+0.38,1)]; },
-  castle2:()=>{ const a=0.40,b=0.29,h1=0.46,h2=0.40,s=0.22;
-    return [WALL_RING(), oDai(-a-0.10,-a*0.86-0.10,a+0.10,a*0.86+0.10,0,s,0.10,0,OBJ_ISHI),
-            oBox(-a,-a*0.86,a,a*0.86,s,h1,0),
-            oBox(-b,-b*0.86,b,b*0.86,h1,h1+h2,1),
-            oRoof(-b*1.22,-b*1.22,b*1.22,b*1.22,h1+h2,h1+h2+0.34,2)]; },
-  castle3:()=>{ const a=0.44,b=0.34,c=0.25,h1=0.42,h2=0.38,h3=0.34,s=0.20;
-    return [WALL_RING(), oDai(-a-0.11,-a*0.84-0.11,a+0.11,a*0.84+0.11,0,s,0.11,0,OBJ_ISHI),
-            oBox(-a,-a*0.84,a,a*0.84,s,h1,0),
-            oBox(-b,-b*0.84,b,b*0.84,h1,h1+h2,1),
-            oBox(-c,-c*0.84,c,c*0.84,h1+h2,h1+h2+h3,2),
-            oRoof(-c*1.26,-c*1.26,c*1.26,c*1.26,h1+h2+h3,h1+h2+h3+0.32,3)]; },
+  castle1:()=>{ const s=0.30;
+    return [WALL_RING(), ...WALL_CAP(),
+            oDai(-0.60,-0.52,0.60,0.52,0,s,0.14,0,OBJ_ISHI),            // 野面積みの石垣（裾広がり）
+            ...KESHO(0.38,0.33,s,s+0.32),                               // 壁と庇
+            oHip(-0.46,-0.41,0.46,0.41,s+0.38,s+0.62,0.28,0.32,0,OBJ_YANE), // 最上の屋根（入母屋の代わりの寄棟）
+            oRoof(-0.11,0.33,0.11,0.43,s+0.42,s+0.54,0,OBJ_YANE)];      // 千鳥破風
+  },
+  castle2:()=>{ const s=0.30;
+    return [WALL_RING(), ...WALL_CAP(),
+            oDai(-0.60,-0.52,0.60,0.52,0,s,0.14,0,OBJ_ISHI),
+            ...KESHO(0.40,0.35,s,s+0.28),
+            ...KESHO(0.28,0.24,s+0.34,s+0.60),
+            oHip(-0.36,-0.32,0.36,0.32,s+0.66,s+0.88,0.22,0.26,0,OBJ_YANE),
+            oRoof(-0.10,0.24,0.10,0.34,s+0.70,s+0.81,0,OBJ_YANE)];
+  },
+  castle3:()=>{ const s=0.30;
+    return [WALL_RING(), ...WALL_CAP(),
+            oDai(-0.62,-0.54,0.62,0.54,0,s,0.14,0,OBJ_ISHI),
+            ...KESHO(0.44,0.38,s,s+0.26),
+            ...KESHO(0.32,0.28,s+0.32,s+0.56),
+            ...KESHO(0.21,0.18,s+0.62,s+0.84),
+            oHip(-0.29,-0.26,0.29,0.26,s+0.90,s+1.10,0.18,0.20,0,OBJ_YANE),
+            oRoof(-0.09,0.18,0.09,0.28,s+0.93,s+1.03,0,OBJ_YANE),
+            oRoof(-0.14,0.30,0.14,0.42,s+0.60,s+0.72,0,OBJ_YANE)];      // 二層目にも破風
+  },
   /* 支城。土を掻き上げた土塁の上に櫓を一基、板葺きの屋根を載せ、まわりを
      低い柵で囲う。城とは足元が石垣か土塁か、囲いが塀か柵か、屋根が瓦色か
      板色か、段が重なるか一基かで、すべて別に作ってある。総高 0.62 は前と同じ */
-  fort   :()=>[ SAKU_RING(),
-                oDai (-0.40,-0.36,0.40,0.36,0,   0.14,0.08,0,OBJ_DORUI),  // 土塁
-                oBox (-0.30,-0.26,0.30,0.26,0.14,0.50,0,OBJ_TORIDE),      // 櫓
-                oRoof(-0.35,-0.31,0.35,0.31,0.50,0.62,0,OBJ_ITAYA) ],     // 板葺き
+  fort   :()=>{ const out=[
+                oDai (-0.56,-0.48,0.56,0.48,0,   0.16,0.12,0,OBJ_DORUI),   // 土塁
+                oRing(0.44,0.36,0.03,0.26,0,OBJ_WOOD) ];                   // 木柵
+    for(const [x,z] of [[-0.44,-0.36],[0.44,-0.36],[-0.44,0.36],[0.44,0.36],[0,-0.36],[0,0.36],[-0.44,0],[0.44,0]])
+      out.push(oRod([x,z,0.16],[x,z,0.34],0.025,0,OBJ_ITAYA,5));           // 柵の柱
+    out.push(oBox(-0.13,0.30,-0.07,0.40,0.16,0.44,0,OBJ_ITAYA), oBox(0.07,0.30,0.13,0.40,0.16,0.44,0,OBJ_ITAYA),
+             oBox(-0.16,0.33,0.16,0.39,0.40,0.46,0,OBJ_ITAYA));            // 門
+    for(const [x,z] of [[-0.16,-0.14],[0.16,-0.14],[-0.16,0.14],[0.16,0.14]])
+      out.push(oRod([x,z,0.16],[x,z,0.62],0.028,0,OBJ_ITAYA,5));           // 井楼櫓の柱
+    out.push(oBox(-0.22,-0.20,0.22,0.20,0.62,0.86,0,OBJ_WOOD),             // 櫓
+             oHip(-0.29,-0.27,0.29,0.27,0.86,1.00,0.20,0.20,0,OBJ_ITAYA),  // 板葺きの屋根
+             oRod([0.22,-0.20,0.86],[0.22,-0.20,1.30],0.018,0,OBJ_SAO,5),  // 旗竿
+             oPennant(0.22,-0.20,0.02,1.10,1.28,0,OBJ_HATA2));             // 小旗
+    return out; },
   /* 開墾地。**耕せない土を起こしただけの段。** 作物はまだ無い。
      低い畝を何本か通し、隅に鋤を立てておく */
   kaikon :()=>{
     const out=[];
-    for(let i=0;i<5;i++){
-      const z=-0.44+i*0.22;
-      out.push(oFlat(-0.52,z-0.045,0.52,z+0.045,0.016,0,OBJ_DORUI));
+    for(let i=0;i<3;i++){
+      const z=-0.34+i*0.32;
+      out.push(oFlat(-0.52,z-0.11,0.52,z+0.11,0.012,0,i%2?OBJ_SOIL:OBJ_DORUI));          // 幅のある畝。土 2 色交互、高さは持たない
     }
-    out.push(oRod([0.40,-0.50,0],[0.34,-0.44,0.42],0.020,0,OBJ_SAO,5));
-    out.push(oBox(0.30,-0.46,0.40,-0.40,0.40,0.46,0,OBJ_DORUI));
+    out.push(oCyl(0.40,-0.56,0.07,0,0.10,0,OBJ_WOOD,8), oCyl(-0.46,0.54,0.06,0,0.09,0,OBJ_WOOD,8));   // 切株
+    out.push(oRod([0.48,0.46,0.03],[0.32,0.24,0.62],0.018,0,OBJ_SAO,5),                            // 立て掛けた鍬
+             oBox(0.42,0.42,0.54,0.50,0.0,0.03,0,OBJ_YARIHO));
     return out;
   },
+
   /* 関所。道を跨ぐ冠木門と、両脇へ延びる柵。**通る道を塞ぐものなので、
      門そのものより、道の幅いっぱいに渡した貫が目印になる** */
-  sekisho:()=>[ oBox(-0.46,-0.06,-0.34, 0.06,0,   0.46,0,OBJ_WOOD),   // 左柱
-                oBox( 0.34,-0.06, 0.46, 0.06,0,   0.46,0,OBJ_WOOD),   // 右柱
-                oBox(-0.52,-0.05, 0.52, 0.05,0.38,0.46,1,OBJ_WOOD),   // 貫
-                oRoof(-0.56,-0.12,0.56,0.12,0.46,0.58,1,OBJ_ITAYA),   // 板庇
-                oBox(-0.80,-0.03,-0.46,0.03,0,   0.24,0,OBJ_WOOD),    // 左の柵
-                oBox( 0.46,-0.03, 0.80,0.03,0,   0.24,0,OBJ_WOOD) ],  // 右の柵
+  sekisho:()=>{ const out=[ oBox(-0.46,-0.06,-0.34, 0.06,0,   0.46,0,OBJ_ITAYA),   // 左柱
+                oBox( 0.34,-0.06, 0.46, 0.06,0,   0.46,0,OBJ_ITAYA),   // 右柱
+                oBox(-0.52,-0.05, 0.52, 0.05,0.38,0.46,1,OBJ_WOOD),    // 貫
+                oRoof(-0.56,-0.12,0.56,0.12,0.46,0.58,1,OBJ_WOOD) ];   // 板庇
+    for(const sg of [-1,1]){                                             // 柵。立てた杭と横桟
+      for(let i=0;i<4;i++){ const x=sg*(0.50+i*0.10); out.push(oRod([x,0,0],[x,0,0.26],0.022,0,OBJ_WOOD,5)); }
+      for(const h of [0.12,0.22]) out.push(oBox(Math.min(sg*0.48,sg*0.82),-0.012,Math.max(sg*0.48,sg*0.82),0.012,h-0.012,h+0.012,0,OBJ_WOOD));
+    }
+    out.push(oBox(0.48,0.08,0.78,0.34,0,0.18,0,OBJ_MURA), oHip(0.45,0.05,0.81,0.37,0.18,0.30,0.10,0.10,0,OBJ_ITAYA));   // 番所
+    return out; },
   /* 港。開業した港適地にだけ立つ。+z が海の側に来るよう回して置く。
      岸の小屋・沖へ延びる桟橋・船溜まりの船（船底＋屋形の三角柱）*/
-  harbor :()=>[
-    oBox (-0.28,-0.76, 0.10,-0.58,0.00,0.13,0,OBJ_WOOD),   // 岸の小屋
-    oRoof(-0.31,-0.79, 0.13,-0.55,0.13,0.20,0,OBJ_YANE),   // その屋根
-    oBox (-0.09,-0.52, 0.09, 0.70,0.05,0.15,0,OBJ_WOOD),   // 桟橋
-    oRoof(-0.70, 0.14,-0.16, 0.48,0.00,0.17,0,OBJ_WOOD,1), // 船底
-    oRoof(-0.56, 0.19,-0.30, 0.43,0.17,0.37,1,OBJ_WOOD),   // 屋形
-  ],
+  harbor :()=>{
+    const out=[];
+    for(const dx of [0,0.46]){                                            // 蔵 2 棟（陸側）
+      out.push(oBox(-0.52+dx,-0.78,-0.14+dx,-0.46,0,0.28,0,OBJ_BODY),
+               oHip(-0.56+dx,-0.82,-0.10+dx,-0.42,0.28,0.44,0.08,0.20,0,OBJ_YANE));
+    }
+    out.push(oBox(-0.08,-0.40,0.08,0.78,0.08,0.13,0,OBJ_WOOD));          // 桟橋
+    for(const z of [-0.2,0.1,0.4,0.7])for(const sg of [-1,1])
+      out.push(oRod([sg*0.09,z,0],[sg*0.09,z,0.18],0.02,0,OBJ_ITAYA,5));   // 杭
+    for(const sg of [-1,1])                                               // 和船 2 隻。桟橋から少し離して平行に
+      out.push(...kobayaSolids(sg*0.42,0.26).map(sd=>oScale(sd,0.90,1.0)));
+    out.push(oRod([0.38,0.22,0.16],[0.38,0.22,0.90],0.02,0,OBJ_SAO,5),      // 帆柱と帆（1 隻だけ）。100% で白い帆 1 枚が港の印
+             oBox(0.24,0.21,0.52,0.23,0.34,0.84,0,OBJ_HO));
+    return out;
+  },
   /* 畑と水田。地面に寝かせた面だけなので高さを持たない。段階は面積・区画の
      割り方・列の数で分け、水田 Lv.3 だけ外縁に用水路が付く。
      畑だけ turn を立てて区画と畝を90度回し、水田と向きで分ける。
@@ -2925,17 +2983,19 @@ function umaSolids(x, z, f) {
   return out;
 }
 function idouSolids(f) {
-  const out = umaSolids(0, 0, f);
+  const out = umaSolids(0, 0, f).map(sd => oScale(sd, 1.22, 1.22));
+  out.push(oBox(-0.10, -0.06, 0.10, 0.12, 0.70, 0.76, 0, OBJ_HACHI));    // 鞍。赤は面積小
   /* 乗り手。軍装ではなく直垂に立烏帽子。袖と裾を太い rod にして布の量を出す */
+  const r = [];
   for (const g of [-1, 1]) {
-    out.push(oRod([g*0.105,-0.02,0.74], [g*0.150, 0.09,0.44], 0.062, 0, OBJ_HAKAMA));
-    out.push(oRod([g*0.125,-0.04,1.06], [g*0.120, 0.17,0.92], 0.058, 0, OBJ_HITATA));
+    r.push(oRod([g*0.105,-0.02,0.74], [g*0.150, 0.09,0.44], 0.062, 0, OBJ_HAKAMA));
+    r.push(oRod([g*0.125,-0.04,1.06], [g*0.120, 0.17,0.92], 0.058, 0, OBJ_HITATA));
   }
-  out.push(oRod([0,-0.02,0.66], [0,-0.05,0.90], 0.150, 0, OBJ_HAKAMA));  // 腰から裾
-  out.push(oRod([0,-0.04,0.88], [0,-0.06,1.14], 0.120, 0, OBJ_HITATA));  // 身頃
-  out.push(oBall(0, -0.07, 0.135, 1.26, 0, OBJ_KAO));                    // 顔
-  out.push(oRod([0,-0.09,1.33], [0,-0.17,1.50], 0.100, 0, OBJ_EBOSHI));  // 烏帽子の下半
-  out.push(oRod([0,-0.16,1.48], [0,-0.25,1.66], 0.070, 0, OBJ_EBOSHI));  // 後ろへ倒れる先
+  r.push(oRod([0,-0.02,0.66], [0,-0.05,0.90], 0.150, 0, OBJ_HAKAMA));  // 腰から裾
+  r.push(oRod([0,-0.04,0.88], [0,-0.06,1.14], 0.120, 0, OBJ_HITATA));  // 身頃
+  r.push(oBall(0, -0.07, 0.135, 1.26, 0, OBJ_KAO));                    // 顔
+  r.push(...kaburi(0, -0.07, 1.26, 0.135, "tateeboshi", OBJ_EBOSHI));  // 立烏帽子。使者と同じ寸法
+  out.push(...r.map(sd => oLift(sd, 0.12)));                           // 馬が大きくなった分、鞍の高さへ
   return f ? out.map(sd => oLift(sd, 0.02)) : out;
 }
 
@@ -3025,7 +3085,7 @@ function funeSolids(col, f) {
   out.push(oRod([0,-0.60,0.235], [0,-0.63,1.36], 0.028, 0, OBJ_SAO));    // 艫の旗竿
   const hata = col.map(v => Math.round(v + (255 - v) * 0.22));      // 船体の茶から浮かす
   /* 三角の小旗。**表と裏の2面だけ。** 拍では竿のまわりに振る */
-  out.push(oSpin(oPennant(0, -0.615, -1.45, 0.50, 1.30, 0, hata),
+  out.push(oSpin(oPennant(0, -0.615, -1.55, 0.42, 1.34, 0, hata),
                  (f ? 9 : -9) * Math.PI / 180, 0, -0.615));
   return out.map(sd => oWave(sd, f ? 0.045 : 0, f ? 0.030 : -0.030));
 }
@@ -3067,7 +3127,9 @@ const W_YAKU = { fuku: OBJ_SUOU,   te: OBJ_NIN,  kabu: "eboshi",    kabuC: OBJ_E
 const W_UNPAN= { fuku: OBJ_KAKI,   te: OBJ_NIN,  kabu: "hachimaki", kabuC: OBJ_TENUGU };
 const W_GAIKO= { fuku: OBJ_SEISO,  te: OBJ_SEISO2, kabu: "tateeboshi", kabuC: OBJ_EBOSHI };
 /* 忍びは顔も布で覆うので kao を差し替える。目のところだけ肌の色を残す */
-const W_NINJA= { fuku: OBJ_SHINOB, te: OBJ_SHINOB, kabu: "zukin", kabuC: OBJ_SHINOB, kao: OBJ_SHINOB };
+const W_NINJA= { fuku: OBJ_SHINOB, te: OBJ_SHINOB2, kabu: "zukin", kabuC: OBJ_SHINOB, kao: OBJ_SHINOB };
+/* 商人。素襖のまま、頭は烏帽子ではなく手拭い。天秤棒を担ぐ */
+const W_SHO  = { fuku: OBJ_SUOU,   te: OBJ_NIN,  kabu: "hachimaki", kabuC: OBJ_TENUGU };
 
 /* かぶり物。顔の中心 hc と球の半径 r に対する比で作るので、
    足軽の小さい頭にも人夫の大きい頭にも同じ関数で載る。
@@ -3082,11 +3144,11 @@ function kaburi(x, z, hc, r, kind, c) {
     return [oCyl(x, z, r*1.05, hc - r*0.24, hc + r*0.28, 0, c, 10),
             oRod([x, z - r*0.90, hc + r*0.12], [x, z - r*1.70, hc - r*0.30],
                 r*0.12, 0, c, 5)];
-  if (kind === "tateeboshi")                    // 使者。正装の立烏帽子。侍烏帽子より高い
-    return [oRod([x, z - r*0.16, hc + r*0.46], [x, z - r*0.58, hc + r*1.28],
-                r*0.78, 0, c, 7),
-            oRod([x, z - r*0.52, hc + r*1.20], [x, z - r*0.96, hc + r*2.00],
-                r*0.52, 0, c, 7)];
+  if (kind === "tateeboshi")                    // 使者。正装の立烏帽子。侍烏帽子より高いが頭幅は超えない
+    return [oRod([x, z - r*0.14, hc + r*0.50], [x, z - r*0.40, hc + r*1.20],
+                r*0.56, 0, c, 7),
+            oRod([x, z - r*0.36, hc + r*1.12], [x, z - r*0.66, hc + r*1.70],
+                r*0.38, 0, c, 7)];
   if (kind === "zukin")                         // 忍び。頭巾の結びと、目のところの隙間
     return [oRod([x, z - r*0.85, hc + r*0.10], [x, z - r*1.55, hc - r*0.30],
                 r*0.16, 0, c, 5),
@@ -3156,7 +3218,7 @@ const NIN_A = {                               // 振り上げ
   koshi:[0,0.02,0.52], kata:[0,-0.05,1.02], atama:[0,-0.06,1.15],
   hiji:[0.195,-0.17,1.17], te:[0.080,-0.29,1.33],
   hiza:[0.150,0.07,0.30], ashi:[0.205,-0.05,0.03],
-  e0:[0,-0.26,1.26], e1:[0,-0.47,1.75], tsuchi:[0,-0.50,1.80],
+  e0:[0,-0.27,1.28], e1:[0,-0.40,1.56], tsuchi:[0,-0.42,1.59],
 };
 const NIN_B = {                               // 振り下ろし。前へ屈む
   koshi:[0,0.00,0.50], kata:[0,0.17,0.93], atama:[0,0.25,1.05],
@@ -3185,15 +3247,15 @@ function ninpuBody(x, z, K, W) {
 /* 木槌。柄と、先に渡した太い横木 */
 function tsuchiTool(x, z, K) {
   return [
-    oRod([x + K.e0[0], z + K.e0[1], K.e0[2]], [x + K.e1[0], z + K.e1[1], K.e1[2]], 0.030, 0, OBJ_SAO),
-    oRod([x - 0.145, z + K.tsuchi[1], K.tsuchi[2]],
-        [x + 0.145, z + K.tsuchi[1], K.tsuchi[2]], 0.080, 0, OBJ_SAO),
+    oRod([x + K.e0[0], z + K.e0[1], K.e0[2]], [x + K.e1[0], z + K.e1[1], K.e1[2]], 0.022, 0, OBJ_SAO),
+    oRod([x - 0.085, z + K.tsuchi[1], K.tsuchi[2]],
+        [x + 0.085, z + K.tsuchi[1], K.tsuchi[2]], 0.046, 0, OBJ_SAO),
   ];
 }
 /* 道具を担いで歩く姿。作業中は ninpuBody で腰も肘も曲げるが、歩いている間は
    足軽と同じ person を使う。道具は槍と同じ要領で右肩へ倒し、柄を t で辿る。
    t=0.17（高さ 0.49）が右手の握りで、その側の腕は振らない */
-const TSUCHI_C = { x: 0.152, z0: 0.20, h0: 0.32, z1: -0.26, h1: 1.30 };
+const TSUCHI_C = { x: 0.152, z0: 0.20, h0: 0.32, z1: -0.22, h1: 1.12 };
 const tsuchiAt = (x, z, t) => [x + TSUCHI_C.x,
   z + TSUCHI_C.z0 + (TSUCHI_C.z1 - TSUCHI_C.z0) * t,
   TSUCHI_C.h0 + (TSUCHI_C.h1 - TSUCHI_C.h0) * t];
@@ -3244,9 +3306,11 @@ function choTool(x, z, K) {
 function nogyoSolids(f) {
   const K = f ? KARI_B : KARI_A, x = 0.00, z = -0.06;
   const out = [...ninpuBody(x, z, K, W_NOU), ...kamaTool(x, z, K)];
-  for (const dx of [-0.36, -0.14, 0.08, 0.30])                    // 刈る手前の稲
-    out.push(oBox(dx, 0.34, dx + 0.15, 0.44, 0, 0.25, 0, OBJ_INE));
-  out.push(oRod([-0.36, -0.42, 0.09], [-0.04, -0.36, 0.09], 0.085, 0, OBJ_INEBA));
+  for (const dx of [-0.36, -0.14, 0.08, 0.30])                    // 刈る手前の稲。束ねて立てた円錐
+    out.push(oCone(dx + 0.07, 0.40, 0.11, 0, 0.26, 0, OBJ_INE, 6),
+             oBall(dx + 0.07, 0.40, 0.045, 0.27, 0, OBJ_KASA, 5, 2));   // 穂
+  out.push(oRod([-0.36, -0.42, 0.07], [-0.08, -0.36, 0.07], 0.070, 0, OBJ_INEBA, 6),   // 足元の刈り束
+           oBall(-0.06, -0.355, 0.055, 0.07, 0, OBJ_KASA, 5, 2));
   return out;
 }
 
@@ -3257,7 +3321,8 @@ function nogyoIdouSolids(f) {
   const e = [te[0] + 0.03, te[1] + 0.19, te[2] - 0.07];
   out.push(oRod(te, e, 0.023, 0, OBJ_SAO, 5));                         // 柄
   out.push(oRod(e, [e[0] + 0.15, e[1] + 0.09, e[2] - 0.02], 0.019, 0, OBJ_YARIHO, 5));
-  out.push(oRod([-0.44, -0.10, 0.86], [-0.17, 0.14, 0.91], 0.098, 0, OBJ_INEBA));
+  out.push(oRod([-0.40, -0.12, 0.84], [-0.17, 0.12, 0.90], 0.080, 0, OBJ_INEBA, 6),   // 左肩の稲束
+           oBall(-0.42, -0.14, 0.065, 0.835, 0, OBJ_KASA, 5, 2));                     // 穂の側
   return out;
 }
 
@@ -3266,8 +3331,11 @@ function nogyoIdouSolids(f) {
 function kenchikuSolids(f) {
   const K = f ? NIN_B : NIN_A, x = 0.00, z = -0.14;
   const out = [];
-  for (const dx of [-0.66, -0.52])                                // 寝かせた材木
-    out.push(oRod([dx, -0.36, 0.06], [dx, 0.20, 0.06], 0.055, 0, OBJ_WOOD, 5));
+  for (const dx of [-0.70, -0.58, -0.46])                         // 寝かせた材木 3 本
+    out.push(oRod([dx, -0.38, 0.05], [dx, 0.24, 0.05], 0.050, 0, OBJ_WOOD, 5));
+  out.push(oBox(-0.64, -0.30, -0.50, -0.26, 0, 0.12, 0, OBJ_ITAYA),      // 架台
+           oBox(-0.64,  0.12, -0.50,  0.16, 0, 0.12, 0, OBJ_ITAYA),
+           oRod([-0.57, -0.40, 0.16], [-0.57, 0.26, 0.16], 0.050, 0, OBJ_WOOD, 5));
   out.push(oRod([x, z + 0.64, 0.02], [x, z + 0.64, 0.34], 0.048, 0, OBJ_WOOD)); // 打つ杭
   out.push(...ninpuBody(x, z, K, W_DAI), ...tsuchiTool(x, z, K));
   return out;
@@ -3277,9 +3345,9 @@ function kenchikuSolids(f) {
 function kenchikuIdouSolids(f) {
   const p = tsuchiAt(0, 0, 1);
   const out = person(0, 0, W_DAI, f, false, tsuchiAt(0, 0, 0.17));
-  out.push(oRod(tsuchiAt(0, 0, 0), p, 0.030, 0, OBJ_SAO, 5));            // 柄
-  out.push(oRod([p[0] - 0.145, p[1], p[2]],                          // 先の横木
-               [p[0] + 0.145, p[1], p[2]], 0.080, 0, OBJ_SAO, 7));
+  out.push(oRod(tsuchiAt(0, 0, 0), p, 0.022, 0, OBJ_SAO, 5));            // 柄
+  out.push(oRod([p[0] - 0.085, p[1], p[2]],                          // 先の横木
+               [p[0] + 0.085, p[1], p[2]], 0.046, 0, OBJ_SAO, 7));
   out.push(oRod([-0.20, -0.38, 0.94], [-0.20, 0.42, 0.94], 0.050, 0, OBJ_WOOD, 5));
   return out;
 }
@@ -3287,20 +3355,26 @@ function kenchikuIdouSolids(f) {
 /* 商業（作業）。烏帽子に素襖の小役人が、年貢の俵を検地して帳面につける。
    売り買いではなく取り立てる側。俵は数える相手として二つ置くだけ */
 function shogyoSolids(f) {
-  const K = f ? CHO_B : CHO_A, x = -0.16, z = 0.06;
+  const K = f ? CHO_B : CHO_A, x = -0.10, z = 0.06;
   const out = [];
-  for (const [tx, tz, h] of [[0.40,-0.20,0.12], [0.40, 0.12,0.12]])
-    out.push(oRod([tx - 0.17, tz, h], [tx + 0.17, tz, h], 0.120, 0, OBJ_TAWARA));
-  out.push(...ninpuBody(x, z, K, W_YAKU), ...choTool(x, z, K));
+  for (const g of [-1, 1])                                          // 下ろした荷。地面に 2 つ
+    out.push(oBox(x + g*0.42 - 0.08, 0.36, x + g*0.42 + 0.08, 0.50, 0, 0.14, 0, OBJ_TAWARA));
+  out.push(oRod([x - 0.44, 0.43, 0.15], [x + 0.44, 0.43, 0.15], 0.020, 0, OBJ_WOOD, 5)); // 荷に渡した天秤棒
+  out.push(...ninpuBody(x, z, K, W_SHO));
+  out.push(oBox(x - 0.07, z + K.te[1] - 0.02, x + 0.07, z + K.te[1] + 0.02,   // 算盤
+               K.te[2] - 0.05, K.te[2] + 0.05, 0, OBJ_WOOD));
   return out;
 }
 
 /* 商業（移動）。同じ小役人が帳面を小脇に抱えて歩く */
 function shogyoIdouSolids(f) {
-  const te = [0.185, 0.16, 0.58];
-  const out = person(0, 0, W_YAKU, f, false, te);
-  out.push(oBox(0.11, te[1] - 0.16, 0.19, te[1] + 0.16,
-               te[2] - 0.02, te[2] + 0.22, 0, OBJ_KAMI));
+  const te = [0.160, 0.06, 0.84];                   // 右手は肩の天秤棒を押さえる
+  const out = person(0, 0, W_SHO, f, false, te);
+  out.push(oRod([0.15-0.44, 0.06, 0.86], [0.15+0.44, 0.06, 0.86], 0.02, 0, OBJ_WOOD, 5));   // 天秤棒
+  for (const g of [-1, 1]) {
+    out.push(oRod([0.15+g*0.42, 0.06, 0.86], [0.15+g*0.42, 0.06, 0.86-0.22], 0.010, 0, OBJ_SAO, 4));  // 吊り
+    out.push(oBox(0.15+g*0.42-0.08, 0.06-0.07, 0.15+g*0.42+0.08, 0.06+0.07, 0.86-0.36, 0.86-0.22, 0, OBJ_TAWARA)); // 荷
+  }
   return out;
 }
 
@@ -3329,32 +3403,41 @@ function unpanSolids(f) {
 /* 外交。正装の使者がひとりで歩く。馬に乗せると図が高くなるので徒歩にした。
    持ち物は右手の巻物ひとつだけ */
 function gaikoSolids(f) {
-  const te = [0.170, 0.24, 0.50];
+  const te = [0.095, 0.20, 0.60];
   const out = person(0, 0, W_GAIKO, f, false, te);
-  out.push(oRod([0.05, te[1] + 0.03, te[2] + 0.01],
-               [0.29, te[1] - 0.03, te[2] - 0.01], 0.042, 0, OBJ_KAMI, 7));
+  out.push(oRod([-HEI_W, 0, HEI_KATA - 0.05], [-0.150, 0.08, 0.60], 0.043, 0, OBJ_SEISO2, 5),  // 左腕も前へ
+           oRod([-0.150, 0.08, 0.60], [-0.095, 0.20, 0.60], 0.040, 0, OBJ_SEISO2, 5));
+  out.push(oBox(-0.09, 0.14, 0.09, 0.24, 0.56, 0.64, 0, OBJ_YANE));        // 文箱。黒漆
+  const sgn = f ? 1 : -1;                                                 // 袴。白一色だと雪で消えるので脚だけ鉄紺を被せる
+  for (const g of [-1, 1]) {
+    const d = HEI_SW * sgn * g;
+    out.push(oRod([g*0.062, 0, HEI_KOSHI + 0.02], [g*0.072, d*0.55, HEI_HIZA], 0.052, 0, OBJ_HITATA, 5));
+    out.push(oRod([g*0.072, d*0.55, HEI_HIZA], [g*0.076, d*0.92, HEI_ASHI + 0.05], 0.047, 0, OBJ_HITATA, 5));
+  }
   return out;
 }
 
 /* 忍者。腰を落として忍び歩く。総高は他より低い。
    背に刀を一振り負い、顔は頭巾で覆って目のところだけ開ける */
-const SHINOBI_A = {                           // 踏み出す
-  koshi:[0,0.06,0.36], kata:[0,0.22,0.68], atama:[0,0.32,0.80],
-  hiji:[0.185,0.30,0.52], te:[0.150,0.48,0.40],
-  hiza:[0.185,0.22,0.22], ashi:[0.230,0.02,0.03],
+const SHINOBI_A = {                           // 踏み出す。腰を落とすが、立って走る人の形は保つ
+  koshi:[0,0.03,0.46], kata:[0,0.12,0.86], atama:[0,0.18,0.99],
+  hiji:[0.185,0.06,0.68], te:[0.150,0.28,0.54],
+  hiza:[0.120,0.18,0.25], ashi:[0.150,0.02,0.03],
 };
 const SHINOBI_B = {                           // 引きつける
-  koshi:[0,0.04,0.40], kata:[0,0.18,0.72], atama:[0,0.28,0.84],
-  hiji:[0.180,0.24,0.56], te:[0.145,0.40,0.44],
-  hiza:[0.180,0.16,0.26], ashi:[0.225,0.00,0.03],
+  koshi:[0,0.02,0.48], kata:[0,0.10,0.88], atama:[0,0.16,1.01],
+  hiji:[0.180,0.02,0.70], te:[0.145,0.22,0.56],
+  hiza:[0.115,0.12,0.27], ashi:[0.145,-0.02,0.03],
 };
 function ninjaSolids(f) {
   const K = f ? SHINOBI_B : SHINOBI_A;
   const out = ninpuBody(0, 0, K, W_NINJA);
-  const a = [-0.13, K.kata[1] - 0.20, K.kata[2] - 0.20];   // 背負う刀
-  const b = [ 0.15, K.kata[1] - 0.06, K.kata[2] + 0.20];
-  out.push(oRod(a, b, 0.021, 0, OBJ_SHINOB, 5));
-  out.push(oRod(b, [b[0] + 0.09, b[1] + 0.04, b[2] + 0.07], 0.028, 0, OBJ_SHINOB, 5));
+  const a = [-0.12, K.kata[1] - 0.22, K.kata[2] - 0.16];   // 背負う刀。左腰から右肩の上へ
+  const b = [ 0.14, K.kata[1] - 0.10, K.kata[2] + 0.26];
+  out.push(oRod(a, b, 0.021, 0, OBJ_SAYA, 5));
+  out.push(oRod(b, [b[0] + 0.05, b[1] + 0.02, b[2] + 0.10], 0.026, 0, OBJ_TSUKA, 5));   // 柄
+  out.push(oRod([-0.14, K.koshi[1], K.koshi[2] + 0.02], [0.14, K.koshi[1], K.koshi[2] + 0.02],
+                0.145, 0, OBJ_SHINOB2, 6));                                              // 帯。胴を上下に割る
   return out;
 }
 
@@ -3367,7 +3450,7 @@ function ninjaSolids(f) {
    ・前屈みで、足取りは重い。左腕はだらりと下げる
    ・刀は一本だけ、鞘ごと右肩に担ぐ
    ------------------------------------------------------------ */
-const OBJ_KOGE  =[0x3b,0x30,0x28];              // 煤けた着物。焦げ茶
+const OBJ_KOGE  =[0x6a,0x5a,0x48];              // 煤けた着物。くすんだ茶
 const OBJ_KOGE2 =[0x1f,0x1a,0x17];              // 焦げ跡。ほとんど黒
 const OBJ_YAKE  =[0x86,0x4a,0x26];              // 焼けた縁。赤茶
 const OBJ_ROHAKA=[0x55,0x4c,0x41];              // 色の抜けた袴
@@ -3376,6 +3459,8 @@ const OBJ_ROKAMI=[0x24,0x21,0x20];              // 乱れ髪
 const OBJ_YABUKASA=[0x86,0x74,0x52];            // 破れた菅笠。日焼けて暗い
 const OBJ_SAYA  =[0x1c,0x1a,0x1b];              // 鞘。黒漆が剥げかけ
 const OBJ_TSUKA =[0x6a,0x5a,0x46];              // 柄巻。擦り切れた色
+/* 浪人。くすんだ着物に色の抜けた袴、破れ笠 */
+const W_RONIN= { fuku: OBJ_KOGE,   te: OBJ_ROHAKA, kabu: "kasa",    kabuC: OBJ_KASA, kao: OBJ_ROKAO };   // 笠は明るい茅色。着物と同系だと塊に見える
 /* 立体を傾ける。(cx,cz,ch) を中心に、前後（x 軸まわり）へ ax、左右（z 軸まわり）へ az */
 function oTilt(sd, ax, az, cx, cz, ch) {
   const ca = Math.cos(ax), sa = Math.sin(ax), cb = Math.cos(az), sb = Math.sin(az);
@@ -3390,63 +3475,20 @@ function oTilt(sd, ax, az, cx, cz, ch) {
   }))};
 }
 function roninSolids(f) {
-  const s = f ? 1 : -1, bob = f ? 0.015 : 0;
-  const out = [];
-  const koshi = [0, 0.00, 0.47], kata = [0.02, 0.15, 0.86];   // 前屈み。肩は右へ少し寄る
-  /* 脚。重い足取りなので振り幅は足軽より小さく、膝を曲げる */
-  for (const g of [-1, 1]) {
-    const d = 0.095 * s * g;
-    const hiza = [g*0.072, d*0.55 + 0.04, 0.26], ashi = [g*0.082, d, 0.03];
-    out.push(oRod([g*0.060, 0, 0.45], hiza, 0.047, 0, OBJ_ROKAO, 5));
-    out.push(oRod(hiza, ashi, 0.043, 0, OBJ_ROKAO, 5));
-  }
-  /* 袴。膝下で焼け切れて、左右で丈が違う */
-  out.push(oRod([-0.070, 0.00, 0.50], [-0.080, 0.02 - 0.05*s, 0.20], 0.078, 0, OBJ_ROHAKA, 6));
-  out.push(oRod([ 0.070, 0.00, 0.50], [ 0.085, 0.02 + 0.05*s, 0.29], 0.074, 0, OBJ_ROHAKA, 6));
-  out.push(oRod([-0.085, 0.01 - 0.05*s, 0.22], [-0.095, 0.00 - 0.06*s, 0.15], 0.040, 0, OBJ_YAKE, 5)); // 焼けた裾
-  out.push(oRod([ 0.100, 0.03 + 0.05*s, 0.30], [ 0.108, 0.06 + 0.05*s, 0.25], 0.030, 0, OBJ_KOGE2, 5));
-  /* 胴。着物は腰から肩へ。帯は緩んで斜め */
-  out.push(oRod(koshi, kata, 0.138, 0, OBJ_KOGE, 7));
-  out.push(oTilt(oCyl(0, 0.02, 0.145, 0.50, 0.56, 0, OBJ_ROHAKA, 9), 0, 0.22, 0, 0.02, 0.53));
-  out.push(oRod([-0.115, 0.13, 0.84], [0.150, 0.18, 0.80], 0.066, 0, OBJ_KOGE, 5));  // 肩。左が下がる
-  /* 胸元がはだけて、肌が覗く */
-  out.push(oRod([0.03, 0.23, 0.80], [0.01, 0.20, 0.66], 0.032, 0, OBJ_ROKAO, 5));
-  /* 焦げ跡の斑。背・脇・腰に */
-  for (const [x, z, h, r] of [[-0.10,-0.07,0.70,0.050],[0.11,0.04,0.58,0.042],
-                              [-0.05,-0.10,0.54,0.036],[0.06,0.20,0.72,0.030]])
-    out.push(oBall(x, z, r, h, 0, OBJ_KOGE2, 6, 2));
-  /* 左腕。だらりと下げ、袖口が焼けて破れている */
-  const lh = [-0.170, 0.10 + 0.03*s, 0.64], lt = [-0.160, 0.14 + 0.05*s, 0.43];
-  out.push(oRod([-0.125, 0.13, 0.80], lh, 0.058, 0, OBJ_KOGE, 5));     // 袖
-  out.push(oRod(lh, [-0.172, 0.11 + 0.035*s, 0.58], 0.054, 0, OBJ_YAKE, 5)); // 焼けた袖口
-  out.push(oRod([-0.172, 0.11 + 0.035*s, 0.60], lt, 0.036, 0, OBJ_ROKAO, 5));
-  /* 右腕。肩の刀の柄を握る */
-  const te = [0.130, 0.30, 0.86];
-  out.push(oRod([0.150, 0.17, 0.80], [0.205, 0.26, 0.70], 0.056, 0, OBJ_KOGE, 5));
-  out.push(oRod([0.205, 0.26, 0.70], te, 0.038, 0, OBJ_ROKAO, 5));
-  /* 刀。鞘ごと右肩に担ぐ。柄は前、鞘尻は後ろ上へ */
-  const kt = [0.13, 0.40, 0.90], kb = [0.18, -0.40, 1.06];
-  out.push(oRod(kt, [0.14, 0.21, 0.95], 0.024, 0, OBJ_TSUKA, 5));     // 柄
-  out.push(oRod([0.14, 0.21, 0.95], [0.142, 0.19, 0.955], 0.036, 0, OBJ_YARIHO, 6)); // 鍔
-  out.push(oRod([0.142, 0.19, 0.955], kb, 0.022, 0, OBJ_SAYA, 5));   // 鞘
-  /* 首と顔。うつむいて前へ出る */
-  const hc = [0.01, 0.25, 0.99];
-  out.push(oRod([0.01, 0.17, 0.86], hc, 0.046, 0, OBJ_ROKAO, 5));
-  out.push(oBall(hc[0], hc[1], 0.128, hc[2], 0, OBJ_ROKAO, 8, 3));
-  out.push(oBall(hc[0] - 0.03, hc[1] + 0.07, 0.030, hc[2] - 0.05, 0, OBJ_KOGE2, 5, 2)); // 頬の煤
-  /* 乱れ髪。ほどけた髷が後ろと横へ散る */
-  for (const [dx, dz, dh, L] of [[-0.05,-0.20,0.02,0.10],[0.06,-0.19,-0.03,0.09],
-                                 [-0.12,-0.12,-0.07,0.08],[0.12,-0.10,-0.08,0.07],
-                                 [0.00,-0.22,-0.09,0.11]])
-    out.push(oRod([hc[0], hc[1] - 0.06, hc[2] + 0.03],
-                  [hc[0] + dx, hc[1] + dz, hc[2] + dh - L*0.4], 0.028, 0, OBJ_ROKAMI, 4));
-  /* 破れ笠。菅笠の一角を欠き、左へずらして傾ける。裂けた端が垂れる */
-  const kasa = oCone(hc[0] - 0.02, hc[1] - 0.01, 0.178, hc[2] + 0.03, hc[2] + 0.17, 0, OBJ_YABUKASA, 9);
-  kasa.faces = kasa.faces.filter((_, i) => i !== 4 && i !== 5);     // 左の一角が欠ける
-  out.push(oTilt(kasa, -0.16, 0.30, hc[0], hc[1], hc[2] + 0.08));
-  out.push(oRod([hc[0] + 0.14, hc[1] + 0.08, hc[2] + 0.02],
-                [hc[0] + 0.19, hc[1] + 0.12, hc[2] - 0.10], 0.020, 0, OBJ_YABUKASA, 4));
-  return bob ? out.map(sd => oLift(sd, bob)) : out;
+  const out = person(0, 0, W_RONIN, f, false, [0.150, 0.14, 0.50]);   // 右手は腰の刀に添える
+  /* 襟元と帯。着物の胴に袴の帯を一本回す */
+  out.push(oRod([-0.13, 0, HEI_KOSHI + 0.06], [0.13, 0, HEI_KOSHI + 0.06], 0.125, 0, OBJ_ROHAKA, 6));
+  /* 刀。鞘ごと左腰に横ざし。柄は前へ */
+  out.push(oRod([-0.10, -0.34, 0.50], [-0.11, 0.08, 0.53], 0.020, 0, OBJ_SAYA, 5));
+  out.push(oRod([-0.11, 0.08, 0.53], [-0.11, 0.10, 0.532], 0.032, 0, OBJ_YARIHO, 6));   // 鍔
+  out.push(oRod([-0.11, 0.10, 0.532], [-0.12, 0.26, 0.545], 0.022, 0, OBJ_TSUKA, 5));   // 柄
+  /* 髷はほどけて、後ろへ一房 */
+  const hc = HEI_KATA + 0.155;
+  out.push(oRod([0, -0.06, hc + 0.06], [0.02, -0.22, hc - 0.02], 0.030, 0, OBJ_ROKAMI, 4));
+  /* 破れ笠。菅笠の一角だけ欠ける */
+  const kasa = out.find(sd => sd.body === OBJ_KASA);
+  if (kasa) kasa.faces = kasa.faces.filter((_, k) => k !== 5);
+  return out;
 }
 
 /* 旗指物。細い竿と薄い旗。竿まわりに deg だけ振ってある。
@@ -5697,7 +5739,7 @@ let GLR=null;                  // 描き手。使えないときは null
 
 /* 画素の処理の定数（§10.21・8.4.0）。紙色・彩度・紙の目の振幅と細かさ（世界 km あたり）*/
 const PAPER_RGB=[0.914,0.863,0.753];            // #e9dcc0。被せる紙の色
-const GRADE_SAT=0.86;                           // 彩度（1 で素のまま）
+const GRADE_SAT=0.94;                           // 彩度（1 で素のまま）。0.86 は霧がかって見えた
 const GRADE_NOISE_A=0.045;                      // 紙の目の振幅（明度の ±）
 const GRADE_NOISE_F=0.32;                       // 紙の目の細かさ。1/0.32 km ≒ 2 升が粗い目の周期
 const glShade=(hex,f)=>{const n=parseInt(hex.slice(1),16),
@@ -6959,12 +7001,13 @@ function glCreate(){
     vec3 grade(vec3 c, float sat, float haze){
       float l=dot(c,vec3(0.299,0.587,0.114));
       c=mix(vec3(l),c,sat);                       /* 彩度 */
-      c=mix(c,c*uPaper*1.10,0.12);                /* 紙色の被り（12%。多いと色相差が縮む）*/
-      c=pow(max(c,0.0),vec3(0.95));               /* 中間調 */
-      c=c*0.97+uPaper*0.03;                       /* 黒を少し持ち上げる。紙に描いた墨は真っ黒にならない */
-      c=mix(c,uPaper,haze);                       /* 奥の靄 */
+      c=mix(c,c*uPaper*1.10,0.08);                /* 紙色の被り（8%。多いと霧がかって見える）*/
+      /* **コントラストは落とさない。** 中間調の持ち上げ・黒の持ち上げ・靄は「霧がかった」絵になった（依頼）ので
+         やめ、中間調を軸に少し締める（S 字 1.10）。紙の色は被りだけで出す */
+      c=clamp((c-0.5)*1.10+0.5,0.0,1.0);
+      c=mix(c,uPaper,haze);                       /* 奥の靄（いまは 0）*/
       return c; }
-    float haze(vec2 res){ return 0.07*smoothstep(0.55,1.0,gl_FragCoord.y/res.y); }`;
+    float haze(vec2 res){ return 0.0*smoothstep(0.55,1.0,gl_FragCoord.y/res.y); }`;
   const pFlat=link(`#version 300 es
     in vec3 aPos; in vec4 aCol;
     uniform vec2 uRes; uniform vec2 uOff; uniform float uS;
