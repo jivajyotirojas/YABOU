@@ -6458,7 +6458,7 @@ function* glBuildMeshGen(){
      手前の行の面に下半分が隠される）。名のある峰と高山は円錐のまま（岩山として読み分ける）。
      本数は倍率で 3〜7 本。升が小さい（半径 11px 未満）ときは描かない */
   const treeRows=[];
-  if(obl&&rad>=LOD_TONGUE){                      /* 50% では木を描かず面色だけ（木が柄に見える）*/
+  if(obl&&rad>=LOD_TONGUE){                      /* 50% では木を描かない（1〜2px の木は柄に見える）。山地は円錐で（下）*/
     const nMax=rad>=45?7:5;
     for(const c of drawCache){
       if(c.type!==MT_A||c.named)continue;
@@ -6604,7 +6604,7 @@ function* glBuildMeshGen(){
       }
       const mts=[];                               /* 山は背の高い順に */
       for(const c of row){ if(!c.mtn)continue;
-        if(rad>=LOD_TONGUE&&c.type===MT_A&&!c.named)continue;   /* 森は木の群れで（下）。50% では面色だけ */
+        if(rad>=LOD_TONGUE&&c.type===MT_A&&!c.named)continue;   /* 100% 以上の山地は木の群れで（上）。50% は多峰の円錐のまま（引いても山と読める）*/
         const grow=0.60+Math.min(1,c.m/2300)*0.62;
         mts.push({c,px:c.x*sRef,py:(c.y*ys)*sRef-c.g*sRef,
                   hh:(c.type===MT_B?0.86:0.68)*grow*(c.named?1.18:1)}); }
