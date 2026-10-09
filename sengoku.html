@@ -6450,42 +6450,54 @@ function* glBuildMeshGen(){
   }
 
   /* ------------------------------------------------------------
-     **山地は重ね山で描く**（§10.21・8.4.0）
+     **山地は行ごとに繋がった山並みで描く**（§10.21・8.4.0）
      ------------------------------------------------------------
-     国絵図の山の描き方。丸い山の形（半楕円）を升ごとに 2〜3 つ重ね、左に日向・右に日陰、
-     裾に墨の輪郭を回す。隊が入れない「山」であることを、季節によらず形で読ませる
-     （木の群れだけだと、雪の下では平原や丘陵と見分けがつかなかった。依頼）。
-     山の上に木の冠（三角）を少し散らして森であることも残す。
-     升の縁を越えた山と木は根元の行（手前）の束に入れ、その行の面の上に積む（自分の行に積むと
-     手前の行の面に下半分が隠される）。名のある峰と高山は円錐のまま（岩山として読み分ける）。
-     50% では升ごとに山 1 つだけ、木は描かない（木が柄に見える）*/
+     升ごとに峰を置くと、同じ形の小さな山が隙間なく並んで「集合体」に見える（依頼）。
+     同じ行で隣り合う山地の升をひと続きの稜線にし、升の中心ごとに峰、升の間に鞍部を置いた
+     一本の折れ線を、裾の地面の色から稜線の色へ塗る。左の斜面は日向、右の斜面は日陰。
+     行が 0.75R おきに重なるので、国絵図の山並みのように奥から手前へ層になる。
+     隊が入れない「山」であることを、季節によらず形で読ませる。木の冠は 100% 以上で少しだけ。
+     名のある峰と高山は円錐のまま（山並みの上に積む）*/
   const treeRows=[];
   if(obl){
-    const big=rad>=LOD_TONGUE, nMax=rad>=45?3:2;
-    for(const c of drawCache){
-      if(c.type!==MT_A||c.named)continue;
-      const rn=k=>rnd3(c.q,c.r,k);
-      const grow=1+Math.min(1,c.m/2300)*0.35;
-      const nH=big?(rn(11)<0.65?2:1):1;
-      let coast=false; for(let d=0;d<6;d++){ const n=cellNbr(c,d); if(!n||n.fam===0){coast=true;break;} }   /* 海際の升は山を内に収める（峰が海へはみ出す）*/
-      for(let k=0;k<nH;k++){
-        const t=nH===1?0.5:k;
-        let w=R*(big?0.70+0.35*rn(40+k*9):0.78+0.27*rn(40+k*9)), h=R*(0.38+0.32*rn(50+k*9))*grow;
-        let dx=(-0.36+0.72*t)*R+(rn(20+k*9)-0.5)*R*0.40, dy=(rn(30+k*9)-0.5)*R*0.80+R*0.16;
-        if(coast){ w=Math.min(w,R*0.80); dx=Math.max(-(R*0.90-w),Math.min(R*0.90-w,dx)); dy=Math.max(-R*0.30,Math.min(R*0.45,dy)); }
-        const x=c.x+dx, y=c.y+dy;
-        const rr=rowOf(y); (treeRows[rr]||(treeRows[rr]=[])).push({kind:1,c,x,y,h,w,ax:(rn(60+k*9)-0.5)*0.44,pw:1.35+0.5*rn(70+k*9)});
-      }
-      if(big){
-        const dens=vns(c.x*0.18+3.1,c.y*0.18+7.7);
-        const nTree=Math.max(1,Math.round(nMax*(0.35+0.65*dens)));
-        for(let k=0;k<nTree;k++){
-          const ax=rn(500+k*7), ay=rn(600+k*7);
-          const x=c.x+(ax-0.5)*2*R*(coast?0.6:0.95), y=c.y+(ay-0.5)*2*R*0.85;
-          const h=R*(0.30+0.26*rn(700+k*7)), w=R*(0.14+0.09*rn(800+k*7));
-          const rr=rowOf(y); (treeRows[rr]||(treeRows[rr]=[])).push({kind:0,c,x,y,h,w,lt:rn(900+k*7)<0.5});
+    const big=rad>=LOD_TONGUE, nMax=rad>=45?2:1;
+    const byRow=new Map();
+    for(const c of drawCache){ if(c.type!==MT_A||c.named)continue; (byRow.get(c.r)||byRow.set(c.r,[]).get(c.r)).push(c); }
+    for(const cells of byRow.values()){
+      cells.sort((a,b)=>a.q-b.q);
+      let run=[];
+      const flush=()=>{ if(!run.length)return;
+        const rn=(c,k)=>rnd3(c.q,c.r,k);
+        const first=run[0], last=run[run.length-1];
+        const coastL=[0,1,2,3,4,5].some(d=>{const n=cellNbr(first,d);return !n||n.fam===0;});
+        const coastR=[0,1,2,3,4,5].some(d=>{const n=cellNbr(last,d);return !n||n.fam===0;});
+        const base=first.y+R*0.14;
+        const pts=[];                                                   /* [x, 裾からの高さ] 世界座標。高さは奥行きの縮み（ys）を掛けない */
+        /* 峰の高さは場所の低周波の揺らぎで 0.45〜1.15R。行ごと升ごとに同じ高さだと波板に見える */
+        const hOf=c=>{ const n=vns(c.x*0.22+1.7,c.y*0.22+4.3); return R*(0.45+0.70*(0.65*n+0.35*rn(c,50)))*(1+Math.min(1,c.m/2300)*0.30)*((c.r&1)?0.82:1); };
+        pts.push([first.x-R*(coastL?0.90:1.05),0]);
+        pts.push([first.x-R*0.58,hOf(first)*0.26]);
+        for(let i=0;i<run.length;i++){
+          const c=run[i], h=hOf(c);
+          pts.push([c.x+(rn(c,20)-0.5)*R*0.50, h]);                      /* 峰 */
+          if(i<run.length-1){ const n=run[i+1];                             /* 鞍部 */
+            pts.push([(c.x+n.x)/2+(rn(c,21)-0.5)*R*0.3, Math.min(h,hOf(n))*(0.28+0.20*rn(c,22))]); }
         }
-      }
+        pts.push([last.x+R*0.58,hOf(last)*0.26]);
+        pts.push([last.x+R*(coastR?0.90:1.05),0]);
+        (treeRows[rowOf(base)]||(treeRows[rowOf(base)]=[])).push({kind:2,c:first,y:base,pts,base});
+        if(big)for(const c of run){                                       /* 木の冠。まばらに */
+          const dens=vns(c.x*0.18+3.1,c.y*0.18+7.7);
+          const nTree=Math.round(nMax*(0.2+0.8*dens));
+          for(let k=0;k<nTree;k++){
+            const x=c.x+(rn(c,500+k*7)-0.5)*2*R*0.7, y=c.y+(rn(c,600+k*7)-0.5)*2*R*0.6;
+            const h=R*(0.28+0.22*rn(c,700+k*7)), w=R*(0.13+0.08*rn(c,800+k*7));
+            (treeRows[rowOf(y)]||(treeRows[rowOf(y)]=[])).push({kind:0,c,x,y,h,w,lt:rn(c,900+k*7)<0.5});
+          }
+        }
+        run=[]; };
+      for(const c of cells){ if(run.length&&c.q!==run[run.length-1].q+1)flush(); run.push(c); }
+      flush();
     }
   }
   /* --- 一の巻き。地形だけを行の順に積む --- */
@@ -6625,28 +6637,28 @@ function* glBuildMeshGen(){
         const c=t.c, fc=c.own||glShade(color.get(c.paint)||"#000",c.sh);
         const vS=snowAt(c);
         const px=t.x*sRef, py=(t.y*ys)*sRef-c.g*sRef;
-        if(t.kind===1){                           /* 山。尖りと片寄りのある峰を頂で割り、左が日向・右が日陰。裾に墨の輪郭 */
+        if(t.kind===2){                           /* 山並み。稜線の折れ線を裾の地面色から塗り上げる */
           const lt=fc.map(v=>Math.min(255,Math.round(v*1.05))), dk=fc.map(v=>Math.round(v*0.78));
           const cl=vS<0.02?lt.concat(255):snowMix(lt,Math.min(0.92,vS+0.22));
           const cd=vS<0.02?dk.concat(255):snowMix(dk,vS*0.88);
-          const cg=vS<0.02?fc.concat(255):snowMix(fc,vS);                 /* 裾は地面の色へ溶かす（裾が水平な帯に見えない）*/
-          const ia=rad>=45?0.45:0.32;
+          const cg=vS<0.02?fc.concat(255):snowMix(fc,vS);
+          const ia=rad>=45?0.40:0.30;
           const ink=vS<0.02?[Math.round(fc[0]*0.50),Math.round(fc[1]*0.52),Math.round(fc[2]*0.48),Math.round(255*ia)]:[96,104,100,Math.round(230*ia)];
-          /* 輪郭：u を −1〜1 で辿り、高さは 1−|u|^pw（pw 1.35〜1.85。楕円より尖る）。頂は ax だけ横へ寄せる */
-          const N=10, prof=[], ax=t.ax;
-          for(let i=0;i<=N;i++){ const u=-1+2*i/N;
-            const v=u<ax?(u+1)/(ax+1):(1-u)/(1-ax);                   /* 頂で 1、裾で 0 */
-            prof.push([px+u*t.w*sRef, py-Math.pow(Math.max(0,v),1/t.pw)*t.h*sRef]); }
-          let hi=0; for(let i=1;i<=N;i++)if(prof[i][1]<prof[hi][1])hi=i;
-          const apexP=[px+ax*t.w*sRef, py-t.h*sRef]; prof[hi]=apexP;
-          const L=prof.slice(0,hi+1), Rr=prof.slice(hi);
-          const base=W([px,py]);
-          const vcol=(P,cc)=>{ const v=Math.min(1,(py-P[1])/(t.h*sRef)), k=Math.sqrt(Math.max(0,v));     /* 高さで裾色から峰色へ */
+          const by=(t.base*ys)*sRef-c.g*sRef, P=t.pts.map(([x,h])=>[x*sRef,by-h*sRef]);
+          const hmax=Math.max(...P.map(q=>by-q[1]))||1;
+          const col=i=>{                                                  /* 左斜面は日向、右斜面は日陰。高さで裾色から移す */
+            const a=P[Math.max(0,i-1)], b=P[Math.min(P.length-1,i+1)];
+            const d=Math.max(-1,Math.min(1,(b[1]-a[1])/(R*0.35*sRef)));     /* >0: 右へ下る（日陰）*/
+            const m=(d+1)/2, cc=[cl[0]+(cd[0]-cl[0])*m,cl[1]+(cd[1]-cl[1])*m,cl[2]+(cd[2]-cl[2])*m];
+            const k=Math.sqrt(Math.max(0,Math.min(1,(by-P[i][1])/hmax)));
             return [Math.round(cg[0]+(cc[0]-cg[0])*k),Math.round(cg[1]+(cc[1]-cg[1])*k),Math.round(cg[2]+(cc[2]-cg[2])*k),255]; };
-          M.fan(base,L.map(W),cg,L.map(P=>vcol(P,cl))); M.fan(base,Rr.map(W),cg,Rr.map(P=>vcol(P,cd)));
+          const cols=P.map((_,i)=>col(i));
+          for(let i=0;i<P.length-1;i++){
+            M.quad(W(P[i]),W(P[i+1]),W([P[i+1][0],by]),W([P[i][0],by]),cols[i],cols[i+1],cg,cg);
+          }
           const hw=Math.max(0.5,rad*0.028)/sRef/2;
-          for(let i=0;i<N;i++)M.seg(W(prof[i]),W(prof[i+1]),hw,ink);
-          const apex=W(apexP); if(apex[1]<ymin)ymin=apex[1]; if(base[1]>ymax)ymax=base[1];
+          for(let i=1;i<P.length-2;i++)M.seg(W(P[i]),W(P[i+1]),hw,ink);
+          const top=W([0,by-hmax]), bot=W([0,by]); if(top[1]<ymin)ymin=top[1]; if(bot[1]>ymax)ymax=bot[1];
           continue;
         }
         const top=fc.map(v=>Math.round(v*(t.lt?0.84:0.68)));
