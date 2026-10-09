@@ -795,7 +795,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.4.0";
+const VERSION="8.4.1";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -6244,7 +6244,9 @@ function* glBuildMeshGen(){
                  Math.round(LAKE_RGB[1]+(dst[1]-LAKE_RGB[1])*t),
                  Math.round(LAKE_RGB[2]+(dst[2]-LAKE_RGB[2])*t),255];
     lc.set(ln,{P,Pw,L,Rt,at,N:Nn,I,shift:me.shift,hw:k=>widAt(k)*sRef/2,nx:k=>NX[k],ny:k=>NY[k],tOf:k=>(I?I[k]:k)/(N-1)});
-    const segRow=j=>Math.max(rowOf(yWorld(j)),rowOf(yWorld(j+1)));
+    /* **区間の行は、帯の手前の縁が届く行で決める**（8.4.1）。節点の中心だけで決めると、辺の中点の節点や
+       並走で寄せた節点の帯が次の行へはみ出し、その行の升の角が川の上に乗る（関東の 1 升 2 川。依頼）*/
+    const segRow=j=>Math.max(rowOf(yWorld(j)+widAt(j)*0.5),rowOf(yWorld(j+1)+widAt(j+1)*0.5));
     let j=0;
     while(j<Nn-1){ const r=segRow(j); let k=j;
       while(k+1<Nn-1&&segRow(k+1)===r)k++;
@@ -13150,6 +13152,73 @@ function* makeCells(){
     rp.mouthW=null;
   }
 
+
+  /* ------------------------------------------------------------
+     **支流は本流に繋ぐ**（依頼・8.4.1）
+     ------------------------------------------------------------
+     海や湖へ注がない川（支流）は、必ずほかの川の升で終わらせる。
+     ・終わりが本流に隣り合っている（並んで流れている）なら、本流に初めて隣り合った升で切り、
+       本流の升を足す（只見川・入間川は本流の脇を 2〜3 升なぞってから終わっていた）。
+     ・終わりが本流から離れているなら、3 升以内でいちばん近い川の升へ、間の陸の升を川にして繋ぐ
+       （千曲川→信濃川は 2 升、姫川の上流→下流は 1 升の空きがあった）。
+     ・どの川にも届かず、2 升以内に水があるなら、そこを河口にする（鵡川・大野川）。
+     これまでは描く側で切ったり繋いだりしていた（§10.15）。データで繋ぎ、描く側の繋ぎは控えに残す */
+  for(const rp of riverPaths){
+    if(rp.mouthW)continue;
+    const own=new Set(rp.undo.map(u=>u[0]).filter(c=>rp.cells.includes(c)));
+    const other=c=>!!c&&c.river&&!own.has(c);
+    const stamp=c=>{ rp.undo.push([c,c.t,c.m]); let b=c.t;
+      if(b===T_MTNA||b===T_MTNB){ c.m=Math.min(c.m,620); b=c.arable>0.34?T_HILL:T_WHILL; }
+      c.river=1; c.base=b; c.hilly=(b===T_HILL||b===T_WHILL); c.t=riverType(c.hilly); c.riverName=rp.n; own.add(c); };
+    const restore=cut=>{ for(const [c,tt,m] of rp.undo){ if(!cut.has(c)||c.riverName!==rp.n)continue;
+      c.t=tt;c.m=m;c.base=null;c.river=0;c.hilly=false;c.riverName=null; } };
+    const mine=rp.cells.filter(c=>own.has(c)); if(mine.length<2)continue;
+    const last=mine[mine.length-1];
+    const tLast=last.nb.find(other);
+    if(tLast){                                                          /* 本流の脇に出ている。初めて隣り合った升で切る */
+      const M=tLast.riverName; const touchM=c=>c.nb.some(n=>other(n)&&n.riverName===M);
+      let i=mine.length-1; while(i>0&&touchM(mine[i-1]))i--;
+      const t=mine[i].nb.find(n=>other(n)&&n.riverName===M);
+      const cut=new Set(mine.slice(i+1)); restore(cut);
+      rp.cells=mine.slice(0,i+1).concat([t]);
+      continue;
+    }
+    let best=null,bd=1e9;                                               /* 離れている。3 升以内の川へ */
+    for(let dq=-3;dq<=3;dq++)for(let dr=-3;dr<=3;dr++){
+      const c=mkIdx.get((last.q+dq)+","+(last.r+dr)); if(!other(c))continue;
+      const d=hexSteps(last.q,last.r,c.q,c.r); if(d>3)continue;
+      const dd=d*10+Math.hypot(c.x-last.x,c.y-last.y); if(dd<bd){bd=dd;best=c;}
+    }
+    if(best){
+      let cur=last, guard=0;
+      while(hexSteps(cur.q,cur.r,best.q,best.r)>1&&guard++<6){
+        let nx=null,nd=1e9;
+        for(const n of cur.nb){ if(!n.land||n.t===T_LAKE||own.has(n))continue;
+          const d=hexSteps(n.q,n.r,best.q,best.r)*10+Math.hypot(n.x-best.x,n.y-best.y); if(d<nd){nd=d;nx=n;} }
+        if(!nx)break;
+        if(other(nx)){ best=nx; break; }
+        stamp(nx); rp.cells.push(nx); cur=nx;
+      }
+      rp.cells.push(best);
+      continue;
+    }
+    let W=null,wd=1e9;                                                  /* どの川にも届かない。2 升以内の水を河口に */
+    for(let dq=-2;dq<=2;dq++)for(let dr=-2;dr<=2;dr++){
+      const c=mkIdx.get((last.q+dq)+","+(last.r+dr)); if(!c||(c.land&&c.t!==T_LAKE))continue;
+      const d=hexSteps(last.q,last.r,c.q,c.r); if(d>2)continue;
+      const dd=d*10+Math.hypot(c.x-last.x,c.y-last.y); if(dd<wd){wd=dd;W=c;}
+    }
+    if(W){
+      let cur=last, guard=0;
+      while(hexSteps(cur.q,cur.r,W.q,W.r)>1&&guard++<3){
+        let nx=null,nd=1e9;
+        for(const n of cur.nb){ if(!n.land||n.t===T_LAKE||own.has(n)||n.river)continue;
+          const d=hexSteps(n.q,n.r,W.q,W.r)*10+Math.hypot(n.x-W.x,n.y-W.y); if(d<nd){nd=d;nx=n;} }
+        if(!nx)break; stamp(nx); rp.cells.push(nx); cur=nx;
+      }
+      if(hexSteps(cur.q,cur.r,W.q,W.r)<=1){ rp.mouthW=W; cur.t=T_MOUTH; cur.base=null; cur.m=0; cur.hilly=false; }
+    }
+  }
 
   yield "湊と峰";   /* ロードの進み（§1.5） */
   /* 1551年に現に開業していた湊。三津七湊の格を骨格にした11湊。
