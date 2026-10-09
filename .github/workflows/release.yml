@@ -1,16 +1,16 @@
 # 版の印（タグ）とリリースを付ける。
-# main の sengoku_v7.html が変わるたびに、その VERSION の印がまだ無ければ v主版.副版.修正 の印を付け、
+# main の sengoku.html が変わるたびに、その VERSION の印がまだ無ければ v主版.副版.修正 の印を付け、
 # 前の印からの PR をまとめたリリースノートを作る。手で動かすとき（workflow_dispatch）は版とコミットを指定できる。
 name: Release
 
 on:
   push:
     branches: [main]
-    paths: [sengoku_v7.html]
+    paths: [sengoku.html]
   workflow_dispatch:
     inputs:
       version:
-        description: "版（例 8.2.0）。空なら sengoku_v7.html の VERSION"
+        description: "版（例 8.2.0）。空なら sengoku.html の VERSION"
         required: false
       sha:
         description: "印を付けるコミット。空なら main の先頭"
@@ -37,7 +37,7 @@ jobs:
           SHA="${{ inputs.sha }}"
           [ -z "$SHA" ] && SHA=$(git rev-parse HEAD)
           V="${{ inputs.version }}"
-          [ -z "$V" ] && V=$(git show "$SHA:sengoku_v7.html" | grep -oE 'const VERSION="[0-9.]+"' | grep -oE '[0-9.]+')
+          [ -z "$V" ] && V=$(git show "$SHA:sengoku.html" | grep -oE 'const VERSION="[0-9.]+"' | grep -oE '[0-9.]+')
           echo "tag=v$V" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           if git ls-remote --exit-code --tags origin "v$V" >/dev/null 2>&1; then
