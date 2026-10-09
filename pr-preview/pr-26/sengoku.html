@@ -2075,9 +2075,13 @@ const hex2rgb=h=>{const n=parseInt(h.slice(1),16);return [(n>>16)&255,(n>>8)&255
    ------------------------------------------------------------ */
 /* 濃さ 0〜1 を、雪の色へ寄せる割合にする。**下限を上げる。**
    薄い升まで地の色が透けると、降っているように見えない */
-const snowA=v=>0.72+0.28*Math.max(0,Math.min(1,v));   /* 雪の白さ。寄せる先は胡粉 #f2efe6（L* 94。8.4.0）。雪は白く読めること（依頼・8.2.3）*/
+/* 雪の白さ t。**地形の種類が床を決め、積雪の深さは上乗せだけ**（8.4.0・§10.21）。
+   以前は t = 0.72 + 0.28·深さ で、1 月の深さは 0.2〜0.6 に集中するので全升が同じ白になり、
+   雪の下の地形（丘陵か山地か）がカーソルを合わせないと読めなかった（依頼）。
+   `snowAt` が床＋上乗せを返し、ここでは頭打ちだけ。寄せる先は胡粉 #f2efe6 */
+const snowA=v=>Math.max(0,Math.min(0.92,v));
 /* 積雪の斑（依頼）。揺らぎの細かさ（1km あたり）・振れ幅・扇の三角を割る数 */
-const SNOW_BLOT_F=0.45, SNOW_BLOT_A=1.6, SNOW_BLOT_K=3;
+const SNOW_BLOT_F=0.45, SNOW_BLOT_A=0.22, SNOW_BLOT_K=3;   /* 斑の振幅は t に対する比。床が入ったので小さく（1.6 → 0.22）*/
 /* 積もらない地形。**水上を通れる地形はすべて。** 港適地も水面なので入る */
 const SNOW_NONE=new Set(BASE_TERRAIN.filter(t=>t.sui).map(t=>t.id));
 /* ------------------------------------------------------------
@@ -5955,21 +5959,24 @@ function glBridge(M,W,b,sRef,rad,ys){
    盤ぜんぶを三角形に組む。世界の座標（倍率も位置も掛けない）で持つ
    ------------------------------------------------------------ */
 /* 升の積もり具合。印はプレイデータ、濃さはベースデータから */
-/* **下地の地形で白くなり方を変える**（§10.21・8.4.0）。全部同じ白にすると雪の下の地形が読めない。
-   平原 0.92／寒冷平地 0.85／湿地 0.80／荒地 0.78／丘陵 0.70／荒丘陵 0.62 */
-const SNOW_RATE=new Map([[T_PLAIN,0.92],[T_CPLAIN,0.88],[T_MARSH,0.85],[T_WMARSH,0.82],[T_WASTE,0.84],[T_HILL,0.80],[T_RIVERP,0.91],[T_RIVERH,0.80]]);
+/* **白さの床は地形の種類で決める**（§10.21・8.4.0）。平原はほぼ白、丘陵は灰オリーブ、山地と高山は
+   梢と錐の暗さが残る。床の差（平原–丘陵 ΔE 9〜11、平原–山地 20 以上）が雪の下の地形を読ませる。
+   深さの上乗せは 0.18 まで。深い雪の丘陵が浅い雪の平原より白くならない */
+const SNOW_FLOOR=new Map([[T_PLAIN,0.74],[T_CPLAIN,0.72],[T_MARSH,0.64],[T_WMARSH,0.60],[T_WASTE,0.66],[T_HILL,0.54],[T_WHILL,0.48],[T_RIVERP,0.74],[T_RIVERH,0.54]]);
+const SNOW_SLOPE=0.18;
 function snowAt(c){
   const pc=playCells[c.id-1];
   if(!pc||!(pc.effect&16))return 0;
-  const r=SNOW_RATE.get(c.paint)??(c.mtn?1:0.74);
-  return snowOf(BASE_CELLS[c.id-1])*r;
+  const f=SNOW_FLOOR.get(c.paint)??(c.mtn?(c.type===MT_B?0.40:0.45):0.60);
+  return f+SNOW_SLOPE*snowOf(BASE_CELLS[c.id-1]);
 }
 /* 色を雪へ寄せる。不透明なので、重なっても濃くならない */
 function snowMix(rgbv,v){
   const t=snowA(Math.max(0,Math.min(1,v)));
-  /* 白くする前に下地を無彩へ寄せる。寄せないと、白化率の低い升（丘陵・湿地）が黄緑の斑になり盤で最も彩度が高くなる */
-  const l=0.299*rgbv[0]+0.587*rgbv[1]+0.114*rgbv[2];
-  rgbv=[rgbv[0]+(l-rgbv[0])*0.9*t, rgbv[1]+(l-rgbv[1])*0.9*t, rgbv[2]+(l-rgbv[2])*0.9*t];
+  /* 白くする前に下地を無彩へ寄せる。白いものほど強く（平原 7 割、丘陵 6 割、森 5 割）。
+     全部 9 割寄せると色相の手掛かりが消え、全く寄せないと丘陵・湿地が黄緑の斑になる */
+  const l=0.299*rgbv[0]+0.587*rgbv[1]+0.114*rgbv[2], d=(0.40+0.35*t)*t;
+  rgbv=[rgbv[0]+(l-rgbv[0])*d, rgbv[1]+(l-rgbv[1])*d, rgbv[2]+(l-rgbv[2])*d];
   return [Math.round(rgbv[0]+(242-rgbv[0])*t),
           Math.round(rgbv[1]+(239-rgbv[1])*t),
           Math.round(rgbv[2]+(230-rgbv[2])*t),255];   /* 胡粉 #f2efe6 */
@@ -6559,10 +6566,22 @@ function* glBuildMeshGen(){
              隣の升と共有する縁の頂点は同じ値になり、継ぎ目は出ない。平均の濃さは変えない */
           const midP=[cx,cy-c.g*sRef];
           const cv=i=>(vS+nv[(i+5)%6]+nv[i])/3;
+          /* **丘陵の雪には斜面影を落とす。** 色の床だけでは丘が平原に溶けるので、升の中心から南東へずらした
+             柔らかい楕円を寒色で暗くする。向きとずれは升ごとの乱数で散らす（全升が同じ形・同じ位相だと
+             隣と連なって斜めの縞に見える。レビューの指摘）*/
+          const hillK=(c.paint===T_HILL||c.paint===T_WHILL||c.paint===T_RIVERH)?1:0;
+          const Rw=Math.hypot(pt[0][0]-midP[0],pt[0][1]-midP[1])||1;
+          const hA=(0.62+0.35*(rnd3(c.q,c.r,41)-0.5))*Math.PI, hO=0.30+0.15*(rnd3(c.q,c.r,42)-0.5);
+          const hC=[midP[0]+Math.cos(hA)*hO*Rw, midP[1]+Math.sin(hA)*hO*Rw*0.8];
           const blot=(P,v,col)=>{
             const x=P[0]/sRef, y=P[1]/sRef;
             const n=0.65*vns(x*SNOW_BLOT_F,y*SNOW_BLOT_F)+0.35*vns(x*SNOW_BLOT_F*2.4+17,y*SNOW_BLOT_F*2.4+5);
-            return snowMix(col,Math.max(0,Math.min(1,v*(1+SNOW_BLOT_A*(n-0.5)))));
+            const o=snowMix(col,Math.max(0,Math.min(1,v*(1+(SNOW_BLOT_A+0.08*hillK)*(n-0.5)))));
+            if(hillK){
+              const d=Math.hypot((P[0]-hC[0])/(0.62*Rw),(P[1]-hC[1])/(0.50*Rw));
+              const k=0.075*Math.max(0,Math.min(1,1.3-d));
+              o[0]=Math.round(o[0]*(1-k)); o[1]=Math.round(o[1]*(1-k*0.9)); o[2]=Math.round(o[2]*(1-k*0.45)); }
+            return o;
           };
           const K=SNOW_BLOT_K;
           for(let i=0;i<6;i++){
@@ -6600,7 +6619,9 @@ function* glBuildMeshGen(){
         const vS=snowAt(T.c);
         const y0=S.apexY/sRef, y1=base;
         /* **山は平地よりさらに濃く。** 高いところほど積もる */
-        const vM=Math.min(1,vS*1.35);
+        /* 雪の山は二面の明暗で稜線を示す。日向は床より 0.25 白く、日陰は床のまま。
+           稜線の棒を白い錐に立てると傘に見えた（依頼）ので、雪の間は描かない */
+        const vM=Math.min(0.92,vS+0.08);
         const mixTo=(rgbv,t)=>snowMix(rgbv,t);
         /* **山は升の面色から生やす**（§10.21・8.4.0）。暗部・明部は面色からの相対（×0.70／×1.14）、
            裾は面色そのもの。固定の濃緑で描いていたため、山が地面に刺さった置物に見えていた */
@@ -6618,9 +6639,9 @@ function* glBuildMeshGen(){
           M.quad(A,B,[B[0],base],[A[0],base],at(dk,A),at(dk,B),foot,foot);
         }
         const half=glSil([...S.sil.slice(0,S.half+1),S.fr]).map(W);
-        M.fan(W(S.fr),half,vS<0.02?lt.concat(255):mixTo(lt,vM*0.88),
-              half.map(p=>at(lt,p)));             /* 日の当たる側 */
-        M.seg(W([S.apexX,S.apexY]),W(S.fr),Math.max(0.5,rad*0.04)/sRef/2,
+        M.fan(W(S.fr),half,vS<0.02?lt.concat(255):mixTo(lt,Math.min(0.92,vM+0.25)),
+              half.map(p=>vS<0.02?at(lt,p):mixTo(lt,Math.min(0.92,vM+0.25-0.08*Math.max(0,Math.min(1,(p[1]-y0)/((y1-y0)||1)))))));   /* 日の当たる側 */
+        if(vS<0.02)M.seg(W([S.apexX,S.apexY]),W(S.fr),Math.max(0.5,rad*0.04)/sRef/2,
               [111,116,112,128]);               /* 稜線は灰の縁取り（国絵図）。白は雪と街道の記号なので使わない */
         if(playCells[T.c.id-1].effect&32){        /* 冠雪（高い山の頂。10月〜5月・§10.16）*/
           const rn=k=>rnd3(T.c.q,T.c.r,k);
@@ -6654,8 +6675,9 @@ function* glBuildMeshGen(){
         const px=t.x*sRef, py=(t.y*ys)*sRef-c.g*sRef;
         const top=fc.map(v=>Math.round(v*(t.lt?0.84:0.68)));
         const base=vS<0.02?fc.concat(255):snowMix(fc,vS);
-        /* 雪の森は梢を白くしない。日向 #c3c8ba／日陰 #8f9a88 へ寄せる（白い三角の群れは静電気のノイズに見える）*/
-        const apex=vS<0.02?top.concat(255):(t.lt?[195,200,186,255]:[143,154,136,255]);
+        /* 雪の森は梢を白くしない。梢の色から雪影の青灰 #dfe6e0 へ 3 割だけ寄せる（白い三角の群れは静電気のノイズに見え、
+           灰緑一色だと幽霊の森に見える。梢が暗いまま残ることが「雪の下の山地」の印）*/
+        const apex=vS<0.02?top.concat(255):top.map((v,i)=>Math.round(v+([223,230,224][i]-v)*0.30)).concat(255);
         const A=W([px,py-t.h*sRef]), Bl=W([px-t.w*sRef,py]), Br=W([px+t.w*sRef,py]);
         M.tri(Bl,Br,A,base,base,apex);
         if(A[1]<ymin)ymin=A[1]; if(Bl[1]>ymax)ymax=Bl[1];
