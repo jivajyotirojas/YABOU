@@ -878,10 +878,10 @@ const tableOf=id=>TABLES.find(t=>t.id===id)??null;
    色相で付ける（隣り合い得る陸地形は ΔL* ≥ 12 か色相差 ≥ 30°）。8.3.1 までの原色寄りの色は、
    升ごとに別の色紙を並べたように見え、置物が浮く原因だった */
 const BASE_TERRAIN=[
- {id: 1, label:"遠洋",     color:"#3e5566",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:0},
- {id: 2,  label:"外海",     color:"#4b6878",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:2.0},
- {id: 3,   label:"海",       color:"#5c8190",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
- {id: 4,  label:"湖沼",     color:"#78a3a6",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
+ {id: 1, label:"遠洋",     color:"#46606f",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:0},
+ {id: 2,  label:"外海",     color:"#567384",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:2.0},
+ {id: 3,   label:"海",       color:"#688b98",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
+ {id: 4,  label:"湖沼",     color:"#80aaab",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
  {id: 5,label:"港適地",   color:"#d8d09a",line:null,     sui:true, warRide:0.80, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
  {id: 6, label:"河口",     color:"#d4d29a",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
  {id: 7,label:"平地河川",     color:"#d6cc93",line:"#5f9ec2",sui:false, warRide:0.60, warShot:0.85, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:6.0, mvSnow:12.0, mvLevee:3.0, mvLeveeSnow:6.0, mvSea:0},
@@ -890,13 +890,13 @@ const BASE_TERRAIN=[
  {id:10,label:"荒湿地",   color:"#7f9d72",line:null,     sui:false, warRide:0.60, warShot:0.95, farmHata:0, farmSuiden:3, mura:0, machi:0, mv:6.0, mvSnow:12.0, mvSea:0},
  {id:11, label:"平原",     color:"#dcd296",line:null,     sui:false, warRide:1.20, warShot:1.00, farmHata:2, farmSuiden:3, mura:2, machi:3, mv:1.5, mvSnow:3.0, mvSea:0},
  {id:12,label:"寒冷平地", color:"#a8c796",line:null,     sui:false, warRide:1.20, warShot:1.00, farmHata:1, farmSuiden:0, mura:1, machi:1, mv:1.5, mvSnow:3.0, mvSea:0},
- {id:13, label:"荒地",     color:"#c6a37c",line:null,     sui:false, warRide:1.15, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:2.0, mvSnow:4.0, mvSea:0},
+ {id:13, label:"荒地",     color:"#c29f78",line:null,     sui:false, warRide:1.15, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:2.0, mvSnow:4.0, mvSea:0},
  /* **丘陵には村だけが立つ**（依頼）。Lv.1 まで。町は立たない */
- {id:14,  label:"丘陵",     color:"#abb16a",line:null,     sui:false, warRide:0.75, warShot:1.15, farmHata:2, farmSuiden:0, mura:1, machi:0, mv:3.0, mvSnow:6.0, mvSea:0},
+ {id:14,  label:"丘陵",     color:"#a4ab63",line:null,     sui:false, warRide:0.75, warShot:1.15, farmHata:2, farmSuiden:0, mura:1, machi:0, mv:3.0, mvSnow:6.0, mvSea:0},
  {id:15, label:"荒丘陵",   color:"#7e7056",line:null,     sui:false, warRide:0.75, warShot:1.15, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:6.0, mvSnow:12.0, mvSea:0},
  {id:16,  label:"山地",     color:"#4f764c",line:null,     sui:false, warRide:0.50, warShot:1.20, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:0},
- {id:17,  label:"高山",     color:"#8e968a",line:null,     sui:false, warRide:0.50, warShot:1.20, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:0},
- {id:18,  label:"拠点",     color:"#abb16a",line:null,     sui:false, warRide:0.80, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:1.0, mvSnow:1.0, mvSea:0},
+ {id:17,  label:"高山",     color:"#858d80",line:null,     sui:false, warRide:0.50, warShot:1.20, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:0},
+ {id:18,  label:"拠点",     color:"#a4ab63",line:null,     sui:false, warRide:0.80, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:1.0, mvSnow:1.0, mvSea:0},
 ];
 /* **地形IDを名前で呼ぶための束。表そのものから作る。**
    表に第二の名前（key）を持たせるかわりに、ここで一度だけ label から引く。
@@ -2024,7 +2024,7 @@ function drawPrepare(){
      同じ家族（陸どうし／山どうし／水どうし）の隣とだけ混ぜる。隣も同じ平均を持つので縁の両側で
      色が一致し、升の縁が消える。家族の境（水際・山裾）は混ぜず、そこだけ縁が残る */
   const rowAt=new Map(rows.map(c=>[c.id,c]));
-  const faceOf=c=>glShade(colorOfTerrain(c.paint),c.sh);
+  const faceOf=c=>c.wet?hex2rgb(colorOfTerrain(c.type)):glShade(colorOfTerrain(c.paint),c.sh);
   for(const c of rows){
     const D=DIR6[c.r&1], own=faceOf(c), cc=new Array(6);
     for(let i=0;i<6;i++){
@@ -2032,7 +2032,7 @@ function drawPrepare(){
       for(const j of [(i+5)%6, i]){
         const k=cellOf(c.q+D[j][0], c.r+D[j][1]); const kr=k&&rowAt.get(k.id);
         if(!kr||kr.fam!==c.fam)continue;
-        const w=kr.paint===c.paint?1:0.5;          /* 同じ地形は等分、同じ家族の別の地形は半分だけ（1升幅の地形が消えないように）*/
+        const w=kr.paint===c.paint?1:0.3;          /* 同じ地形は等分、同じ家族の別の地形は 0.3（境が升の辺から 1/4 升ほどしか滲まない）*/
         const f=faceOf(kr); rr+=f[0]*w;gg+=f[1]*w;bb+=f[2]*w;n+=w;
       }
       cc[i]=[Math.round(rr/n),Math.round(gg/n),Math.round(bb/n)];
@@ -2062,7 +2062,7 @@ function drawPrepare(){
    節点を曲線で結び、幅のある帯として塗る。輪郭は全長で1本だけ作り、
    その中を区間ごとに塗る。区間ごとに輪郭を作ると継ぎ目に段が出る。
    ------------------------------------------------------------ */
-const LAKE_RGB=[0x78,0xa3,0xa6];               /* 湖沼の色（8.4.0 のパレット）*/
+const LAKE_RGB=[0x74,0x9e,0xa2];               /* 湖沼の色（8.4.0 のパレット）*/
 const hex2rgb=h=>{const n=parseInt(h.slice(1),16);return [(n>>16)&255,(n>>8)&255,n&255];};
 
 
@@ -2482,7 +2482,7 @@ const BAT_TH_DEF =dirTh(3);                     // 左下（南西）を向く
 const BAT_TH_SIDE=dirTh(5);                     // 場の並びに対して横を向く
 const OBJ_FLAT=0.34;                            // 上から見るときの高さの倍率
 const OBJ_LIGHT=[-0.38,0.45,0.81];              // rx, rz, 上（左前上から）
-const OBJ_BODY =[0xe4,0xdc,0xcb];               // 城・館の壁。漆喰（8.4.0。それまでは青灰の箱）
+const OBJ_BODY =[0xdd,0xd3,0xbd];               // 城・館の壁。漆喰（8.4.0。それまでは青灰の箱）
 const OBJ_WOOD =[0x8c,0x6a,0x48];               // 木部（港・橋・桟橋）
 const OBJ_SOIL =[0xa9,0x8b,0x66];               // 畑の土
 const OBJ_MIZU =[0x9b,0xb3,0xb0];               // 水田の水面
@@ -2527,7 +2527,7 @@ const OBJ_KAO  =[0xd8,0xb0,0x8c];               // 顔。肌の色
 const OBJ_UMA  =[0x6b,0x4f,0x35];               // 馬
 const OBJ_FUNE =[0x5a,0x46,0x30];               // 船体
 const OBJ_DECK =[0x7a,0x62,0x44];               // 甲板
-const OBJ_YAKATA=[0xe4,0xdc,0xcb];               // 屋形の壁。漆喰
+const OBJ_YAKATA=[0xdd,0xd3,0xbd];               // 屋形の壁。漆喰
 const OBJ_YANE =[0x3f,0x3a,0x35];               // 屋形の庇・屋根。墨（暖）
 const OBJ_HO   =[0xe6,0xe2,0xd6];               // 帆
 const OBJ_TAWARA=[0xc2,0xa8,0x79];              // 俵
@@ -2585,6 +2585,7 @@ function oDai2(x0,z0,x1,z1,hb,ht,ix,iz,order,body){
 }
 /* 三角の小旗。船の艫に立てる。表と裏の2面だけ */
 function oRoof(x0,z0,x1,z1,hb,ht,order,body,keel){
+  body=body||OBJ_YANE;                         /* 屋根の既定は屋根色。壁色（漆喰）で焼かれると城が白い箱になる（8.4.0）*/
   const zm=(z0+z1)/2, dz=(z1-z0)/2, dh=ht-hb, nl=Math.hypot(dz,dh)||1;
   if(!keel)return {order,body,faces:[
     {n:[0, dh/nl,dz/nl],pts:[[x0,z1,hb],[x1,z1,hb],[x1,zm,ht],[x0,zm,ht]]},
@@ -3598,7 +3599,7 @@ function objSnow(rgb,up,v,seed){
   if(!(v>0))return `rgb(${rgb.join(",")})`;
   /* 真上に近い面から順に積もる。境目は面ごとに少し揺らして、
      一枚一枚が同じだけ白くならないようにする */
-  const t=Math.max(0,Math.min(1,(up-0.42)/0.48))*v*(0.80+0.40*seed);
+  const t=Math.min(0.3,Math.max(0,Math.min(1,(up-0.42)/0.48))*v*(0.80+0.40*seed));   /* 屋根の白化は 3 割まで。真っ白だと雪の升に溶ける */
   const m=x=>Math.round(x+(242-x)*Math.min(1,t));   /* 雪の白さは升の雪（胡粉）に揃える（8.4.0）*/
   return `rgb(${m(rgb[0])},${m(rgb[1])},${m(rgb[2])})`;
 }
@@ -3630,9 +3631,10 @@ function drawObject(key,make,px,py,rad,th,snow=0){
   const lw=Math.max(.3,rad*0.014);
   /* **接地影**（§10.21・8.4.0）。足元に楕円の影を敷く。影が無いと板が地面から浮く。
      升の内側（半径 0.55R）に収め、手前の行の面に隠されないようにする */
-  if(rad>4&&!solids.noShadow){
-    ctx.beginPath(); ctx.ellipse(px,py+0.02*rad*ys,rad*0.55,rad*0.55*ys,0,0,Math.PI*2);
-    ctx.fillStyle="rgba(70,66,52,0.26)"; ctx.fill();
+  let maxH=0; for(const sd of solids)for(const f of sd.faces)for(const q of f.pts)if(q[2]>maxH)maxH=q[2];
+  if(rad>4&&maxH>=0.12){                         /* 平らな物（畑・水田・畦）には影を付けない。「卵」に見える */
+    ctx.beginPath(); ctx.ellipse(px+0.06*rad,py+0.03*rad*ys,rad*0.42,rad*0.42*ys,0,0,Math.PI*2);
+    ctx.fillStyle="rgba(70,66,52,0.22)"; ctx.fill();
   }
   for(const f of list){
     ctx.beginPath();
@@ -5799,11 +5801,11 @@ function glSmooth(pts,n){
 
 /* 街道の一区間と、そこに架かる橋 */
 function glRoadSpan(M,W,C,a,b,sRef,ys){
-  const P=C.P, N=C.N, hw=C.hw()*0.85, core=0.5;  /* 外は明るい縁、内は代赭の芯。どちらも不透明（重ねの濃淡が出ないように）*/
+  const P=C.P, N=C.N, hw=Math.max(C.hw()*0.85,1.4), core=0.5;  /* 外は明るい縁、内は代赭の芯。どちらも不透明。縁は画面で 1px 以上 */
   /* **街道は、明るい縁を持つ代赭の線**（§10.21・8.4.0）。白い帯は升の中心を結んでグリッドをなぞって見え、
      雪の上では消えていた。代赭一色だと丘陵・森の上で消えるので、明るい縁（#efe6cf α0.45）と暗い芯（#a35f42）の
      二色にし、どちらかが必ず地面と ΔL* 20 以上になるようにする。領域の縁（暗いハローに明るい線）とは極性が逆 */
-  const edge=[232,222,198,255], mid=[163,95,66,255];
+  const edge=[232,222,198,255], mid=[155,117,88,255];   /* 縁 #e8dec6、芯 #9b7558（赤を弱めた代赭）*/
   /* **川と同じで、節点の中割りは使わない。** 区間ごとにその区間の法線で
      帯を張り、点には円い継ぎ手を置く。中割りで岸を取ると、曲がりの
      きついところで内岸が行き違い、継ぎ目に切れ込みが出る。
@@ -5913,16 +5915,19 @@ function glBridge(M,W,b,sRef,rad,ys){
 /* 升の積もり具合。印はプレイデータ、濃さはベースデータから */
 /* **下地の地形で白くなり方を変える**（§10.21・8.4.0）。全部同じ白にすると雪の下の地形が読めない。
    平原 0.92／寒冷平地 0.85／湿地 0.80／荒地 0.78／丘陵 0.70／荒丘陵 0.62 */
-const SNOW_RATE=new Map([[T_PLAIN,0.92],[T_CPLAIN,0.85],[T_MARSH,0.80],[T_WMARSH,0.76],[T_WASTE,0.78],[T_HILL,0.70],[T_RIVERP,0.90],[T_RIVERH,0.72]]);
+const SNOW_RATE=new Map([[T_PLAIN,0.92],[T_CPLAIN,0.88],[T_MARSH,0.85],[T_WMARSH,0.82],[T_WASTE,0.84],[T_HILL,0.80],[T_RIVERP,0.91],[T_RIVERH,0.80]]);
 function snowAt(c){
   const pc=playCells[c.id-1];
   if(!pc||!(pc.effect&16))return 0;
-  const r=SNOW_RATE.get(c.paint)??(c.mtn?1:0.62);
+  const r=SNOW_RATE.get(c.paint)??(c.mtn?1:0.74);
   return snowOf(BASE_CELLS[c.id-1])*r;
 }
 /* 色を雪へ寄せる。不透明なので、重なっても濃くならない */
 function snowMix(rgbv,v){
   const t=snowA(Math.max(0,Math.min(1,v)));
+  /* 白くする前に下地を無彩へ寄せる。寄せないと、白化率の低い升（丘陵・湿地）が黄緑の斑になり盤で最も彩度が高くなる */
+  const l=0.299*rgbv[0]+0.587*rgbv[1]+0.114*rgbv[2];
+  rgbv=[rgbv[0]+(l-rgbv[0])*0.9*t, rgbv[1]+(l-rgbv[1])*0.9*t, rgbv[2]+(l-rgbv[2])*0.9*t];
   return [Math.round(rgbv[0]+(242-rgbv[0])*t),
           Math.round(rgbv[1]+(239-rgbv[1])*t),
           Math.round(rgbv[2]+(230-rgbv[2])*t),255];   /* 胡粉 #f2efe6 */
@@ -6404,15 +6409,18 @@ function* glBuildMeshGen(){
      手前の行の面に下半分が隠される）。名のある峰と高山は円錐のまま（岩山として読み分ける）。
      本数は倍率で 3〜7 本。升が小さい（半径 11px 未満）ときは描かない */
   const treeRows=[];
-  if(obl&&rad>=LOD_BAND){
-    const nTree=rad>=45?7:rad>=22?5:3;
+  if(obl&&rad>=LOD_TONGUE){                      /* 50% では木を描かず面色だけ（木が柄に見える）*/
+    const nMax=rad>=45?7:5;
     for(const c of drawCache){
       if(c.type!==MT_A||c.named)continue;
+      /* 本数は低周波の揺らぎで 2〜7 本。升の 1/4 ほどは 2 本以下にして地面を見せる */
+      const dens=vns(c.x*0.18+3.1,c.y*0.18+7.7);
+      const nTree=Math.max(2,Math.round(nMax*(0.35+0.65*dens)));
       for(let k=0;k<nTree;k++){
         const ax=rnd3(c.q,c.r,500+k*7), ay=rnd3(c.q,c.r,600+k*7);
         const x=c.x+(ax-0.5)*2*R*1.05, y=c.y+(ay-0.5)*2*R*0.92;
-        const h=R*(0.46+0.24*rnd3(c.q,c.r,700+k*7)), w=R*(0.19+0.10*rnd3(c.q,c.r,800+k*7));
-        const rr=rowOf(y); (treeRows[rr]||(treeRows[rr]=[])).push({c,x,y,h,w,lt:rnd3(c.q,c.r,900+k*7)<0.33});
+        const h=R*(0.35+0.40*rnd3(c.q,c.r,700+k*7)), w=R*(0.16+0.12*rnd3(c.q,c.r,800+k*7));
+        const rr=rowOf(y); (treeRows[rr]||(treeRows[rr]=[])).push({c,x,y,h,w,lt:rnd3(c.q,c.r,900+k*7)<0.5});
       }
     }
   }
@@ -6440,7 +6448,9 @@ function* glBuildMeshGen(){
           const wy=cy-c.g*sRef;
           for(let i=0;i<6;i++){const a=Math.PI/180*(60*i-90);
             q.push(W([cx+rad*1.04*Math.cos(a), wy+rad*1.04*Math.sin(a)*ys]));}
-          M.fan(q[0],q.slice(1),wc);
+          /* 水も角の色を隣の水と平均する（遠洋・外海・海の段が六角の階段に見えないように）*/
+          const wcc=c.ccol||[wc,wc,wc,wc,wc,wc];
+          M.fan(W([cx,wy]),q.concat([q[0]]),wc,q.concat([q[0]]).map((_,i)=>wcc[i%6].concat(255)));
           for(const p of q){if(p[1]<ymin)ymin=p[1];if(p[1]>ymax)ymax=p[1];}
           continue;
         }
@@ -6464,15 +6474,16 @@ function* glBuildMeshGen(){
              舌の長さを落差より短くも振っていたため、舌の底と水面のあいだに
              盤の外の色が覗く小さな穴が開いていた（崖の内角で目立つ）*/
           M.quad(W(A),W(B),W(B2),W(A2),glShade("#6e5a46",c.sh*0.92));
+          M.seg(W(A),W(B),Math.max(0.5,rad*0.02)/sRef/2,[58,50,40,110]);   /* 海岸線の墨線（国絵図の作法）*/
           const N2=5,L2=(Q,S,t)=>[Q[0]+(S[0]-Q[0])*t,Q[1]+(S[1]-Q[1])*t];
           for(let k=0;k<N2;k++){                  /* 断面を舌のように垂らす */
             const t0=k/N2,t1=(k+1)/N2;
-            const jj=1.0+0.50*rnd3(c.q,c.r,i*11+k);
+            const jj=1.0+0.30*rnd3(c.q,c.r,i*11+k);
             const tA=L2(A,B,t0),tB=L2(A,B,t1),bA=L2(A2,B2,t0),bB=L2(A2,B2,t1);
             const mA=[tA[0]+(bA[0]-tA[0])*jj,tA[1]+(bA[1]-tA[1])*jj];
             const mB=[tB[0]+(bB[0]-tB[0])*jj,tB[1]+(bB[1]-tB[1])*jj];
             M.quad(W(tA),W(tB),W(mB),W(mA),
-              glShade("#6e5a46",0.70+0.50*rnd3(c.q,c.r,i*11+k+53)));
+              glShade("#6e5a46",0.86+0.20*rnd3(c.q,c.r,i*11+k+53)));   /* 縞を弱く（バーコードに見えない程度）*/
           }
         }
         const q=pt.map(W);
@@ -6532,7 +6543,7 @@ function* glBuildMeshGen(){
       }
       const mts=[];                               /* 山は背の高い順に */
       for(const c of row){ if(!c.mtn)continue;
-        if(treeRows.length&&c.type===MT_A&&!c.named)continue;   /* 森は木の群れで（下）*/
+        if(rad>=LOD_TONGUE&&c.type===MT_A&&!c.named)continue;   /* 森は木の群れで（下）。50% では面色だけ */
         const grow=0.60+Math.min(1,c.m/2300)*0.62;
         mts.push({c,px:c.x*sRef,py:(c.y*ys)*sRef-c.g*sRef,
                   hh:(c.type===MT_B?0.86:0.68)*grow*(c.named?1.18:1)}); }
@@ -6552,8 +6563,8 @@ function* glBuildMeshGen(){
         /* **山は升の面色から生やす**（§10.21・8.4.0）。暗部・明部は面色からの相対（×0.70／×1.14）、
            裾は面色そのもの。固定の濃緑で描いていたため、山が地面に刺さった置物に見えていた */
         const fc=T.c.own||glShade(color.get(T.c.paint)||"#000",T.c.sh);
-        const dk=fc.map(v=>Math.round(v*(T.c.type===MT_B?0.74:0.70)));
-        const lt=fc.map(v=>Math.min(255,Math.round(v*(T.c.type===MT_B?1.12:1.14))));
+        const dk=fc.map(v=>Math.round(v*(T.c.type===MT_B?0.72:0.70)));
+        const lt=fc.map(v=>Math.min(255,Math.round(v*(T.c.type===MT_B?1.04:1.14))));
         const at=(rgbv,p)=>{
           if(vS<0.02)return rgbv.concat(255);
           const h=Math.max(0,Math.min(1,(p[1]-y0)/((y1-y0)||1)));
@@ -6568,7 +6579,7 @@ function* glBuildMeshGen(){
         M.fan(W(S.fr),half,vS<0.02?lt.concat(255):mixTo(lt,vM*0.88),
               half.map(p=>at(lt,p)));             /* 日の当たる側 */
         M.seg(W([S.apexX,S.apexY]),W(S.fr),Math.max(0.5,rad*0.04)/sRef/2,
-              [111,116,112,115]);               /* 稜線は灰の縁取り（国絵図）。白は雪と街道の記号なので使わない */
+              [111,116,112,128]);               /* 稜線は灰の縁取り（国絵図）。白は雪と街道の記号なので使わない */
         if(playCells[T.c.id-1].effect&32){        /* 冠雪（高い山の頂。10月〜5月・§10.16）*/
           const rn=k=>rnd3(T.c.q,T.c.r,k);
           const yc=S.apexY+S.tot*(0.30+0.10*rn(4)), cap=[];
@@ -6601,7 +6612,8 @@ function* glBuildMeshGen(){
         const px=t.x*sRef, py=(t.y*ys)*sRef-c.g*sRef;
         const top=fc.map(v=>Math.round(v*(t.lt?0.84:0.68)));
         const base=vS<0.02?fc.concat(255):snowMix(fc,vS);
-        const apex=vS<0.02?top.concat(255):snowMix(top,Math.min(1,vS*1.3));
+        /* 雪の森は梢を白くしない。日向 #c3c8ba／日陰 #8f9a88 へ寄せる（白い三角の群れは静電気のノイズに見える）*/
+        const apex=vS<0.02?top.concat(255):(t.lt?[195,200,186,255]:[143,154,136,255]);
         const A=W([px,py-t.h*sRef]), Bl=W([px-t.w*sRef,py]), Br=W([px+t.w*sRef,py]);
         M.tri(Bl,Br,A,base,base,apex);
         if(A[1]<ymin)ymin=A[1]; if(Bl[1]>ymax)ymax=Bl[1];
@@ -6649,6 +6661,11 @@ function* glBuildMeshGen(){
           for(let i=0;i<=8;i++){const t=i/8*Math.PI*2;
             ring.push(W([p[0]+Math.cos(t)*h, p[1]+Math.sin(t)*h*ys]));}
           M.fan(W(p),ring,C.at(C.tOf(j)));
+        }
+        /* **川の縁の墨線**（§10.21・8.4.0）。国絵図の川は青に細い縁。荒丘陵・山地の面の上では帯だけだと消える */
+        if(rad>=LOD_TONGUE){
+          const hwE=Math.max(0.5,rad*0.025)/sRef/2, EC=[75,111,125,200];
+          for(let j=a;j<b;j++){ M.seg(W(C.L[j]),W(C.L[j+1]),hwE,EC); M.seg(W(C.Rt[j]),W(C.Rt[j+1]),hwE,EC); }
         }
       }
       for(const c of row){                         /* 堤 */
@@ -6944,7 +6961,7 @@ function glCreate(){
       c=mix(vec3(l),c,sat);                       /* 彩度 */
       c=mix(c,c*uPaper*1.10,0.12);                /* 紙色の被り（12%。多いと色相差が縮む）*/
       c=pow(max(c,0.0),vec3(0.95));               /* 中間調 */
-      c=c*0.94+uPaper*0.06;                       /* 黒を少し持ち上げる。紙に描いた墨は真っ黒にならない */
+      c=c*0.97+uPaper*0.03;                       /* 黒を少し持ち上げる。紙に描いた墨は真っ黒にならない */
       c=mix(c,uPaper,haze);                       /* 奥の靄 */
       return c; }
     float haze(vec2 res){ return 0.07*smoothstep(0.55,1.0,gl_FragCoord.y/res.y); }`;
