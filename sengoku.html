@@ -6450,26 +6450,41 @@ function* glBuildMeshGen(){
   }
 
   /* ------------------------------------------------------------
-     **森（山地）は木の群れで描く**（§10.21・8.4.0）
+     **山地は重ね山で描く**（§10.21・8.4.0）
      ------------------------------------------------------------
-     升ごとの低ポリの円錐は「濃緑の塊」にしか見えなかった。木の冠（三角）を升の中心から
-     1.05R まで散らし、**升の縁を越えて群れさせる**。根元の色は升の面色そのもので、梢ほど暗い。
-     升の縁を越えた木は根元の行（手前）の束に入れ、その行の面の上に積む（自分の行に積むと
+     国絵図の山の描き方。丸い山の形（半楕円）を升ごとに 2〜3 つ重ね、左に日向・右に日陰、
+     裾に墨の輪郭を回す。隊が入れない「山」であることを、季節によらず形で読ませる
+     （木の群れだけだと、雪の下では平原や丘陵と見分けがつかなかった。依頼）。
+     山の上に木の冠（三角）を少し散らして森であることも残す。
+     升の縁を越えた山と木は根元の行（手前）の束に入れ、その行の面の上に積む（自分の行に積むと
      手前の行の面に下半分が隠される）。名のある峰と高山は円錐のまま（岩山として読み分ける）。
-     本数は倍率で 3〜7 本。升が小さい（半径 11px 未満）ときは描かない */
+     50% では升ごとに山 1 つだけ、木は描かない（木が柄に見える）*/
   const treeRows=[];
-  if(obl&&rad>=LOD_TONGUE){                      /* 50% では木を描かず面色だけ（木が柄に見える）*/
-    const nMax=rad>=45?7:5;
+  if(obl){
+    const big=rad>=LOD_TONGUE, nMax=rad>=45?3:2;
     for(const c of drawCache){
       if(c.type!==MT_A||c.named)continue;
-      /* 本数は低周波の揺らぎで 2〜7 本。升の 1/4 ほどは 2 本以下にして地面を見せる */
-      const dens=vns(c.x*0.18+3.1,c.y*0.18+7.7);
-      const nTree=Math.max(2,Math.round(nMax*(0.35+0.65*dens)));
-      for(let k=0;k<nTree;k++){
-        const ax=rnd3(c.q,c.r,500+k*7), ay=rnd3(c.q,c.r,600+k*7);
-        const x=c.x+(ax-0.5)*2*R*1.05, y=c.y+(ay-0.5)*2*R*0.92;
-        const h=R*(0.35+0.40*rnd3(c.q,c.r,700+k*7)), w=R*(0.16+0.12*rnd3(c.q,c.r,800+k*7));
-        const rr=rowOf(y); (treeRows[rr]||(treeRows[rr]=[])).push({c,x,y,h,w,lt:rnd3(c.q,c.r,900+k*7)<0.5});
+      const rn=k=>rnd3(c.q,c.r,k);
+      const grow=1+Math.min(1,c.m/2300)*0.35;
+      const nH=big?(rn(11)<0.65?2:1):1;
+      let coast=false; for(let d=0;d<6;d++){ const n=cellNbr(c,d); if(!n||n.fam===0){coast=true;break;} }   /* 海際の升は山を内に収める（峰が海へはみ出す）*/
+      for(let k=0;k<nH;k++){
+        const t=nH===1?0.5:k;
+        let w=R*(big?0.70+0.35*rn(40+k*9):0.78+0.27*rn(40+k*9)), h=R*(0.38+0.32*rn(50+k*9))*grow;
+        let dx=(-0.36+0.72*t)*R+(rn(20+k*9)-0.5)*R*0.40, dy=(rn(30+k*9)-0.5)*R*0.80+R*0.16;
+        if(coast){ w=Math.min(w,R*0.80); dx=Math.max(-(R*0.90-w),Math.min(R*0.90-w,dx)); dy=Math.max(-R*0.30,Math.min(R*0.45,dy)); }
+        const x=c.x+dx, y=c.y+dy;
+        const rr=rowOf(y); (treeRows[rr]||(treeRows[rr]=[])).push({kind:1,c,x,y,h,w,ax:(rn(60+k*9)-0.5)*0.44,pw:1.35+0.5*rn(70+k*9)});
+      }
+      if(big){
+        const dens=vns(c.x*0.18+3.1,c.y*0.18+7.7);
+        const nTree=Math.max(1,Math.round(nMax*(0.35+0.65*dens)));
+        for(let k=0;k<nTree;k++){
+          const ax=rn(500+k*7), ay=rn(600+k*7);
+          const x=c.x+(ax-0.5)*2*R*(coast?0.6:0.95), y=c.y+(ay-0.5)*2*R*0.85;
+          const h=R*(0.30+0.26*rn(700+k*7)), w=R*(0.14+0.09*rn(800+k*7));
+          const rr=rowOf(y); (treeRows[rr]||(treeRows[rr]=[])).push({kind:0,c,x,y,h,w,lt:rn(900+k*7)<0.5});
+        }
       }
     }
   }
@@ -6602,9 +6617,51 @@ function* glBuildMeshGen(){
         }
         for(const p of q){if(p[1]<ymin)ymin=p[1];if(p[1]>ymax)ymax=p[1];}
       }
+    /* 重ね山と木。奥（y の小さい）から順に */
+    const trees=treeRows[r];
+    if(trees){
+      trees.sort((a,b)=>a.y-b.y);
+      for(const t of trees){
+        const c=t.c, fc=c.own||glShade(color.get(c.paint)||"#000",c.sh);
+        const vS=snowAt(c);
+        const px=t.x*sRef, py=(t.y*ys)*sRef-c.g*sRef;
+        if(t.kind===1){                           /* 山。尖りと片寄りのある峰を頂で割り、左が日向・右が日陰。裾に墨の輪郭 */
+          const lt=fc.map(v=>Math.min(255,Math.round(v*1.05))), dk=fc.map(v=>Math.round(v*0.78));
+          const cl=vS<0.02?lt.concat(255):snowMix(lt,Math.min(0.92,vS+0.22));
+          const cd=vS<0.02?dk.concat(255):snowMix(dk,vS*0.88);
+          const cg=vS<0.02?fc.concat(255):snowMix(fc,vS);                 /* 裾は地面の色へ溶かす（裾が水平な帯に見えない）*/
+          const ia=rad>=45?0.45:0.32;
+          const ink=vS<0.02?[Math.round(fc[0]*0.50),Math.round(fc[1]*0.52),Math.round(fc[2]*0.48),Math.round(255*ia)]:[96,104,100,Math.round(230*ia)];
+          /* 輪郭：u を −1〜1 で辿り、高さは 1−|u|^pw（pw 1.35〜1.85。楕円より尖る）。頂は ax だけ横へ寄せる */
+          const N=10, prof=[], ax=t.ax;
+          for(let i=0;i<=N;i++){ const u=-1+2*i/N;
+            const v=u<ax?(u+1)/(ax+1):(1-u)/(1-ax);                   /* 頂で 1、裾で 0 */
+            prof.push([px+u*t.w*sRef, py-Math.pow(Math.max(0,v),1/t.pw)*t.h*sRef]); }
+          let hi=0; for(let i=1;i<=N;i++)if(prof[i][1]<prof[hi][1])hi=i;
+          const apexP=[px+ax*t.w*sRef, py-t.h*sRef]; prof[hi]=apexP;
+          const L=prof.slice(0,hi+1), Rr=prof.slice(hi);
+          const base=W([px,py]);
+          const vcol=(P,cc)=>{ const v=Math.min(1,(py-P[1])/(t.h*sRef)), k=Math.sqrt(Math.max(0,v));     /* 高さで裾色から峰色へ */
+            return [Math.round(cg[0]+(cc[0]-cg[0])*k),Math.round(cg[1]+(cc[1]-cg[1])*k),Math.round(cg[2]+(cc[2]-cg[2])*k),255]; };
+          M.fan(base,L.map(W),cg,L.map(P=>vcol(P,cl))); M.fan(base,Rr.map(W),cg,Rr.map(P=>vcol(P,cd)));
+          const hw=Math.max(0.5,rad*0.028)/sRef/2;
+          for(let i=0;i<N;i++)M.seg(W(prof[i]),W(prof[i+1]),hw,ink);
+          const apex=W(apexP); if(apex[1]<ymin)ymin=apex[1]; if(base[1]>ymax)ymax=base[1];
+          continue;
+        }
+        const top=fc.map(v=>Math.round(v*(t.lt?0.84:0.68)));
+        const base=vS<0.02?fc.concat(255):snowMix(fc,vS);
+        /* 雪の森は梢を白くしない。梢の色から雪影の青灰 #dfe6e0 へ 3 割だけ寄せる（白い三角の群れは静電気のノイズに見え、
+           灰緑一色だと幽霊の森に見える。梢が暗いまま残ることが「雪の下の山地」の印）*/
+        const apex=vS<0.02?top.concat(255):top.map((v,i)=>Math.round(v+([223,230,224][i]-v)*0.30)).concat(255);
+        const A=W([px,py-t.h*sRef]), Bl=W([px-t.w*sRef,py]), Br=W([px+t.w*sRef,py]);
+        M.tri(Bl,Br,A,base,base,apex);
+        if(A[1]<ymin)ymin=A[1]; if(Bl[1]>ymax)ymax=Bl[1];
+      }
+    }
       const mts=[];                               /* 山は背の高い順に */
       for(const c of row){ if(!c.mtn)continue;
-        if(rad>=LOD_TONGUE&&c.type===MT_A&&!c.named)continue;   /* 森は木の群れで（下）。50% では面色だけ */
+        if(c.type===MT_A&&!c.named)continue;   /* 山地は重ね山で描く（上）。どの倍率でも */
         const grow=0.60+Math.min(1,c.m/2300)*0.62;
         mts.push({c,px:c.x*sRef,py:(c.y*ys)*sRef-c.g*sRef,
                   hh:(c.type===MT_B?0.86:0.68)*grow*(c.named?1.18:1)}); }
@@ -6633,14 +6690,14 @@ function* glBuildMeshGen(){
           const h=Math.max(0,Math.min(1,(p[1]-y0)/((y1-y0)||1)));
           return mixTo(rgbv, vM*(1-0.32*h));      /* 裾ほど薄い */
         };
-        const foot=vS<0.02?fc.concat(255):mixTo(fc,vM*0.68);
+        const foot=vS<0.02?fc.concat(255):mixTo(fc,vS);          /* 裾は地面と同じ白さ（暗い四角が出ない）*/
         for(let i=0;i<prof.length-1;i++){         /* 影の側 */
           const A=prof[i],B=prof[i+1];
           M.quad(A,B,[B[0],base],[A[0],base],at(dk,A),at(dk,B),foot,foot);
         }
         const half=glSil([...S.sil.slice(0,S.half+1),S.fr]).map(W);
-        M.fan(W(S.fr),half,vS<0.02?lt.concat(255):mixTo(lt,Math.min(0.92,vM+0.25)),
-              half.map(p=>vS<0.02?at(lt,p):mixTo(lt,Math.min(0.92,vM+0.25-0.08*Math.max(0,Math.min(1,(p[1]-y0)/((y1-y0)||1)))))));   /* 日の当たる側 */
+        M.fan(W(S.fr),half,vS<0.02?lt.concat(255):mixTo(lt,Math.min(0.92,vM+0.35)),
+              half.map(p=>vS<0.02?at(lt,p):mixTo(lt,Math.min(0.92,vM+0.35-0.10*Math.max(0,Math.min(1,(p[1]-y0)/((y1-y0)||1)))))));   /* 日の当たる側。高山は山地より白く */
         if(vS<0.02)M.seg(W([S.apexX,S.apexY]),W(S.fr),Math.max(0.5,rad*0.04)/sRef/2,
               [111,116,112,128]);               /* 稜線は灰の縁取り（国絵図）。白は雪と街道の記号なので使わない */
         if(playCells[T.c.id-1].effect&32){        /* 冠雪（高い山の頂。10月〜5月・§10.16）*/
@@ -6663,24 +6720,6 @@ function* glBuildMeshGen(){
           }
         }
         for(const p of prof)if(p[1]<ymin)ymin=p[1];
-      }
-    }
-    /* 木の群れ。奥（y の小さい）から順に */
-    const trees=treeRows[r];
-    if(trees){
-      trees.sort((a,b)=>a.y-b.y);
-      for(const t of trees){
-        const c=t.c, fc=c.own||glShade(color.get(c.paint)||"#000",c.sh);
-        const vS=snowAt(c);
-        const px=t.x*sRef, py=(t.y*ys)*sRef-c.g*sRef;
-        const top=fc.map(v=>Math.round(v*(t.lt?0.84:0.68)));
-        const base=vS<0.02?fc.concat(255):snowMix(fc,vS);
-        /* 雪の森は梢を白くしない。梢の色から雪影の青灰 #dfe6e0 へ 3 割だけ寄せる（白い三角の群れは静電気のノイズに見え、
-           灰緑一色だと幽霊の森に見える。梢が暗いまま残ることが「雪の下の山地」の印）*/
-        const apex=vS<0.02?top.concat(255):top.map((v,i)=>Math.round(v+([223,230,224][i]-v)*0.30)).concat(255);
-        const A=W([px,py-t.h*sRef]), Bl=W([px-t.w*sRef,py]), Br=W([px+t.w*sRef,py]);
-        M.tri(Bl,Br,A,base,base,apex);
-        if(A[1]<ymin)ymin=A[1]; if(Bl[1]>ymax)ymax=Bl[1];
       }
     }
     terAt[r]={start,count:M.n-start,ymin,ymax};
