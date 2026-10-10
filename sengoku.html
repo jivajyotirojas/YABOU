@@ -795,7 +795,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.4.1";
+const VERSION="8.4.2";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -20698,12 +20698,17 @@ function runBatAct(sd,me,foe,B){
   /* **工作**（§31.2）。城の壁を焼く手ではなく、敵の備えに酒盛・放火・混乱を及ぼす手である。
      **重ねて掛けられる**（依頼）。掛かっている相手でも、掛かれば3拍に戻る */
   if(sd.lead&&ok(ACT_KOU)&&runRand()<0.5)return ACT_KOU;
+  /* **前列は原則、一斉と攻撃**（依頼・8.4.2・§31.2）。弓射は後列の手である。
+     先頭の行に立っていて斬り込める相手が届くなら、どの下知でも弓射は選ばない。
+     「射る」の好みが弓射を攻撃より先に置くので、前列の足軽まで弓を引いていた */
+  const front=(sd.y|0)===battleFront(me);
+  const skipYumi=id=>id===ACT_YUMI&&front&&(ok(ACT_ISSEI)||ok(ACT_UCHI));
   const od=byId(BASE_ORDER,me.order)||BASE_ORDER[0];
-  for(const id of od.want)if(id!==ACT_SEI&&ok(id))return id;
+  for(const id of od.want)if(id!==ACT_SEI&&!skipYumi(id)&&ok(id))return id;
   /* **下知の好みでは決まらなかった。取れる手を残らず見る。**
      「固め」の下知は弓と鉄砲しか好まないので、斬り込むしかない備えは
      ここまで落ちる。好みが無いことは、手が無いことではない */
-  for(const id of can)if(id!==ACT_SEI&&id!==ACT_IDOU&&ok(id))return id;
+  for(const id of can)if(id!==ACT_SEI&&id!==ACT_IDOU&&!skipYumi(id)&&ok(id))return id;
   /* **打つ手が無いなら前へ出る**（§31.2）。手をこまねかない */
   if(ok(ACT_IDOU)&&battleSlot(me,sd,true,B))return ACT_IDOU;
   if(ok(ACT_KOU))return ACT_KOU;                /* まだ何も受けていない相手が届くなら工作 */
