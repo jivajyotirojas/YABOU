@@ -15576,13 +15576,11 @@ function runIkkiRise(siteId){
   const id=runNewPowerId();
   playPowers.push({id, kind:"ikki", label:kind, toushu:mkLink(18,bid,"name"),
                    group:mkLink(19,id,"bushouNum"), colorUp:IKKI_COLOR, colorLow:IKKI_COLOR});
-  const se=Math.floor(runRand()*(HIRE_ABILITY_MAX+1));
-  const sk=()=>1+Math.floor(runRand()*HIRE_SKILL_MAX);
   playBushou.push({id:bid, name, myoji:"", shozoku:mkLink(15,id,"label"), since:runNowMonthNo(), chusei:CHUSEI_HIRE,
     birth:g.year-(HIRE_AGE_MIN+Math.floor(runRand()*(HIRE_AGE_MAX-HIRE_AGE_MIN+1))), life:runRollLife(),
     site:"-", rank:mkLink(22,7,"label"), ichimon:true,
-    gaikou:Math.floor(runRand()*(HIRE_ABILITY_MAX+1)), sentou:se, chibou:Math.floor(runRand()*(HIRE_ABILITY_MAX+1)),
-    ninja:false, rest:0, nou:sk(), shou:sk(), ken:sk(), tou:sk(), ...tekiOf(name,se), kunkou:0});
+    gaikou:runRandAbility(), sentou:runRandAbility(), chibou:runRandAbility(),
+    ninja:false, rest:0, ...runRandSkills(), kunkou:0});   /* 能力は無作為（依頼・8.5.0）*/
   playBushouGroups.push({id, bushouNum:1, bushou:[bid]});
   const gc=runGroupAt(cell); if(!gc)return null;
   const row=runUnitRow({label:kind+" "+name, type:tb.id, state:"sagyo", power:id, bushou:bid,
@@ -15930,8 +15928,22 @@ const BASE_NANORI=[
 ];
 /* 武将数÷拠点数（切り捨て）ごとの、年の初めに仕官してくる割。1 から順に */
 const HIRE_ODDS=[0.75,0.50,0.40,0.30,0.20,0.15,0.10,0.08,0.05,0.02];   // 1〜9、10以上は最後の値（依頼）。切り捨てて0なら1と見る
-const HIRE_ABILITY_MAX=39;     // 戦闘・智謀・外交の上限（C の帯の上端。D 0〜19／C 20〜39）
-const HIRE_SKILL_MAX=2;        // 仕事の適性の上限（D 1／C 2）
+/* **無作為に作る武将の能力**（依頼・8.5.0）。仕官してくる者と一揆の頭。
+   段ごとの割で段を引き、数の能力（戦闘・智謀・外交）はその段の帯（D 0〜19／C 20〜39／B 40〜59／A 60〜79）から等しい割で引く。
+   適性（農業・商業・建築・登用・足軽・騎馬・鉄砲・鉄騎・水軍）は段そのもの（D 1〜A 4）。S は出ない。
+   **鉄騎は騎馬を越えない**（§31.2）*/
+const HIRE_GRADE_ODDS=[0.60,0.30,0.09,0.01];   // D・C・B・A の割（依頼：D 高・C 中・B かなり低・A 極低）
+function runRandGrade(){
+  let x=runRand();
+  for(let i=0;i<HIRE_GRADE_ODDS.length;i++){ if(x<HIRE_GRADE_ODDS[i])return i+1; x-=HIRE_GRADE_ODDS[i]; }
+  return 1;
+}
+const runRandAbility=()=>(runRandGrade()-1)*20+Math.floor(runRand()*20);
+function runRandSkills(){
+  const kiba=runRandGrade();
+  return {nou:runRandGrade(), shou:runRandGrade(), ken:runRandGrade(), tou:runRandGrade(),
+          ashi:runRandGrade(), kiba, tepp:runRandGrade(), kiki:Math.min(kiba,runRandGrade()), sui:runRandGrade()};
+}
 const MYOJI_RANK=3;            // この役職（部将）以上に上がれば苗字が付く
 /* 武将の苗字。**欄を持つ者はその欄、持たない者は名から切る**（§19.3）*/
 const runMyojiOf=b=>b?(b.myoji!==undefined?b.myoji:runMyoji(b.name)):"";
@@ -15971,18 +15983,15 @@ function runHireWeak(siteId){
   }
   if(!name)return null;
   const id=runNextBushouId();
-  const se=Math.floor(runRand()*(HIRE_ABILITY_MAX+1));
-  const sk=()=>1+Math.floor(runRand()*HIRE_SKILL_MAX);
   const row={id, name, myoji:"", shozoku:mkLink(15,owner,"label"), since:runNowMonthNo(), chusei:CHUSEI_HIRE,
              birth:g.year-(HIRE_AGE_MIN+Math.floor(runRand()*(HIRE_AGE_MAX-HIRE_AGE_MIN+1))), life:runRollLife(),
              site:mkLink(20,siteId,"name"), rank:mkLink(22,0,"label"),
              ichimon:false,
-             gaikou:Math.floor(runRand()*(HIRE_ABILITY_MAX+1)),
-             sentou:se,
-             chibou:Math.floor(runRand()*(HIRE_ABILITY_MAX+1)),
+             gaikou:runRandAbility(),
+             sentou:runRandAbility(),
+             chibou:runRandAbility(),
              ninja:false, rest:0,
-             nou:sk(), shou:sk(), ken:sk(), tou:sk(),
-             ...tekiOf(name,se),
+             ...runRandSkills(),           /* 能力は無作為（依頼・8.5.0）*/
              kunkou:0};
   playBushou.push(row);
   runJoinGroups(id,owner,siteId);
