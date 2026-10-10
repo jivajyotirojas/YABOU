@@ -2885,14 +2885,19 @@ ID は勢力ぶんを先に振り、拠点ぶんはその続き。**合計が食
 当たれば、**その家の拠点のうち、在城の武将がいちばん少ない拠点**に一人入る。
 **その拠点の銭が 300 に満たなければ入らない**（浪人の登用と同じ線、§19.2）。銭は取らない。
 
-**来るのは弱い者である。** 能力の段を 0〜100 の 20 刻み（D 0〜19／C 20〜39／B 40〜59／A 60〜79／S 80〜100）、
-仕事の適性 1〜5 を D=1／C=2 と読み、**すべての能力が C か D**。
+**来るのはおおむね弱い者である。** 能力の段を 0〜100 の 20 刻み（D 0〜19／C 20〜39／B 40〜59／A 60〜79／S 80〜100）、
+適性 1〜5 を D=1／C=2／B=3／A=4／S=5 と読む。**能力ごとに段を次の割で引く**（依頼・8.5.0。それまではすべて C か D を等しい割で）。
+一揆の頭（§21.4）も同じ引き方で作る（`runRandGrade`・`runRandAbility`・`runRandSkills`）。
+
+| 段 | D | C | B | A | S |
+|---|---|---|---|---|---|
+| 割（依頼：D 高・C 中・B かなり低・A 極低） | 60% | 30% | 9% | 1% | 0 |
 
 | 欄 | 値 |
 |---|---|
-| 戦闘・智謀・外交 | 0〜39 の無作為 |
-| 農業・商業・建築・登用 | 1〜2 の無作為 |
-| 兵科の適性 | 戦闘から導く（§31.2。2 以下になる）|
+| 戦闘・智謀・外交 | 能力ごとに段を引き、その段の帯から等しい割で |
+| 農業・商業・建築・登用 | 能力ごとに段を引く |
+| 兵科の適性（足軽・騎馬・鉄砲・鉄騎・水軍） | 能力ごとに段を引く。**鉄騎は騎馬を越えない**（§31.2）|
 | 忍び | 無し |
 | 役職・勲功 | 足軽小頭・0 |
 | 一門 | でない |
@@ -3616,7 +3621,7 @@ NPCは、領内を踏まれて籠城に徹する城が、留守＋1000 に届く
 
 **勢力と武将**
 
-`runDelPower`　`runPowerSites`　`runSiteOwner`　`runSetSiteOwner`　`runFallCheck`　`runAddKunkou`　`runRankOf`　`runRonin`　`runHire`　`runKillBushou`　`runBehead`　`runSuccession`　`runCapture`　`runJudgeCaptive`　`runFreeBushou`　`runPutIdou`　`runReassign`　`runSkillOf`　`runBushouAt`　`runCastellan`　`runJoinGroups`　`runLeaveGroups`　`runTransferBushou`　`runNewPowerId`　`runIsToushu`　`runBushouCell`　`runVanishBushou`　`runRestBushou`　`runJustIn`　`runGrowSkill`　`runTradeKunkou`　`runDaimyoRankFor`　`runFixDaimyoRanks`　`runLordGone`　`runFallHold`　`runFallLater`　`runFallNow`　`runHeirAsk`　`runHeirHold`　`runHeirNow`　`runRename`　`runGiveMyoji`　`runMyoji`　`runMyojiOf`　`runIeMyoji`　`runHasSei`　`runMeiOf`　`runHataOf`　`runTakerName`　`runVacateSite`　`runHireWeak`　`runHireTick`　`runRaiseHouse`　`runRaiseDokuritsu`　`runDokuHeirUnit`
+`runDelPower`　`runPowerSites`　`runSiteOwner`　`runSetSiteOwner`　`runFallCheck`　`runAddKunkou`　`runRankOf`　`runRonin`　`runHire`　`runKillBushou`　`runBehead`　`runSuccession`　`runCapture`　`runJudgeCaptive`　`runFreeBushou`　`runPutIdou`　`runReassign`　`runSkillOf`　`runBushouAt`　`runCastellan`　`runJoinGroups`　`runLeaveGroups`　`runTransferBushou`　`runNewPowerId`　`runIsToushu`　`runBushouCell`　`runVanishBushou`　`runRestBushou`　`runJustIn`　`runGrowSkill`　`runTradeKunkou`　`runDaimyoRankFor`　`runFixDaimyoRanks`　`runLordGone`　`runFallHold`　`runFallLater`　`runFallNow`　`runHeirAsk`　`runHeirHold`　`runHeirNow`　`runRename`　`runGiveMyoji`　`runMyoji`　`runMyojiOf`　`runIeMyoji`　`runHasSei`　`runMeiOf`　`runHataOf`　`runTakerName`　`runVacateSite`　`runHireWeak`　`runHireTick`　`runRandGrade`　`runRandAbility`　`runRandSkills`　`runRaiseHouse`　`runRaiseDokuritsu`　`runDokuHeirUnit`
 
 **升に問う**
 
