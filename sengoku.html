@@ -624,7 +624,6 @@
   #site table.bt th:nth-child(2),#site table.bt td:nth-child(2){width:3.9em;min-width:3.9em}
   #site table.bt tr.g th:nth-child(1),#site table.bt tr.g th:nth-child(2){width:auto}
   #site table.bt .fill{width:100%;padding:0}
-  #site table.bt .bl{padding-left:12px}
   #site table.bt th{color:var(--dim)}
   #site table.bt th.so{color:var(--shiro)}
   #site table.bt th.so.on{color:var(--ki)}
@@ -635,6 +634,12 @@
     #site table.bt th:last-child,#site table.bt td:last-child{padding-right:8px}}
   @media (max-width:640px){#site table.bt td.r,#site table.bt th.r{padding-left:5px}}
   #site table.bt td:first-child,#site table.bt th:first-child{padding-right:6px}
+  /* **値の列は同じ幅**（依頼・8.5.0）。3桁の数（表の字）と全角2字（見出しの字）の広いほうに揃える */
+  #site table.bt td.v,#site table.bt th.v{box-sizing:content-box;width:var(--vw);min-width:var(--vw);max-width:var(--vw);
+    padding-left:3px;padding-right:3px;overflow:hidden;text-overflow:clip}
+  #site table.bt{--vw:max(3ch,22px)}
+  #site table.bt td.v{font-variant-numeric:tabular-nums}
+  @media (max-width:640px){#site table.bt td.v,#site table.bt th.v{padding-left:2px;padding-right:2px}}
   /* **ロードの進み**（依頼）。盤を作るあいだだけ出して、終わったら消す */
   #loading{position:fixed;inset:0;z-index:50;background:var(--sumi);display:flex;
     flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--ki)}
@@ -4603,7 +4608,7 @@ function drawSite(){
   /* **適性は五段階で S・A・B・C・D**（依頼）。値は1〜5で持ち、5が S */
   const tekiLabel=v=>v>=1&&v<=5?"DCBAS"[v-1]:"";
   const SK={nou:b=>b.nou||0, shou:b=>b.shou||0, ken:b=>b.ken||0, tou:b=>b.tou||0,
-    ashi:b=>b.ashi||0, kiba:b=>b.kiba||0, tepp:b=>b.tepp||0, kiki:b=>b.kiki||0, sui:b=>b.sui||0, gaikou:b=>b.gaikou||0, sentou:b=>b.sentou||0, chibou:b=>b.chibou||0, ninja:b=>b.ninja?1:0, kunkou:b=>b.kunkou||0, age:b=>b.birth?-b.birth:0, kageki:b=>b.kageki??kifuOf(b.name)[0], kaitaku:b=>b.kaitaku??kifuOf(b.name)[1], chusei:b=>runIsToushu(b)?999:(b.chusei??CHUSEI_START)};
+    ashi:b=>b.ashi||0, kiba:b=>b.kiba||0, tepp:b=>b.tepp||0, kiki:b=>b.kiki||0, sui:b=>b.sui||0, gaikou:b=>b.gaikou||0, sentou:b=>b.sentou||0, chibou:b=>b.chibou||0, ninja:b=>b.ninja?1:0, kunkou:b=>b.kunkou||0, age:b=>b.birth?-b.birth:0, ichimon:b=>b.ichimon?1:0, kageki:b=>b.kageki??kifuOf(b.name)[0], kaitaku:b=>b.kaitaku??kifuOf(b.name)[1], chusei:b=>runIsToushu(b)?999:(b.chusei??CHUSEI_START)};
   const sk=siteSort&&SK[siteSort]?SK[siteSort]:null;
   const ms=men.map(m=>({m,b:byId(playBushou,m.id)})).filter(x=>x.b)
     .sort((a,b)=>(sk?sk(b.b)-sk(a.b):0)||(lord&&b.b.id===lord.id)-(lord&&a.b.id===lord.id)||((rkOf(b.b)||{hei:0}).hei-(rkOf(a.b)||{hei:0}).hei));
@@ -4619,7 +4624,8 @@ function drawSite(){
     const tab=wide?"all":["cho","ikusa","mi"].includes(siteTab)?siteTab:"nai";
     const C={gaikou:["gaikou","外交",b=>({v:b.gaikou,c:"r"})], chibou:["chibou","智謀",b=>({v:b.chibou,c:"r"})], ninja:["ninja","忍び",b=>({v:b.ninja?"○":"",c:"c"})],
       kunkou:["kunkou","勲功",b=>({v:b.kunkou??0,c:"r"})],
-      kageki:["kageki","過激度",b=>({v:b.kageki??kifuOf(b.name)[0],c:"r"})], kaitaku:["kaitaku","開拓",b=>({v:b.kaitaku??kifuOf(b.name)[1],c:"r"})], age:["age","年齢",b=>({v:b.birth?(playProgress[0]?playProgress[0].year:0)-b.birth:"",c:"r"})],
+      ichimon:["ichimon","一門",b=>({v:b.ichimon?"○":"",c:"c"})],
+      kageki:["kageki","過激",b=>({v:b.kageki??kifuOf(b.name)[0],c:"r"})], kaitaku:["kaitaku","開拓",b=>({v:b.kaitaku??kifuOf(b.name)[1],c:"r"})], age:["age","年齢",b=>({v:b.birth?(playProgress[0]?playProgress[0].year:0)-b.birth:"",c:"r"})],
       sentou:["sentou","戦闘",b=>({v:b.sentou,c:"r"})],
       nou:["nou","農",b=>T(b.nou)], shou:["shou","商",b=>T(b.shou)], ken:["ken","建",b=>T(b.ken)], tou:["tou","登用",b=>T(b.tou)],
       ashi:["ashi","足軽",b=>T(b.ashi)], kiba:["kiba","騎馬",b=>T(b.kiba)], tepp:["tepp","鉄砲",b=>T(b.tepp)], kiki:["kiki","鉄騎",b=>T(b.kiki)], sui:["sui","水軍",b=>T(b.sui)],
@@ -4628,16 +4634,18 @@ function drawSite(){
     /* **武将の基礎の値は全部出す**（依頼）。**派遣する仕事ごとにまとめる**（レビュー）。
        内政 → 調略 → 戦 → 身上 → 忠誠（右端）。まとまりの中は 数 → ○ → S〜D。内政は派遣の一覧の順（農業・建築・商業）*/
     const G={nai:["内政",pick(["nou","ken","shou"])], cho:["調略",pick(["gaikou","chibou","ninja","tou"])],
-      ikusa:["戦",pick(["sentou","ashi","kiba","tepp","kiki","sui"])], mi:["身上",pick(["kunkou","age"])], ki:["気質",pick(["kageki","kaitaku"])]};
-    /* 気質（過激度・開拓）は、その武将が当主になったときの家の性格。経歴（身上）とは分ける。狭い画面では身上のタブに並べる */
+      ikusa:["戦",pick(["sentou","ashi","kiba","tepp","kiki","sui"])], mi:["身上",pick(["kunkou","age","ichimon"])], ki:["気質",pick(["kageki","kaitaku"])]};
+    /* **一門かどうかは身上に出す**（依頼・8.5.0）。
+       気質（過激度・開拓）は、その武将が当主になったときの家の性格。経歴（身上）とは分ける。狭い画面では身上のタブに並べる */
     const COLS=(tab==="all"?["nai","cho","ikusa","mi","ki"].map(k=>G[k]):tab==="mi"?[G.mi,G.ki]:[G[tab]]).concat([["",pick(["chusei"])]]);
     P.push('<div class="sec">武将 '+ms.length+'人'+(wide?'':'<span class="tabs">'
       +[["nai","内政"],["cho","調略"],["ikusa","戦"],["mi","身上"]].map(([k,l])=>`<button class="tb${tab===k?" on":""}" data-tab="${k}">${l}</button>`).join("")+'</span>')+'</div>');
     const sepH=i=>i===COLS.length-1?'<th class="fill"></th>':'<th class="gap"></th>';
     const sepD=i=>i===COLS.length-1?'<td class="fill"></td>':'<td class="gap"></td>';
-    const bl=(cs,j)=>j>0&&cs[j][2](ms[0].b).c!=="r"&&cs[j-1][2](ms[0].b).c==="r"?" bl":"";
+    /* **値の列はどれも同じ幅**（依頼・8.5.0）。値は3桁の数・S〜D・○ だけなので、3桁の数に揃える（`.v`）。
+       見出しは全角2字まで（過激度は「過激」）*/
     const g1=COLS.map(([g,cs],i)=>(i?sepH(i):'')+(g?`<th colspan="${cs.length}" class="grp">${g}</th>`:`<th colspan="${cs.length}"></th>`)).join("");
-    const g2=COLS.map(([g,cs],i)=>(i?sepH(i):'')+cs.map(([k,l,f],j)=>`<th class="${f(ms[0].b).c}${bl(cs,j)} so${siteSort===k?" on":""}" data-sort="${k}">${l}</th>`).join("")).join("");
+    const g2=COLS.map(([g,cs],i)=>(i?sepH(i):'')+cs.map(([k,l,f],j)=>`<th class="${f(ms[0].b).c} v so${siteSort===k?" on":""}" data-sort="${k}">${l}</th>`).join("")).join("");
     P.push('<table class="bt">'+(wide?'<tr class="g"><th></th><th></th>'+g1+(mine?'<th></th>':'')+'</tr>':'')
       +`<tr><th>名</th><th class="so${siteSort?"":" on"}" data-sort="">役職</th>`+g2+(mine?'<th></th>':'')+'</tr>'
       +vis.map(({m,b})=>{
@@ -4646,7 +4654,7 @@ function drawSite(){
         return `<tr class="${m.busy?"out":can?"sel":""}${siteGoBushou===b.id?" on":""}"${can?` data-go="${b.id}"`:""}><td>${esc(b.name)}`
           +(m.busy&&u?'<span class="tag">'+esc(linkValue(u.type))+'中</span>':"")
           +`</td><td>${esc(r?r.label:"—")}</td>`
-          +COLS.map(([g,cs],i)=>(i?sepD(i):'')+cs.map(([k,l,f],j)=>{const x=f(b); return `<td class="${x.c}${bl(cs,j)}">${x.v}</td>`;}).join("")).join("")
+          +COLS.map(([g,cs],i)=>(i?sepD(i):'')+cs.map(([k,l,f],j)=>{const x=f(b); return `<td class="${x.c} v">${x.v}</td>`;}).join("")).join("")
           +(mine?`<td class="r go">${can?"›":""}</td>`:"")+'</tr>';
       }).join("")+'</table>');
     if(vis.length<ms.length)P.push(`<button class="more" data-more="1">ほか${ms.length-vis.length}人を見る</button>`);
@@ -24817,7 +24825,7 @@ function runAIGoal0(u){
        **バグ**：役職の定員で測っていたため、城の兵が少なく定員の半分未満で出た軍勢
        （家老が1500で出るなど）が、出たその月に「傷んだ」と見て城へ戻っていた（6か月で8隊）*/
     const base=Math.min(cap,u.hei0||cap);
-    /* **3か月で戻れる見込みの無い軍勢は、戻らない**（依頼・`runIntruderFor`）*/
+    /* **1か月で戻れる（相手の升へ着ける）見込みの無い軍勢は、戻らない**（依頼・`runIntruderFor`）*/
     const intruder=runIntruderFor(u,pw);
     if(!intruder&&base>0&&(u.hei<base*AI_FORT_REST
                ||(u.rest2&&u.hei<cap*AI_FORT_FULL))){
@@ -26842,15 +26850,15 @@ const runIntruder=memoStamp(function runIntruder0(powerId,foeId){
 /* ------------------------------------------------------------
    **踏まれたとき、その軍勢が迎え撃ちに戻るか**（依頼・§32.3）
    ------------------------------------------------------------
-   領内に入った敵の軍勢のうち、**いまの状態で `INTRUDER_BACK_MONTHS`（6か月。8.3.0 までは 3か月。依頼）のうちに
+   領内に入った敵の軍勢のうち、**いまの状態で `INTRUDER_BACK_MONTHS`（1か月＝4手番。依頼・8.5.0。8.4.x は 6か月、8.3.0 までは 3か月）のうちに
    着ける見込みのあるもの**だけを相手にする。いちばん近いものを返す。
    見込みは踏み代で測る（`runAIField`。雪・治水・街道を含むいまの踏み代）。
    遠く離れた軍勢まで呼び戻すと、城攻めも占拠も途中で捨てて、着く前に相手が去る。
    ------------------------------------------------------------ */
-const INTRUDER_BACK_MONTHS=6;
+const INTRUDER_BACK_MONTHS=1;
 function runIntruderFor(u,powerId){
   const ix=runDomainIndex();
-  const budget=moveOf(u), lim=budget*INTRUDER_BACK_MONTHS*TURNS_PER_MONTH;   /* 6 か月＝24 手番ぶんの歩き（8.5.0）*/
+  const budget=moveOf(u), lim=budget*INTRUDER_BACK_MONTHS*TURNS_PER_MONTH;   /* 1 か月＝4 手番ぶんの歩き（8.5.0）*/
   const here=u.q.id;
   let best=null,bd=Infinity;
   for(const o of playUnits){
