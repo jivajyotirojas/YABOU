@@ -795,7 +795,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.4.3";
+const VERSION="8.4.4";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -22228,6 +22228,11 @@ function runFallSite(siteId,powerId,atkId){
       runAddKunkou(bid,KUNKOU_FALL);
     }
   }
+  /* **落ちた城の実効支配域は、段に応じた半径まで縮む**（依頼・8.4.4・§11.2.1）。
+     屋敷 2／館 4／城 Lv.1 6／Lv.2 8／Lv.3 10 升。その外にあった域の升は有効領域から外れ、
+     国（グレーゾーン）に戻る。半径の内の升はそのまま新しい持ち主の域になる。
+     縮めたあと、拠点から地続きでない升も落とす（`runDomainTrim`）*/
+  runFallShrink(siteId);
   /* **更地でなければ実効支配域を持つ**（§11.2.1）。無ければここで作る */
   if(st.taikyu>0&&!isLink(st.group))runMakeDomain(siteId);
   /* **在番でない、盤に出ている隊の始末**（§26.6）。
@@ -22249,6 +22254,20 @@ function runFallSite(siteId,powerId,atkId){
    既定範囲を超えず、よその拠点が押さえている升は取らない。
    ------------------------------------------------------------ */
 const DOMAIN_RADIUS=[0,1,2,3,4,5];   // 更地・屋敷・館・城Lv.1〜3
+/* **落城で残る実効支配域の半径**（依頼・8.4.4）。更地・屋敷・館・城Lv.1〜3 */
+const FALL_RADIUS=[0,2,4,6,8,10];
+function runFallShrink(siteId){
+  const st=byId(playSites,siteId); if(!st||!isLink(st.group))return 0;
+  const g=byId(playCellGroups,st.group.id); if(!g)return 0;
+  const bs=byId(BASE_SITES,siteId); if(!bs)return 0;
+  const home=BASE_CELLS[bs.cell-1]; if(!home)return 0;
+  const rad=FALL_RADIUS[taikyuLevel(st.taikyu)]||0;
+  const keep=g.cells.filter(id=>{const c=BASE_CELLS[id-1]; return c&&hexSteps(home.q,home.r,c.q,c.r)<=rad;});
+  const off=g.cells.length-keep.length;
+  if(off>0){ g.cells=keep; g.cellNum=keep.length; playStamp++; }
+  runDomainTrim(siteId);
+  return off;
+}
 /* 耐久度から段の番号。0＝更地、5＝城Lv.3 */
 const taikyuLevel=v=>{let i=0;
   for(let k=0;k<TAIKYU_BAND.length;k++)if(v>=TAIKYU_BAND[k].min)i=k;
