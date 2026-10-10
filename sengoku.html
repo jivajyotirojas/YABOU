@@ -612,18 +612,12 @@
   #site table.bt th.so{color:rgba(255,255,255,.7)}
   #site table.bt th.so.on{color:var(--shiro)}
   #site table.bt td.c,#site table.bt th.c{text-align:center}
-  #site .sec .tabs{float:right;display:inline-flex;gap:0;margin-top:-3px}
-  #site .sec .tb{background:transparent;color:var(--dim);border:1px solid var(--line);font:inherit;font-size:11px;
-    letter-spacing:.1em;padding:1px 10px;cursor:pointer}
-  #site .sec .tb+.tb{border-left:0}
-  #site .sec .tb.on{background:rgba(255,255,255,.10);color:var(--shiro)}
-  #site .sec .tb.on{background:var(--ki);border-color:var(--ki);color:#1d1a14;font-weight:700}
   #site table.bt th.so{color:rgba(255,255,255,.85)}
   /* 武将の表：名・役職の幅は決まった幅、余りは忠誠の手前 */
   #site table.bt th:nth-child(1),#site table.bt td:nth-child(1){width:5.6em;min-width:5.6em;max-width:5.6em;overflow:hidden;text-overflow:ellipsis}
   #site table.bt th:nth-child(2),#site table.bt td:nth-child(2){width:3.9em;min-width:3.9em}
   #site table.bt tr.g th:nth-child(1),#site table.bt tr.g th:nth-child(2){width:auto}
-  #site table.bt .fill{width:100%;padding:0}
+  #site table.bt .fill{width:100%;min-width:12px;padding:0}
   #site table.bt th{color:var(--dim)}
   #site table.bt th.so{color:var(--shiro)}
   #site table.bt th.so.on{color:var(--ki)}
@@ -639,6 +633,12 @@
     padding-left:3px;padding-right:3px;overflow:hidden;text-overflow:clip}
   #site table.bt{--vw:max(3ch,22px)}
   #site table.bt td.v{font-variant-numeric:tabular-nums}
+  /* **武将の表は窓に収まらなければ横へ滑らせる**（依頼・8.5.0）。名の列は左に残す */
+  #site .btw{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  #site .btw table.bt{width:max-content;min-width:100%}
+  #site .btw table.bt th:first-child,#site .btw table.bt td:first-child{position:sticky;left:0;z-index:1;background:var(--sumi2)}
+  #site .btw table.bt tr.sel:hover td:first-child{background:linear-gradient(rgba(201,162,39,.06),rgba(201,162,39,.06)),var(--sumi2)}
+  #site .btw table.bt tr.on td:first-child{background:linear-gradient(rgba(201,162,39,.14),rgba(201,162,39,.14)),var(--sumi2)}
   @media (max-width:640px){#site table.bt td.v,#site table.bt th.v{padding-left:2px;padding-right:2px}}
   /* **ロードの進み**（依頼）。盤を作るあいだだけ出して、終わったら消す */
   #loading{position:fixed;inset:0;z-index:50;background:var(--sumi);display:flex;
@@ -4275,7 +4275,7 @@ function siteUnits(siteId){
 
 /* 派遣で選んでいる武将。選んでいなければ null */
 let siteGoBushou=null;
-let siteMenAll=null, siteRelAll=null, siteSort=null, siteTab="nai";   /* 武将を全員見せている城・並べ替えの列 */
+let siteMenAll=null, siteRelAll=null, siteSort=null;   /* 武将を全員見せている城・並べ替えの列 */
 
 /* ============================================================
    盤の上で選ぶ
@@ -4617,36 +4617,33 @@ function drawSite(){
     const vis=all||ms.length<=SHOW+1?ms:ms.slice(0,SHOW);
     /* **仕事ごとの能力**（依頼）。内政と戦の二つに分けて出す。忠誠は内政の側 */
     const T=v=>({v:tekiLabel(v),c:"c"});
-    /* 並びは どちらも 能力 → 適性 → 忠誠。忠誠はいつも右端。広い画面では全部を1つの表に */
-    /* 窓の幅（CSS の #site と同じ式）で決める。全部の列には約700px要る */
-    const winW=Math.min(window.innerWidth*0.94,Math.max(520,Math.min(window.innerWidth*0.42,760)));
-    const wide=winW>=700;
-    const tab=wide?"all":["cho","ikusa","mi"].includes(siteTab)?siteTab:"nai";
-    const C={gaikou:["gaikou","外交",b=>({v:b.gaikou,c:"r"})], chibou:["chibou","智謀",b=>({v:b.chibou,c:"r"})], ninja:["ninja","忍び",b=>({v:b.ninja?"○":"",c:"c"})],
+    /* **全部を1つの表に出す。窓に収まらなければ横へ滑らせる**（依頼・8.5.0。それまでは狭い窓でタブを切り替えていた）。
+       名の列は滑らせても左に残す */
+    const C={gaikou:["gaikou","外交",b=>({v:b.gaikou,c:"r"})], chibou:["chibou","智謀",b=>({v:b.chibou,c:"r"})], ninja:["ninja","忍者",b=>({v:b.ninja?"○":"✕",c:"c"})],
       kunkou:["kunkou","勲功",b=>({v:b.kunkou??0,c:"r"})],
       ichimon:["ichimon","一門",b=>({v:b.ichimon?"○":"",c:"c"})],
       kageki:["kageki","過激",b=>({v:b.kageki??kifuOf(b.name)[0],c:"r"})], kaitaku:["kaitaku","開拓",b=>({v:b.kaitaku??kifuOf(b.name)[1],c:"r"})], age:["age","年齢",b=>({v:b.birth?(playProgress[0]?playProgress[0].year:0)-b.birth:"",c:"r"})],
       sentou:["sentou","戦闘",b=>({v:b.sentou,c:"r"})],
-      nou:["nou","農",b=>T(b.nou)], shou:["shou","商",b=>T(b.shou)], ken:["ken","建",b=>T(b.ken)], tou:["tou","登用",b=>T(b.tou)],
+      nou:["nou","農業",b=>T(b.nou)], shou:["shou","商業",b=>T(b.shou)], ken:["ken","建築",b=>T(b.ken)], tou:["tou","登用",b=>T(b.tou)],
       ashi:["ashi","足軽",b=>T(b.ashi)], kiba:["kiba","騎馬",b=>T(b.kiba)], tepp:["tepp","鉄砲",b=>T(b.tepp)], kiki:["kiki","鉄騎",b=>T(b.kiki)], sui:["sui","水軍",b=>T(b.sui)],
       chusei:["chusei","忠誠",b=>({v:runIsToushu(b)?"—":(b.chusei??CHUSEI_START),c:"r"})]};
     const pick=ks=>ks.map(k=>C[k]);
-    /* **武将の基礎の値は全部出す**（依頼）。**派遣する仕事ごとにまとめる**（レビュー）。
-       内政 → 調略 → 戦 → 身上 → 忠誠（右端）。まとまりの中は 数 → ○ → S〜D。内政は派遣の一覧の順（農業・建築・商業）*/
-    const G={nai:["内政",pick(["nou","ken","shou"])], cho:["調略",pick(["gaikou","chibou","ninja","tou"])],
+    /* **武将の基礎の値は全部出す**（依頼）。
+       内政・調略 → 戦 → 身上 → 気質 → 忠誠（右端）。**内政と調略は一つのまとまり**（依頼・8.5.0）：
+       外交・智謀・農業・建築・商業・登用・忍者の順。忍者は ○ か ✕ */
+    const G={sei:["内政・調略",pick(["gaikou","chibou","nou","ken","shou","tou","ninja"])],
       ikusa:["戦",pick(["sentou","ashi","kiba","tepp","kiki","sui"])], mi:["身上",pick(["kunkou","age","ichimon"])], ki:["気質",pick(["kageki","kaitaku"])]};
     /* **一門かどうかは身上に出す**（依頼・8.5.0）。
        気質（過激度・開拓）は、その武将が当主になったときの家の性格。経歴（身上）とは分ける。狭い画面では身上のタブに並べる */
-    const COLS=(tab==="all"?["nai","cho","ikusa","mi","ki"].map(k=>G[k]):tab==="mi"?[G.mi,G.ki]:[G[tab]]).concat([["",pick(["chusei"])]]);
-    P.push('<div class="sec">武将 '+ms.length+'人'+(wide?'':'<span class="tabs">'
-      +[["nai","内政"],["cho","調略"],["ikusa","戦"],["mi","身上"]].map(([k,l])=>`<button class="tb${tab===k?" on":""}" data-tab="${k}">${l}</button>`).join("")+'</span>')+'</div>');
+    const COLS=["sei","ikusa","mi","ki"].map(k=>G[k]).concat([["",pick(["chusei"])]]);
+    P.push('<div class="sec">武将 '+ms.length+'人</div>');
     const sepH=i=>i===COLS.length-1?'<th class="fill"></th>':'<th class="gap"></th>';
     const sepD=i=>i===COLS.length-1?'<td class="fill"></td>':'<td class="gap"></td>';
     /* **値の列はどれも同じ幅**（依頼・8.5.0）。値は3桁の数・S〜D・○ だけなので、3桁の数に揃える（`.v`）。
        見出しは全角2字まで（過激度は「過激」）*/
     const g1=COLS.map(([g,cs],i)=>(i?sepH(i):'')+(g?`<th colspan="${cs.length}" class="grp">${g}</th>`:`<th colspan="${cs.length}"></th>`)).join("");
     const g2=COLS.map(([g,cs],i)=>(i?sepH(i):'')+cs.map(([k,l,f],j)=>`<th class="${f(ms[0].b).c} v so${siteSort===k?" on":""}" data-sort="${k}">${l}</th>`).join("")).join("");
-    P.push('<table class="bt">'+(wide?'<tr class="g"><th></th><th></th>'+g1+(mine?'<th></th>':'')+'</tr>':'')
+    P.push('<div class="btw"><table class="bt"><tr class="g"><th></th><th></th>'+g1+(mine?'<th></th>':'')+'</tr>'
       +`<tr><th>名</th><th class="so${siteSort?"":" on"}" data-sort="">役職</th>`+g2+(mine?'<th></th>':'')+'</tr>'
       +vis.map(({m,b})=>{
         const r=rkOf(b); const u=playUnits.find(x=>isLink(x.bushou)&&x.bushou.id===m.id);
@@ -4656,7 +4653,7 @@ function drawSite(){
           +`</td><td>${esc(r?r.label:"—")}</td>`
           +COLS.map(([g,cs],i)=>(i?sepD(i):'')+cs.map(([k,l,f],j)=>{const x=f(b); return `<td class="${x.c} v">${x.v}</td>`;}).join("")).join("")
           +(mine?`<td class="r go">${can?"›":""}</td>`:"")+'</tr>';
-      }).join("")+'</table>');
+      }).join("")+'</table></div>');
     if(vis.length<ms.length)P.push(`<button class="more" data-more="1">ほか${ms.length-vis.length}人を見る</button>`);
     if(siteGoBushou!==null){
       const b=byId(playBushou,siteGoBushou);
@@ -4690,8 +4687,6 @@ function drawSite(){
   /* 押し口は描き直すたびに作り直す。中身ごと入れ替えているため */
   for(const x of body.querySelectorAll("[data-go]"))
     x.addEventListener("click",()=>onSitePick(+x.dataset.go));
-  for(const x of body.querySelectorAll("[data-tab]"))
-    x.addEventListener("click",()=>{if(siteTab!==x.dataset.tab){siteTab=x.dataset.tab; siteSort=null;} drawSite();});
   for(const x of body.querySelectorAll("[data-sort]"))
     x.addEventListener("click",()=>{siteSort=x.dataset.sort||null; drawSite();});
   for(const x of body.querySelectorAll("[data-more]"))
