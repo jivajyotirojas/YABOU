@@ -795,7 +795,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.4.2";
+const VERSION="8.4.3";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -878,10 +878,10 @@ const tableOf=id=>TABLES.find(t=>t.id===id)??null;
    色相で付ける（隣り合い得る陸地形は ΔL* ≥ 12 か色相差 ≥ 30°）。8.3.1 までの原色寄りの色は、
    升ごとに別の色紙を並べたように見え、置物が浮く原因だった */
 const BASE_TERRAIN=[
- {id: 1, label:"遠洋",     color:"#46606f",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:0},
- {id: 2,  label:"外海",     color:"#567384",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:2.0},
- {id: 3,   label:"海",       color:"#688b98",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
- {id: 4,  label:"湖沼",     color:"#80aaab",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
+ {id: 1, label:"遠洋",     color:"#386576",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:0},
+ {id: 2,  label:"外海",     color:"#4a8092",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:2.0},
+ {id: 3,   label:"海",       color:"#639faa",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
+ {id: 4,  label:"湖沼",     color:"#86b8b6",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
  {id: 5,label:"港適地",   color:"#d8d09a",line:null,     sui:true, warRide:0.80, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
  {id: 6, label:"河口",     color:"#d4d29a",line:null,     sui:true, warRide:1.00, warShot:1.00, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:0, mvSnow:0, mvSea:1.2},
  {id: 7,label:"平地河川",     color:"#d6cc93",line:"#5f9ec2",sui:false, warRide:0.60, warShot:0.85, farmHata:0, farmSuiden:0, mura:0, machi:0, mv:6.0, mvSnow:12.0, mvLevee:3.0, mvLeveeSnow:6.0, mvSea:0},
