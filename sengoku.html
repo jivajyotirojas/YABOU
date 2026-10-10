@@ -10320,7 +10320,7 @@ const BUSHOU_SKILL={
  /* 信濃・甲斐・駿河・伊豆（S2 §11）*/
  "武田晴信":{nou:5,ken:4}, "馬場信房":{ken:4}, "上原虎満":{ken:4}, "山本勘助":{ken:4}, "今川義元":{nou:4,shou:5,tou:4}, "太原雪斎":{shou:4}, "江川英元":{shou:4},
 };
-const SKILL_MID=3;             // 名指ししない者の適性
+const SKILL_MID=3;             // 適性の基準（並）。欄の無い古い行はこれと読む。登録された武将の既定は式で出す（`skillOf`）
 
 /* ------------------------------------------------------------
    忍びの適性（§28.2）
@@ -10489,18 +10489,29 @@ const BUSHOU_SITE={
    **群は2種類。所属（勢力ごと）と、詰めている先（拠点ごと）。**
    どちらも同じ表に入れる。どちらも「武将のまとまり」で、分ける理由がない。
    ID は 勢力ぶんの続きから振る。 */
-/* 兵科適性。名指しが無ければ戦闘から導く（§31.2）*/
-/* 仕事の適性。名指しが無ければ並（3）*/
+/* ------------------------------------------------------------
+   **登録された武将の適性**（依頼・8.5.0・§19.4）
+   ------------------------------------------------------------
+   **事跡の知られた者は史実から名指しする**（`BUSHOU_SKILL`・`BUSHOU_TEKI`）。
+   記録の乏しい者は、一人ずつ決めてある戦闘・智謀・外交（無ければ 50）から式で出す。
+   **C や D があってよい。** それまでは名指しの無い者が全員 B（並）だった。
+
+     段 ＝ 40 未満 D／40〜54 C／55〜69 B／70 以上 A（式では S を付けない。S は名指しだけ）
+     農業 ← 智謀　商業 ← 外交　建築 ←（智謀＋戦闘）÷2　登用 ←（外交＋智謀）÷2
+     足軽・騎馬・鉄砲 ← 戦闘　鉄騎 ＝ 騎馬−1　水軍 ＝ 足軽−1（どちらも 1 より下げない）
+   ------------------------------------------------------------ */
+const gradeOfNum=v=>v<40?1:v<55?2:v<70?3:4;
 function skillOf(name){
   const t=BUSHOU_SKILL[name]||{};
-  return {nou:t.nou??SKILL_MID, shou:t.shou??SKILL_MID,
-          ken:t.ken??SKILL_MID, tou:t.tou??SKILL_MID};
+  const se=BUSHOU_SENTOU[name]??50, ch=BUSHOU_CHIBOU[name]??50, ga=BUSHOU_GAIKOU[name]??50;
+  return {nou:t.nou??gradeOfNum(ch), shou:t.shou??gradeOfNum(ga),
+          ken:t.ken??gradeOfNum((ch+se)/2), tou:t.tou??gradeOfNum((ga+ch)/2)};
 }
 
 /* 忍びの適性。**名簿に載っているかどうか。真偽である**（§28.2）*/
 const ninjaOf=name=>BUSHOU_NINJA.has(name);
 function tekiOf(name,sentou){
-  const d=Math.max(1,Math.min(5,1+Math.round(sentou/28)));
+  const d=gradeOfNum(sentou);
   const t=BUSHOU_TEKI[name]||{};
   /* **鉄騎は騎馬の上に立つ。** 騎馬を扱えない者が鉄騎を扱えることはない。
      水軍は名指しが無ければ足軽より低く見る。海の戦は誰にでも執れない */
