@@ -795,7 +795,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.4.5";
+const VERSION="8.5.0";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -3792,15 +3792,15 @@ const objectAtCell=id=>{
 /* ============================================================
    手番
    ------------------------------------------------------------
-   1ターン＝1か月。**全勢力が1回ずつ動いたら月が1つ進む。**
+   1ターン＝1/4月（1 旬）。**全勢力が1回ずつ動いたら旬が1つ進み、4 旬で月が1つ進む**（依頼・8.5.0）。
 
    順は 大名家 → 独立勢力。それぞれの中は**規模の小さい順**で、
    規模は「領有する拠点の数 → 属する武将の数 → 勢力ID」で測る。
    小さいところから動かすのは、大きいところの決めた形に
    小さいところが従うだけ、という展開を避けるため。
 
-   **順は月の初めに決めて、その月のあいだは動かさない。** 途中で拠点を
-   失った勢力が同じ月に二度動いたり、飛ばされたりしないようにする。
+   **順は旬の初めに決めて、その旬のあいだは動かさない。** 途中で拠点を
+   失った勢力が同じ旬に二度動いたり、飛ばされたりしないようにする。
    ------------------------------------------------------------ */
 const runOrder=()=>{
   /* 規模。拠点の数と武将の数から出す。どちらも表から数える */
@@ -3827,48 +3827,60 @@ const runNowPower=()=>{
   return byId(playPowers,g.order[g.at])||null;
 };
 
-/* 手番を1つ進める。ひと回りしたら月を1つ進めて順を組み直す */
+/* 手番を1つ進める。**ひと回りしたら旬を1つ進め、晦の次に月を進める**（§22.1・8.5.0）。
+   手番の時計の処理は毎回、月の時計の処理は月が変わった手番にだけ回す */
 function runTurnNext(){
   const g=playProgress[0]; if(!g)return;
   g.at++;
   /* **済んだ隊の控えは手番ごとに空にする。** 次の勢力は自分の隊を
      まだ1つも動かしていない */
   g.acted=[];
-  /* **滅んだ家の手番は飛ばす。** 順は月の初めに決めてあるので、途中で
-     滅んだ家の枠が残る。枠ごと詰めると、その月にまだ動いていない家が
+  /* **滅んだ家の手番は飛ばす。** 順は旬の初めに決めてあるので、途中で
+     滅んだ家の枠が残る。枠ごと詰めると、その旬にまだ動いていない家が
      繰り上がって二度動くことになる。飛ばすだけにする */
   while(g.at<g.turnNum&&!playPowers.some(p=>p.id===g.order[g.at]))g.at++;
   if(g.at<g.turnNum)return;
-  g.month++;
-  if(g.month>12){g.month=1;g.year++;}
-  runSnowTick(g.month);          /* その月の雪が積もり、解ける（§10.16）*/
-  runDecayRonin();               /* 浪人は月ごとに勲功が減る */
-  runBetrayTick();               /* 忠誠の低い者の分裂・独立（§19.6）*/
-  /* **域は拠点から地続きでなければならない**（依頼・`runDomainTrim`）。月ごとに確かめ、飛び地を落とす */
+  g.jun=runJunOf(g)+1;
+  const newMonth=g.jun>TURNS_PER_MONTH;
+  if(newMonth){
+    g.jun=1;
+    g.month++;
+    if(g.month>12){g.month=1;g.year++;}
+  }
+  /* ---- 月の時計（月の初めの手番だけ）---- */
+  if(newMonth){
+    runSnowTick(g.month);          /* その月の雪が積もり、解ける（§10.16）*/
+    runDecayRonin();               /* 浪人は月ごとに勲功が減る */
+    runLifeTick();                 /* 寿命の尽きた者は病没する（§19.7）*/
+    if(g.month===1)runHealMind();  /* 年の初めに、友好が既定へ1だけ寄る（§32.2）*/
+    if(g.month===1)runHireTick();  /* 年の初めに、弱い武将が仕官してくる（§19.5）*/
+    if(g.month===1)runAppearTick();/* 年の初めに、後の世代の武将が元服する（§19.8）*/
+    if(g.month===1)runManzokuTick();/* 年の初めに、満足度で忠誠が上がる（§19.6）*/
+    if(g.month===1)runJunnoYear(); /* 年の初めに、順応が1上がる（§21.4）*/
+    runDecayTaikyu();              /* 拠点の耐久度が1落ちる */
+    runSeniDecay();                /* 戦意が1下がる（§32.3）*/
+    runWearTick();                 /* 手の入らない建築物が朽ちる（§24.7）*/
+  }
+  /* ---- 手番の時計（毎回）---- */
+  runBetrayTick();                 /* 忠誠の低い者の分裂・独立（§19.6。籤は旬ごと）*/
+  /* **域は拠点から地続きでなければならない**（依頼・`runDomainTrim`）。手番ごとに確かめ、飛び地を落とす */
   runDomainTrimAll();
   /* **古いセーブも揃える**（依頼）。勲功は上限（500）に収め、小大名（廃した）の当主は大名へ直す */
   for(const b of playBushou)if(typeof b.kunkou==="number"&&b.kunkou>KUNKOU_MAX)b.kunkou=KUNKOU_MAX;
-  runFixDaimyoRanks();           /* 大名の位は当主だけ（依頼）*/
-  runLifeTick();                 /* 寿命の尽きた者は病没する（§19.7）*/
-  runDecayAlly();                /* 期限の切れた同盟が解ける */
-  if(g.month===1)runHealMind();  /* 年の初めに、友好が既定へ1だけ寄る（§32.2）*/
-  if(g.month===1)runHireTick();  /* 年の初めに、弱い武将が仕官してくる（§19.5）*/
-  if(g.month===1)runAppearTick();/* 年の初めに、後の世代の武将が元服する（§19.8）*/
-  if(g.month===1)runManzokuTick();/* 年の初めに、満足度で忠誠が上がる（§19.6）*/
-  if(g.month===1)runJunnoYear(); /* 年の初めに、順応が1上がる（§21.4）*/
-  runNameEvents();               /* 改姓・改名（§19.9）*/
-  runDecayTaikyu();              /* 拠点の耐久度が1落ちる */
-  runSeniDecay();                /* 戦意が1下がる（§32.3）*/
-  runWearTick();                 /* 手の入らない建築物が朽ちる（§24.7）*/
-  runGrowSites();                /* 兵糧・金銭・兵・順応が動く */
-  runIkkiTick();                 /* 順応の低い拠点で一揆が起きる（§21.4）*/
-  runBuildTick();                /* 普請の月が進む（§24.6）*/
-  runOccupyTick();               /* 人が始めた占拠の月が進む（§27.7）*/
-  runFeedUnits();                /* 盤に出ている隊が食う（§21.3）*/
-  runDokuritsuHeal();            /* 独立勢力の兵が戻る（§28.3）*/
-  runMerchantMove();             /* 商人が次の城へ渡る（§27.5）*/
-  runRoninTick();                /* 浪人が歩き、仕え、旗を挙げる（§19.2）*/
-  runGrowTouchi();               /* 統治力が伸び、届けば升を取り込む */
+  runFixDaimyoRanks();             /* 大名の位は当主だけ（依頼）*/
+  runDecayAlly();                  /* 期限の切れた同盟が解ける */
+  runNameEvents();                 /* 改姓・改名（§19.9）*/
+  runGrowSites(newMonth);          /* 兵糧を食う・逃げる（手番ごと）。銭・兵・兵糧の入りと俸禄（月の初め）*/
+  runIkkiTick();                   /* 順応の低い拠点で一揆が起きる（§21.4。籤は旬ごと）*/
+  runBuildTick(newMonth);          /* 普請の手番が進む（§24.6）*/
+  runOccupyTick();                 /* 人が始めた占拠の手番が進む（§27.7）*/
+  runFeedUnits(newMonth);          /* 盤に出ている隊が食う（手番ごと）。支城の兵の戻り（月の初め）*/
+  if(newMonth){
+    runDokuritsuHeal();            /* 独立勢力の兵が戻る（§28.3）*/
+    runMerchantMove();             /* 商人が次の城へ渡る（§27.5）*/
+  }
+  runRoninTick();                  /* 浪人が歩き、仕え、旗を挙げる（§19.2）*/
+  if(newMonth)runGrowTouchi();     /* 統治力が伸び、届けば升を取り込む */
   g.order=runOrder(); g.turnNum=g.order.length; g.at=0;
 }
 
@@ -3926,7 +3938,7 @@ function drawHud(){
   /* 一覧が出ているあいだは隠す。地図が見えていないので出す意味がない */
   hud.hidden=listTab!==0;
   const g=playProgress[0];
-  el("hDate").textContent=g?(g.year+"年"+g.month+"月"):"";
+  el("hDate").textContent=dateText(g);
   /* **版はここ一箇所だけが持つ**（§1.6・§1.7）*/
   el("hVer").textContent="v"+VERSION;
   const b=sel===null?null:BASE_CELLS[sel-1];
@@ -4430,7 +4442,7 @@ function onSiteGo(typeId){
 }
 /* 城の下知を受ける。**受けて渡すだけ**（§2.4）*/
 /* 城の下知で売り買いする量。**決まった量だけ**（依頼）*/
-const SITE_BUY_RICE=200, SITE_SELL_RICE=600;
+const SITE_BUY_RICE=800, SITE_SELL_RICE=2400;   /* 一度に売り買いする兵糧。値が 1/4 なので量を 4 倍（8.5.0）*/
 const siteBuyOK =st=>st.kane>=SITE_BUY_RICE/RICE_BUY&&st.hyoro+SITE_BUY_RICE<=HYORO_MAX;
 const siteSellOK=st=>st.hyoro>=SITE_SELL_RICE&&st.kane+SITE_SELL_RICE/RICE_SELL<=KANE_MAX;
 function onSiteCmd(key){
@@ -4495,7 +4507,7 @@ function drawSite(){
   if(owner){
     kp=runKaneParts(st.id);
     for(let mo=1;mo<=12;mo++)crop+=runHarvestNow(st.id,mo);
-    eat=eatOf(st.hei)*12;
+    eat=eatMonthOf(st.hei)*12;
     yKane=(kp.take-kp.pay)*12; yRice=crop-eat;
     yHei=Math.min(heiHealOf(st)*12,Math.max(0,heiMaxOf(st)-st.hei));
   }
@@ -4508,7 +4520,7 @@ function drawSite(){
   if(owner&&yKane<0){const m=Math.floor(st.kane/(-yKane/12));
     P.push(`<div class="warn"><span>${m<=0?"銭が尽きた":"銭 あと"+ym(m)+"で尽きる"}</span></div>`);}
   if(owner&&(st.junno||0)<50)
-    P.push(`<div class="warn"><span>一揆のおそれ（毎月5%）</span>`
+    P.push(`<div class="warn"><span>一揆のおそれ（旬ごとに2%）</span>`
       +'</div>');
 
   /* 蓄え。今の値・1年の増減・収入と支出 */
@@ -4766,10 +4778,10 @@ function unitCmds(u){
   /* **占める**（依頼・§27.7）。人の軍勢も、立っている升を占拠できる。
      選んだ月から月末ごとに1月ずつ積み、積み切れば有効領域になる。離れれば積んだ月は消える */
   if(type==="軍勢"&&runCanOccupy(u.id,u.q.id)&&!(u.occ&&u.occ.cell===u.q.id))
-    out.push({k:"occupy", t:"占める（"+runOccMonths(u.id,u.q.id)+"か月）"});
+    out.push({k:"occupy", t:"占める（"+turnsText(runOccMonths(u.id,u.q.id))+"）"});
   /* **待っている理由を書く**（§26.3・依頼）*/
   if(type==="軍勢"&&campWait&&!foeCells.length)
-    out.push({k:"none", t:"陣を敷いている（次の月から寄せられる）"});
+    out.push({k:"none", t:"陣を敷いている（次の手番から寄せられる）"});
   /* **荒らす**（§27.6）。いま立っている升に、よその家の建てたものがあるとき */
   if(type==="軍勢"&&runCanRavage(u.id,u.q.id))out.push({k:"ravage", t:"荒らす"});
   /* **築港はそれと分かる名で出す**（§24.1）。水の姿の建築の隊が港適地に
@@ -4781,7 +4793,7 @@ function unitCmds(u){
     /* 拠点の普請には期間が無い（依頼）。耐久度と目当てを出す */
     const fx=u.work.fix, fst=(fx!==null&&fx!==undefined)?byId(playSites,fx):null;
     out.push({k:"none", t:u.work.label+"　"+(fst&&fst.fushin
-      ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to):"あと"+Math.ceil(u.work.left)+"月")});
+      ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to):"あと"+turnsText(u.work.left))});
   }else{
     const w=inDom?runBuildAt(u,u.q.id):null;
     /* **開墾は「起こす」と出す**（§24.5）。開墾地は建築物の行になるが、
@@ -4789,10 +4801,10 @@ function unitCmds(u){
     if(w)out.push({k:"build",
       t:(w.cat==="港"?"築港":w.cat==="開墾"?"起こす"
          :(w.up?"段を上げる":"建てる"))
-        +"（"+w.months+"月）"});
+        +"（"+turnsText(w.months)+"）"});
   }
   /* **土手は岸から盛る**（§24.4）。立っている升でも、隣の川でもよい */
-  if(!u.work&&runLeveeAt(u.id)!==null)out.push({k:"levee", t:"治水（"+LEVEE_MONTHS+"月・銭"+LEVEE_COST+"）"});
+  if(!u.work&&runLeveeAt(u.id)!==null)out.push({k:"levee", t:"治水（"+turnsText(LEVEE_MONTHS*TURNS_PER_MONTH)+"・銭"+LEVEE_COST+"）"});
   /* 普請の先は、隣り合う自分の城と無主の拠点（§21.1・§27.1）。
      **月数のある仕事なので、何月かかるかを札に出す**（§24.6）*/
   {const sid=u.work?null:runRepairAt(u.id);
@@ -5595,7 +5607,7 @@ function drawBattle(){
      同じ数が画面に二か所あった。ここは年月と土地だけにする */
   {const g2=playProgress[0];
    const fa=B.atk.gr&&B.atk.gr.field, fd=B.def.gr&&B.def.gr.field;
-   const txt=(g2?g2.year+"年 "+g2.month+"月":"")+"　"+((fa&&fd&&fa!==fd)?("攻め手 "+fa+"・受け手 "+fd):(B.field||""));
+   const txt=dateText(g2," ")+"　"+((fa&&fd&&fa!==fd)?("攻め手 "+fa+"・受け手 "+fd):(B.field||""));
    g.textAlign="right"; g.font=fpx(12);
    g.fillStyle="rgba(16,14,8,0.80)";
    g.fillRect(w-12-g.measureText(txt).width-10,h-40,g.measureText(txt).width+20,22);
@@ -10685,7 +10697,7 @@ function runChuseiFactor(c){
   if(c>=CHUSEI_KNEE)return CHUSEI_KNEE_V*(CHUSEI_LOW-c)/(CHUSEI_LOW-CHUSEI_KNEE);
   return CHUSEI_KNEE_V+(1-CHUSEI_KNEE_V)*(CHUSEI_KNEE-c)/CHUSEI_KNEE;
 }
-const BETRAY_ODDS=0.10;              // 月ごとの分裂・独立の基の割
+const BETRAY_ODDS=0.05;              // 旬ごとの分裂・独立の基の割（依頼・8.5.0。それまでは月ごと 0.10）
 const SHUPPON_RATE=0.2;              // 出奔は分裂・独立の 1/5（依頼）
 const KANYU_NINJA=0.50, KANYU_GAIKOU=0.20;   // 勧誘の基の割。忍びは高く、使いは低く（依頼）
 const CHUSEI_RANK_ODDS={ichimon:0.1, 5:0.2, 4:0.4, 3:0.6, 2:0.8};   // 身分の倍。無ければ 1.0
@@ -10892,6 +10904,23 @@ const RANK_TOP={daimyo:6, dokuritsu:9};
 /* **その家に仕え始めた月**（依頼・§19.3）。跡目の順で、位が同じなら長く仕えた者が先。
    シナリオの始めから仕えている者は持たない（最も古い扱い）*/
 const runNowMonthNo=()=>{const g=playProgress[0]; return g?g.year*12+g.month:0;};
+/* ------------------------------------------------------------
+   **1 手番は 1/4 月**（依頼・8.5.0・§22.1）
+   ------------------------------------------------------------
+   月は 4 つの旬（上旬・中旬・下旬・晦）に分かれ、全勢力が 1 回ずつ動くと旬が 1 つ進む。
+   晦の次に月が進む。いまの旬は進行プレイデータの `jun`（1〜4）。古いセーブは 1 と読む。
+   **時計は二つある。** 手番の時計（移動・戦・判断・普請と占拠の進み・食い・逃散・一揆と裏切りの籤）と、
+   月の時計（銭・兵・兵糧の入り、俸禄、統治力、朽ち、雪、病没、正月の事）。月の時計は月の初めの手番にだけ回る
+   ------------------------------------------------------------ */
+const TURNS_PER_MONTH=4;
+const JUN_LABEL=["上旬","中旬","下旬","晦"];
+const runJunOf=g=>Math.max(1,Math.min(TURNS_PER_MONTH,(g&&g.jun)|0||1));
+/* 通しの手番の番号。**混乱の持ち越し・城を出た手番・城に入った手番**はこれで測る */
+const runNowTurnNo=()=>{const g=playProgress[0]; return g?(g.year*12+g.month-1)*TURNS_PER_MONTH+runJunOf(g)-1:0;};
+/* 暦の表記。「1551年1月 上旬」 */
+const dateText=(g,sep="")=>g?(g.year+"年"+sep+g.month+"月 "+JUN_LABEL[runJunOf(g)-1]):"";
+/* 手番の数を読む言葉に。4 で割り切れれば「Nか月」、ほかは「N手番」 */
+const turnsText=n=>{n=Math.max(0,Math.ceil(n)); return n>=TURNS_PER_MONTH&&n%TURNS_PER_MONTH===0?(n/TURNS_PER_MONTH)+"か月":n+"手番";};
 /* 小大名は廃した（依頼）。古いセーブの小大名を大名に直すためだけに番号を残す */
 const RANK_SHO=11;
 /* ------------------------------------------------------------
@@ -13717,7 +13746,7 @@ const TOUCHI_OUT =100;         // 相手の実効支配域のマスを取る（�
 const TOUCHI_MAX =100;         // 溜められる上限
 
 /* 上限と、月ごとの動き。**数はどれも仮。** 遊びの手ざわりを見てから決める */
-const HYORO_MAX=5000, KANE_MAX=20000, JUNNO_MAX=100;
+const HYORO_MAX=20000, KANE_MAX=20000, JUNNO_MAX=100;   /* 兵糧の上限は 8.5.0 で 4 倍（依頼）*/
 /* **城に置ける兵の上限は、城の段階で決まる**（§21.3）。
    更地・屋敷・館・城Lv.1〜3 の順。段階は耐久度から導く（§21.1）。
    一律にすると、屋敷も城Lv.3も同じだけ兵を抱えられることになり、
@@ -14022,7 +14051,7 @@ function makeSitePlay(baseSites,eff,objs,made,bp){
                一律 800 にしていたため、**大きな城ほど早く蔵が尽き**、
                小さな城は使いきれない米を抱えて始まることになる。
                実りは年に一度（§21.3）なので、**一年ぶん**が始まりの量である */
-            hyoro :lv?eatOf(startHeiOf(st.id,lv))*12:0,
+            hyoro :lv?eatMonthOf(startHeiOf(st.id,lv))*12:0,
             /* **始めの兵は段に応じる**（§21.3）。どの城も一律 1000 にしていたため、
                **城Lv.3（上限15000）が上限の 1/15 で始まり、盤のほとんどの城が
                空に近かった。** 出陣で留守の兵を引くと、隣の家の軍勢1つで落ちる。
@@ -14982,6 +15011,7 @@ function loadPlay(play){
   playProgress=[{id:1,
                  year :q?q.year :play.clock.year,
                  month:q?q.month:play.clock.month,
+                 jun  :q?runJunOf(q):1,
                  at:0, turnNum:0, order:[], acted:[],
                  /* **乱数の種は表が持つ。** 持たないと、同じセーブデータから
                     始めても違う戦になる（§26.1）。
@@ -15006,7 +15036,7 @@ function loadPlay(play){
     /* **進行の残りの欄も読み戻す**（§22.2・§30）。休戦・次の武将の番号・後の世代の繰り上げ・
        改名の済み印など。バグ：順・手番・種・人の家しか戻さず、休戦がロードで消え、
        武将の番号が使い直され、続きが同じ手順で進まなかった */
-    const fixed=["id","year","month","at","turnNum","order","acted","seed","player"];
+    const fixed=["id","year","month","jun","at","turnNum","order","acted","seed","player"];
     for(const k of Object.keys(q))if(!fixed.includes(k))playProgress[0][k]=clone(q[k]);
   }
   playObjects   =clone(play.objects||[]);
@@ -15314,7 +15344,7 @@ function runRoninOut(bushouId,cell){
   const g=runGroupAt(put); if(!g)return null;
   /* `exit`：盤に出た升と月（依頼）。出たその月は歩かない（`runRoninTick`）。`aim`：行き先 {kind:"town"|"site", cell, site} */
   const row=runUnitRow({label:"浪人 "+b.name, type:tb.id, state:stt==="sui"?"sui":"idou",
-    power:null, bushou:bushouId, cell:put, exit:{cell:put, at:runMonthKey()}});
+    power:null, bushou:bushouId, cell:put, exit:{cell:put, at:runTurnKey()}});
   playUnits.push(row);
   g.units.push(row.id); g.unitNum=g.units.length;
   playStamp++;
@@ -15454,7 +15484,7 @@ function runRaiseHouse(u,siteId){
    家を興し（`runIkkiFound`）、もとの主の家とは友好 0、外交方針は強気。
    隊も城も失った一揆は消える（`runIkkiTick`）
    ============================================================ */
-const IKKI_ODDS=0.05;
+const IKKI_ODDS=0.02;            /* 旬ごと（依頼・8.5.0。それまでは月ごと 0.05）*/
 const IKKI_JUNNO=50;                            // これ未満で起きる
 const IKKI_HEI=[5000,4000,3000,2000,1000];      // 順応 0〜9・10〜19・20〜29・30〜39・40〜49 の上限。1000 刻みで上限以下を等しい割で引く
 const IKKI_HEI_STEP=1000;
@@ -15553,7 +15583,7 @@ function runIkkiRise(siteId){
   playBushouGroups.push({id, bushouNum:1, bushou:[bid]});
   const gc=runGroupAt(cell); if(!gc)return null;
   const row=runUnitRow({label:kind+" "+name, type:tb.id, state:"sagyo", power:id, bushou:bid,
-    cell, hei, hyoro:eatOf(hei)*12, sonae:runSonaeFlat(hei)});
+    cell, hei, hyoro:eatMonthOf(hei)*12, sonae:runSonaeFlat(hei)});
   row.ikki=siteId;                               /* 一揆の隊だけが持つ欄（§21.4）*/
   playUnits.push(row); gc.units.push(row.id); gc.unitNum=gc.units.length;
   runTell(st.name+"の領内で"+kind+"（"+name+"・兵"+hei+"）","一揆",cell);
@@ -15986,7 +16016,7 @@ function runRoninTick(){
     /* **出奔などで盤に出たその月は、出た升に立ったまま**（依頼）。
        バグ：盤に出た同じ月の処理のうちに歩き出していたため、「出奔」の報せで城を見ても
        浪人の隊がおらず、浪人にならなかったように見えた */
-    if(u.exit&&u.exit.cell===u.q.id&&u.exit.at===runMonthKey())continue;
+    if(u.exit&&u.exit.cell===u.q.id&&u.exit.at===runTurnKey())continue;
     /* 行き先。町は盤じゅうから選ぶ。**海の向こうでも行く**（依頼）。
        道は引いたときに決めて持ち、月ごとに歩き代のぶんだけ進む */
     if(!u.aim){
@@ -16648,9 +16678,9 @@ const HARVEST_MONTH=9;         // 水田の実りの月
 const WINTER=[12,1,2];         // 畑の穫れない月
 /* **兵糧は依頼で1/4に。切りのいい数にし、畑・開墾地・水田の比は保つ**（依頼。1/4では開墾地が2.25になるので、
    1/3 にした：開墾地9→3・畑36→12・水田480→160。私の判断）*/
-const HARVEST_HATA=12;         // 畑。段1つにつき、冬以外の毎月
-const HARVEST_KAIKON=3;        // 開墾地。1つにつき、冬以外の毎月
-const HARVEST_SUIDEN=160;      // 水田。段1つにつき、実りの月に一度
+const HARVEST_HATA=48;         // 畑。段1つにつき、冬以外の毎月（8.5.0 で 4 倍。依頼）
+const HARVEST_KAIKON=12;       // 開墾地。1つにつき、冬以外の毎月（8.5.0 で 4 倍。依頼）
+const HARVEST_SUIDEN=640;      // 水田。段1つにつき、実りの月に一度（8.5.0 で 4 倍。依頼）
 const HARVEST_HATA_M=12-WINTER.length;      // 畑の穫れる月数
 
 /* 領内の畑と水田の、段の合計 */
@@ -16687,6 +16717,9 @@ function runHarvestNow(siteId,month){
    100 にすると、**田畑を開かない家は必ず米を買うことになる**（依頼）*/
 const EAT_PER=100;
 const eatOf=hei=>Math.ceil(Math.max(0,hei)/EAT_PER);
+/* **食いは手番ごと**（依頼・8.5.0）。いまの 1 か月ぶんを 1 手番で食う。
+   ひと月に食う量は `eatOf` × `TURNS_PER_MONTH`。蓄え・持たせる量・見積りはこちらで測る */
+const eatMonthOf=hei=>eatOf(hei)*TURNS_PER_MONTH;
 /* 出陣のとき、何か月ぶんの兵糧を持たせるか（§21.3）。
    **これを越えて外に居るなら、輸送の隊で運ぶほかにない** */
 const MARCH_MONTHS=15;         // 出陣に持たせる兵糧の月数。**少し多め**（依頼）
@@ -16927,7 +16960,7 @@ function runFortFeeds(u){
   if(!u)return false;
   return runFortFeedsFor(u.q.id,isLink(u.power)?u.power.id:null);
 }
-function runFeedUnits(){
+function runFeedUnits(newMonth=true){
   /* **写しを回す。** 陣を払うと隊が消え、移動の隊が足されるので、
      いまの並びをそのまま回すと飛ばされる行が出る */
   for(const u of playUnits.slice()){
@@ -16952,7 +16985,7 @@ function runFeedUnits(){
        ------------------------------------------------------------ */
     if(lb==="軍勢"&&runFortFeeds(u)){
       {
-        if(lb==="軍勢"){
+        if(lb==="軍勢"&&newMonth){             /* 支城の兵の戻りは月の初めに 1 回（8.5.0）*/
           const cap=unitHeiMax(u);
           const add=Math.min(FORT_HEAL,Math.max(0,cap-u.hei));
           if(add>0){ u.hei+=add; runSonaeScale(u); }
@@ -17038,7 +17071,7 @@ function runCarryUnit(u){
 }
 function runCarrySpare(st){
   return {
-    hyoro:Math.max(0,st.hyoro-Math.ceil(eatOf(st.hei)*12*feedWantOf(st.id))),
+    hyoro:Math.max(0,st.hyoro-Math.ceil(eatMonthOf(st.hei)*12*feedWantOf(st.id))),
     hei  :Math.max(0,st.hei-garrisonOf(st)-IKUSA_MIN),
     kane :Math.max(0,(st.kane||0)-(kaneKeepOf(st.id)+AI_KANE_DEV)),
     uma  :st.uma||0, teppo:st.teppo||0 };
@@ -17073,12 +17106,12 @@ function runCarryPlan(siteId){
     if(!isLink(o.power)||o.power.id!==pw)continue;
     if(runFortFeeds(o))continue;
     const capU=unitHeiMax(o);
-    const needH=runThinFood(o)?eatOf(o.hei)*MARCH_MONTHS-(o.hyoro||0):0;
+    const needH=runThinFood(o)?eatMonthOf(o.hei)*MARCH_MONTHS-(o.hyoro||0):0;
     const needS=(capU>0&&o.hei<capU*AI_FORT_REST)?capU-o.hei:0;
     if(needH<=0&&needS<=0)continue;
     const cargo={hyoro:cap("hyoro",needH), hei:cap("hei",needS)};
     cargo.uma=cap("uma",cargo.hei); cargo.teppo=cap("teppo",cargo.hei);
-    if(cargo.hei>0)cargo.hyoro=cap("hyoro",cargo.hyoro+eatOf(cargo.hei)*MARCH_MONTHS);
+    if(cargo.hei>0)cargo.hyoro=cap("hyoro",cargo.hyoro+eatMonthOf(cargo.hei)*MARCH_MONTHS);
     if(cargo.hyoro+cargo.hei<CARRY_MIN)continue;
     const v=(cargo.hyoro+cargo.hei)/(1+runAIDist(bs.cell,o.q.id));
     if(v>bv){bv=v;best={to:"unit",id:o.id,cargo};}
@@ -17094,13 +17127,13 @@ function runCarryPlan(siteId){
     const short=runAIFeedShort(o.id);
     if(!front&&!short)continue;
     const cargo={hyoro:0,hei:0,kane:0,uma:0,teppo:0};
-    if(short)cargo.hyoro=cap("hyoro",eatOf(o.hei)*12*feedWantOf(o.id)-o.hyoro);
+    if(short)cargo.hyoro=cap("hyoro",eatMonthOf(o.hei)*12*feedWantOf(o.id)-o.hyoro);
     if(front){
       cargo.hei  =cap("hei",garrisonOf(o)+IKUSA_MIN-o.hei);
       cargo.kane =cap("kane",kaneKeepOf(o.id)+AI_KANE_DEV-(o.kane||0));
       cargo.uma  =cap("uma",((st.uma||0)-(o.uma||0))/2);
       cargo.teppo=cap("teppo",((st.teppo||0)-(o.teppo||0))/2);
-      if(cargo.hei>0)cargo.hyoro=cap("hyoro",cargo.hyoro+eatOf(cargo.hei)*MARCH_MONTHS);
+      if(cargo.hei>0)cargo.hyoro=cap("hyoro",cargo.hyoro+eatMonthOf(cargo.hei)*MARCH_MONTHS);
     }
     const tot=CARRY_KEYS.reduce((n,k)=>n+cargo[k],0);
     if(tot<CARRY_MIN)continue;
@@ -17153,7 +17186,7 @@ function runRearm(d,a){
   return used;
 }
 /* その軍勢は兵糧が細っているか。**2か月ぶんを切ったら細い** */
-const runThinFood=u=>(u.hyoro||0)<eatOf(u.hei)*2;
+const runThinFood=u=>(u.hyoro||0)<eatMonthOf(u.hei)*2;
 
 /* 兵糧攻めか。**城の出入り口がすべて、よその家の軍勢で塞がれている**（§26.4）。
    包囲（隣にひとつでも立っている）より厳しい。**逃げ道が無い。**
@@ -17180,15 +17213,16 @@ function runStarved(siteId){
 
 /* 月ごとに、拠点の値を回す。**兵糧が尽きると兵が減り、順応も落ちる。**
    **包囲されている城は、入りが絶え、兵も戻らない**（§26.4）*/
-function runGrowSites(){
+function runGrowSites(newMonth=true){
   for(const st of playSites){
     if(!runSiteOwner(st.id))continue;
     /* **包囲されていれば入りは絶える。** 食うぶんだけが出ていく（§26.4）。
        **飢えの測り方は包囲でも平時でも同じ**（§21.3）。ここに別の式を置くと、
        同じ「食えなかった」が二通りの減り方をする */
     const kakomi=runBesieged(st.id);
-    /* **包囲されていても禄は払う**（依頼）。止まるのは入りだけ */
-    {
+    /* **包囲されていても禄は払う**（依頼）。止まるのは入りだけ。
+       **銭の入りと俸禄は月の初めに 1 回**（依頼・8.5.0）*/
+    if(newMonth){
       const kp=runKaneParts(st.id);
       const take=kakomi?0:kp.take;
       /* **禄が払えたか**（§19.6）。払えれば満足度（表に出さない）が +8、
@@ -17217,8 +17251,8 @@ function runGrowSites(){
       }
       st.kane=Math.max(0,kane);
     }
-    if(!kakomi){
-      /* **畑は冬のほかは毎月、水田は実りの月だけ**（§21.3）*/
+    if(!kakomi&&newMonth){
+      /* **畑は冬のほかは毎月、水田は実りの月だけ**（§21.3）。入るのは月の初めに 1 回（8.5.0）*/
       {const mo=(playProgress[0]||{}).month||1;
        const take=runHarvestNow(st.id,mo);
        if(take>0)st.hyoro=Math.min(HYORO_MAX,st.hyoro+take);}
@@ -17229,9 +17263,9 @@ function runGrowSites(){
       st.hei=Math.max(0,st.hei-gone);
       st.junno=Math.max(st.floor,st.junno-1);
     }
-    /* **城にいる兵の数に応じて食う。** 逃げたあとの兵で数える */
+    /* **城にいる兵の数に応じて食う。** 逃げたあとの兵で数える。**食いと逃散は手番ごと**（依頼・8.5.0）*/
     st.hyoro=Math.max(0,st.hyoro-eatOf(st.hei));
-    if(gone<=0){
+    if(gone<=0&&newMonth){                       /* 兵の戻りは月の初めに 1 回 */
       if(kakomi){
         /* 包囲されていれば、食えていても人は戻らないし土地も馴染まない（上がらない）*/
       }else{
@@ -17650,7 +17684,8 @@ function runAIMinatoWant(siteId){
 /* 型ごとの移動力。**地形の踏み代をここから引いていく**（依頼・§25.3）。
    見える隊（農業・建築・商業・輸送・軍勢）は 6、見えない隊（外交・忍者・移動・浪人）は倍の 12 */
 const UNIT_MOVE={農業:6, 建築:6, 商業:6, 輸送:6, 軍勢:6, 外交:12, 忍者:12, 移動:12, 浪人:12};
-const runMonthKey=()=>{const g=playProgress[0]; return g?g.year*100+g.month:0;};
+/* **城を出た手番の印**（§25.3）。出た手番のうちは城へ戻れず、出た升の踏み代を引く。8.5.0 で月から手番へ */
+const runTurnKey=()=>runNowTurnNo();
 const moveOf=u=>{
   const t=isLink(u.type)?byId(BASE_UNITS,u.type.id):null;
   return t?(UNIT_MOVE[t.label]||6):6;
@@ -17698,7 +17733,7 @@ function runReachAs(unitId,state,passOnly,avoid){
   const from=u.q.id;
   /* **城から出た月は、出た升の踏み代を持ち分から引く**（依頼・§25.3）。城を出る一歩も1升の移動である。
      その一歩が「止まっているところからの一歩」なので、そのあとの一歩に重さを問わない決まりは使わない */
-  const ex=u.exit, justOut=!!(ex&&ex.cell===from&&ex.at===runMonthKey());
+  const ex=u.exit, justOut=!!(ex&&ex.cell===from&&ex.at===runTurnKey());
   const budget=justOut?Math.max(0,Math.round((moveOf(u)-runStepCost(from,state))*1e6)/1e6):moveOf(u);
   const best=new Map([[from,budget]]);
   /* 通り道を辿れるように、どの升から入ったかを持つ（`runMoveUnit` が関所を見る）*/
@@ -18118,7 +18153,7 @@ function runWorkRate(cellId){
   const pc=playCells[cellId-1];
   return (pc&&(pc.effect&16))?SNOW_WORK:1;
 }
-function runBuildTick(){
+function runBuildTick(newMonth=true){
   /* **拠点の普請は、隣に立つ隊の数だけ進む**（§27.1）。
      ほかの普請は升に1隊しか立てないので、1月に1つずつ進む */
   const men=new Map();
@@ -18148,12 +18183,12 @@ function runBuildTick(){
     const to=st.fushin.to, goal=repairTaikyuOf(to);
     let add=0; for(const u of us)add+=runFushinRate(u.id,to);
     /* **拠点の普請（城の改築）は雪でも遅れない**（依頼）*/
-    add=Math.max(add,us.length+REPAIR_STEP)+(st.fushin.acc||0);
+    add=Math.max(add,(us.length+REPAIR_STEP)/TURNS_PER_MONTH)+(st.fushin.acc||0);   /* 最低の上がりは月で「人数＋1」（8.5.0）*/
     const n=Math.floor(add); st.fushin.acc=add-n;
     const pw=isLink(us[0].power)?us[0].power.id:null;
     runRepair(sid,Math.max(0,Math.min(goal,st.taikyu+n)-st.taikyu),pw);
     /* **普請をしている武将には、進んだ月ごとに勲功が 1 入る**（依頼・§19.1）*/
-    for(const u of us)if(isLink(u.bushou))runAddKunkou(u.bushou.id,KUNKOU_FUSHIN);
+    if(newMonth)for(const u of us)if(isLink(u.bushou))runAddKunkou(u.bushou.id,KUNKOU_FUSHIN);   /* 勲功は月に 1（8.5.0）*/
     if(st.taikyu<goal)continue;
     st.fushin=null;
     for(const u of us){
@@ -18798,10 +18833,10 @@ function runAddUnit({type,site,bushou,cell,dir="-",state,keep}){
     cell:target, dir, hei,
     /* **軍勢を出すときだけ蔵を食う**（§27.5）。連れ出した馬と鉄砲は城から出る */
     sonae: hei>0?runSonaeOf(site,hei,true,stt==="sui"):[],
-    exit : {cell:target, at:runMonthKey()},
+    exit : {cell:target, at:runTurnKey()},
   });
   if(hei>0&&st){
-    const want=eatOf(hei)*MARCH_MONTHS;
+    const want=eatMonthOf(hei)*MARCH_MONTHS;
     const give=Math.min(want,st.hyoro);
     st.hyoro-=give; row.hyoro=give;
   }
@@ -21244,7 +21279,7 @@ function runBattleClose(){
     /* **二手の攻城なら、自分の出どころの備えだけを受け取る**（§26.3）*/
     const mine=sd.line.filter(x=>of===undefined||x.of===of||x.of===null&&of===unitId);
     /* **混乱の残りは備えごとに持ち越す**（依頼・`konRem`）。次の戦はそこから始まる */
-    const now=runNowMonthNo();
+    const now=runNowTurnNo();
     const kon=x=>(x.hei>0&&(x.konran||0)>0)?{konAt:now,konTo:now+x.konran}:{};
     u.sonae=mine.map(x=>({k:x.k,hei:x.hei,...kon(x)}));
     u.hei=mine.reduce((n,x)=>n+x.hei,0);
@@ -21434,18 +21469,18 @@ function runBattleClose(){
     const u=byId(playUnits,uid);
     if(!u||u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="軍勢")continue;
     /* この戦の終わりの残りで決め直す。戦の中で解けていれば（一喝）動ける */
-    u.konranTo=n>0?runNowMonthNo()+n:0;
+    u.konranTo=n>0?runNowTurnNo()+n:0;
   }
   playStamp++;
   return out;
 }
 /* 混乱で動けないか（依頼）*/
-const runKonranNow=u=>!!u&&(u.konranTo||0)>=runNowMonthNo();
+const runKonranNow=u=>!!u&&(u.konranTo||0)>=runNowTurnNo();   /* 1 拍＝1 手番（依頼・8.5.0）*/
 /* **備えの混乱の残りの拍**（依頼）。戦のあった月はその戦の残りのまま。
    あとの月は、その月の手番をまだ消化していないものとして数える（`runKonranNow` と同じ数え方）*/
 const konRem=x=>{
   if(!x||!x.konTo)return 0;
-  const now=runNowMonthNo();
+  const now=runNowTurnNo();
   if(now>x.konTo)return 0;
   return x.konTo-now+(now>(x.konAt||0)?1:0);
 };
@@ -22587,10 +22622,10 @@ function runStartLevee(unitId,keep=0){
   const site=runAIHome(u); if(site===null)return null;
   const st=byId(playSites,site); if(!st||(st.kane||0)<LEVEE_COST+keep)return null;
   st.kane=Math.max(0,st.kane-LEVEE_COST);
-  u.work={cell, label:"土手", cat:"治水", cost:LEVEE_COST, left:LEVEE_MONTHS, site, up:false};
+  u.work={cell, label:"土手", cat:"治水", cost:LEVEE_COST, left:LEVEE_MONTHS*TURNS_PER_MONTH, site, up:false};   /* 期間は今のまま（8.5.0）*/
   u.state="sagyo";
   playStamp++;
-  return {cell, months:LEVEE_MONTHS};
+  return {cell, months:LEVEE_MONTHS*TURNS_PER_MONTH};
 }
 
 /* ------------------------------------------------------------
@@ -22873,8 +22908,9 @@ function runOccMonths(unitId,cellId){
   const pw=isLink(u.power)?u.power.id:null;
   const held=runDomainOwnerSite(cellId);
   const kuni=runKuniOwner(cellId)===pw;
-  if(held!==null&&runSiteOwner(held)!==pw)return kuni?OCC_HELD_KUNI:OCC_HELD;   /* 他国の実効支配域 */
-  return kuni?OCC_KUNI:OCC_OTHER;
+  /* 表は暦の月で持ち、手番に直す（依頼・8.5.0。期間は今のまま）*/
+  if(held!==null&&runSiteOwner(held)!==pw)return (kuni?OCC_HELD_KUNI:OCC_HELD)*TURNS_PER_MONTH;   /* 他国の実効支配域 */
+  return (kuni?OCC_KUNI:OCC_OTHER)*TURNS_PER_MONTH;
 }
 /* ------------------------------------------------------------
    **支城を占めたとき、域はどう動くか**（依頼・§27.7）
@@ -23483,7 +23519,7 @@ function runAbsorb(unitId,foeUnitId){
     o.hei=Math.min(o.hei||0,unitHeiMax(o));
     /* **備えは新しい主の蔵から立てる**（§26.5）。独立勢力は蔵を持たない */
     o.sonae=o.hei>0?runSonaeOf(home,o.hei,true):[];   /* 蔵から引く。帰城で返るぶんが無から湧かない */
-    o.hyoro=Math.min(CARRY_MAX.hyoro,eatOf(o.hei)*MARCH_MONTHS);
+    o.hyoro=Math.min(CARRY_MAX.hyoro,eatMonthOf(o.hei)*MARCH_MONTHS);
     o.work=null; o.occ=null; o.done=null; o.wait=0; playStamp++;
     /* **取り込んだ隊も城の指針に従う**（依頼・§28.4）。
        城から隊を出すときと同じく、城の望み（`runAIWant`。指針の重みが掛かる）から引き、
@@ -23565,7 +23601,7 @@ function runReturnUnit(unitId,siteId,viaPass){
   /* **出した月のうちに城へ戻ることはできない**（依頼・§25.4）。
      出して即消える隊は、人の目には出していないのと同じに見える。
      NPC の「用が無いから帰る」「傷んだから帰る」は、どれもここで止まり、翌月に判じ直す */
-  if(u.exit&&u.exit.at===runMonthKey())return false;
+  if(u.exit&&u.exit.at===runTurnKey())return false;
   /* `viaPass` は、味方を通り抜けて城の隣まで届くと確かめたとき（`runEnterByPass`）*/
   if(!viaPass&&runAIDist(u.q.id,bs.cell)>1)return false;
   const mine=isLink(u.power)?u.power.id:null;
@@ -23654,11 +23690,11 @@ function runWithdraw(unitId){
    ------------------------------------------------------------ */
 function runRestBushou(bushouId){
   const b=byId(playBushou,bushouId); if(!b)return false;
-  b.rest=ymNow(); playStamp++;
+  b.rest=runNowTurnNo(); playStamp++;
   return true;
 }
 /* この月に城へ入ったか。**入った月には出せない** */
-const runJustIn=b=>!!b&&b.rest===ymNow();
+const runJustIn=b=>!!b&&b.rest===runNowTurnNo();
 
 /* 武将を別の城へ移す。**移動の隊が着いた先で解ける**（§27.2）*/
 function runTransferBushou(unitId,siteId){
@@ -23682,9 +23718,9 @@ function runTransferBushou(unitId,siteId){
    ------------------------------------------------------------ */
 /* **兵糧の値**（§27.3）。**銭100で兵糧5**、すなわち兵糧1つが銭20。
    売るときは兵糧3つで銭1 */
-const RICE_BUY_KANE=100, RICE_BUY_RICE=5;
+const RICE_BUY_KANE=100, RICE_BUY_RICE=20;   /* 8.5.0 で値を 1/4 に（依頼）。銭100で兵糧20 */
 const RICE_BUY=RICE_BUY_RICE/RICE_BUY_KANE;    // 銭1で買える兵糧
-const RICE_SELL=3;                             // 兵糧いくつで銭1
+const RICE_SELL=12;                            // 兵糧いくつで銭1（8.5.0 で値を 1/4 に。依頼）
 
 
 /* 兵糧の売り買い。**n が正なら買い、負なら売り** */
@@ -24175,8 +24211,9 @@ function runSkillOf(unitId,key){
 }
 /* その隊がその分類を建てるのにかかる月数（§24.6）。
    **率いる者の適性で伸び縮みする** */
+/* **普請にかかる手番の数**（8.5.0）。表（`BUILD_MONTHS`）は暦の月で持ち、手番に直す（依頼：期間は今のまま）*/
 function runMonthsOf(unitId,cat,lv){
-  const raw=buildMonthsOf(cat,lv);
+  const raw=buildMonthsOf(cat,lv)*TURNS_PER_MONTH;
   const key=CAT_SKILL[cat]; if(!key)return raw;
   return Math.max(1,Math.round(raw*SKILL_MONTH[runSkillOf(unitId,key)-1]));
 }
@@ -24277,7 +24314,7 @@ function runRepairTo(siteId){
 const FUSHIN_WIDTH=200;
 function runFushinRate(unitId,to){
   const raw=SITE_MONTHS[Math.max(1,to||1)-1]??SITE_MONTHS[SITE_MONTHS.length-1];
-  return FUSHIN_WIDTH/raw/SKILL_MONTH[runSkillOf(unitId,"ken")-1];
+  return FUSHIN_WIDTH/(raw*TURNS_PER_MONTH)/SKILL_MONTH[runSkillOf(unitId,"ken")-1];   /* 一人が 1 手番に積む量（8.5.0）*/
 }
 /* 普請の目当ての耐久度。段を上げるならその帯のまん中、Max なら上限 */
 const repairTaikyuOf=to=>to>=REPAIR_MAX?TAIKYU_MAX:startTaikyu(to);
@@ -24557,7 +24594,7 @@ function runChutonOK(powerId,fortCell,unitId){
    仲の悪い隣 ＝ 隣接大名で友好が `AI_MIND_BAD` 未満（同盟・休戦を除く）。
    その隣の側 ＝ 支城から `CHUTON_SIDE`（2升）の内に、その家の国（グレーゾーン）の升がある。
    詰めた隊は `CHUTON_MONTHS` で城へ戻り、別の隊と交代する（依頼：交代制）*/
-const CHUTON_SIDE=2, CHUTON_MONTHS=12;
+const CHUTON_SIDE=2, CHUTON_MONTHS=6;   /* 交代は 6 か月（依頼・8.5.0）*/
 function runBadNeighbors(pw){
   const out=new Set();
   for(const o of runNearPowers(pw)){
@@ -25755,7 +25792,7 @@ function runGunHere(u,name,mine,moved){
     if(runIsFort(u.q.id)&&runCanOccupy(u.id,u.q.id)){
       const occ0=runOccupy(u.id);
       if(occ0&&occ0.took!==undefined)return name+occText(occ0);
-      if(occ0)return name+"が支城を囲んでいる（あと"+occ0.left+"月）";
+      if(occ0)return name+"が支城を囲んでいる（あと"+turnsText(occ0.left)+"）";
     }
     /* **支城で休んでいる隊は、満ちるまでそこに居る**（依頼・§27.4.1）。
        ここに手を置かないと、行き先（支城）に着いた隊は「用が済まない」
@@ -25771,7 +25808,7 @@ function runGunHere(u,name,mine,moved){
     }
     if(runAIGoal(u)===null||runAIGoal(u)===u.q.id){const occ=runOccupy(u.id);
      if(occ&&occ.took!==undefined)return name+occText(occ);
-     if(occ)return name+"が土地を押さえている（あと"+occ.left+"月）";}
+     if(occ)return name+"が土地を押さえている（あと"+turnsText(occ.left)+"）";}
     /* ここから下は「引き上げる」道である。**動いたあとには通らない。**
        踏み込んだその月に引き返しては、出した意味がない */
     if(moved)return null;
@@ -26127,7 +26164,7 @@ function runAIHere(u,name,type,mine,moved){
   if(type==="農業"&&!u.work
      &&!(hLv!==null&&(SHI_NO_LEVEE.has(runAIShishin(hLv).id)||runAIHoldWork(hLv)))){
     const r=runStartLevee(u.id,hLv!==null?kaneKeepOf(hLv):0);
-    if(r)return name+"が土手を盛りにかかった（あと"+r.months+"月）";
+    if(r)return name+"が土手を盛りにかかった（あと"+turnsText(r.months)+"）";
   }
 
   /* **抱えている普請の升からは離れない**（§24.6）。離れれば工事は止まり、
@@ -26141,7 +26178,7 @@ function runAIHere(u,name,type,mine,moved){
       const men=fix?runFushinMen(w.fix).length:1;
       const fst=fix?byId(playSites,w.fix):null;
       return name+"が"+nm+"を普請している（"+(fst&&fst.fushin
-          ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to):"あと"+Math.ceil(w.left)+"月")
+          ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to):"あと"+turnsText(w.left))
         +(men>1?"・"+men+"人":"")+"）";
     }
     /* 離れてしまったなら、戻る。**動いたあとにここへ来たなら、もう一度は動かない**
@@ -26187,9 +26224,9 @@ function runAIHere(u,name,type,mine,moved){
     }
     const done=(u.back||!rankOK)?null:runBuild(u.id);
     if(done)return done.cat==="開墾"
-      ?(name+"が地を起こしにかかった（"+done.left+"月）")
+      ?(name+"が地を起こしにかかった（"+turnsText(done.left)+"）")
       :(name+"が"+done.label+"の普請に"
-        +(done.up?"かかった":"取りかかった")+"（"+done.left+"月）");
+        +(done.up?"かかった":"取りかかった")+"（"+turnsText(done.left)+"）");
   }
   return null;
 }
@@ -26509,7 +26546,7 @@ function runAIAct(u){
      出た升の踏み代（川・雪）が持ち分を使い切れば、その月はもう動けない。
      **バグ**：一歩が出ないのを「届かない行き先」と見て、出たその月に城へ帰していた。
      川や雪の升にしか出口の無い城（黒川城・白河小峰城など）は、どの隊も盤に残らなかった */
-  if(u.exit&&u.exit.cell===u.q.id&&u.exit.at===runMonthKey()){
+  if(u.exit&&u.exit.cell===u.q.id&&u.exit.at===runTurnKey()){
     runFaceThreat(u);
     return name+"の"+type+"は城を出た";
   }
@@ -26520,7 +26557,7 @@ function runAIAct(u){
     u.wait=(u.wait||0)+1;
     if(u.wait<=AI_WAIT_MAX){
       runFaceThreat(u);                          /* 待つときも敵に相対する */
-      return name+"の"+type+"は次の月を待った";
+      return name+"の"+type+"は次の手番を待った";
     }
   }
   u.wait=0;
@@ -26638,7 +26675,7 @@ function runAISwap(u,goal){
   const f=runAIField(goal,moveOf(u),u.state==="sui"?"sui":"sagyo");
   const here=f.get(u.q.id); if(here===undefined)return false;
   const c=BASE_CELLS[u.q.id-1]; if(!c)return false;
-  const mk=runMonthKey();
+  const mk=runTurnKey();
   let best=null,bd=here;
   for(const [dq,dr] of DIR6[c.r&1]){
     const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
@@ -26813,7 +26850,7 @@ const runIntruder=memoStamp(function runIntruder0(powerId,foeId){
 const INTRUDER_BACK_MONTHS=6;
 function runIntruderFor(u,powerId){
   const ix=runDomainIndex();
-  const budget=moveOf(u), lim=budget*INTRUDER_BACK_MONTHS;
+  const budget=moveOf(u), lim=budget*INTRUDER_BACK_MONTHS*TURNS_PER_MONTH;   /* 6 か月＝24 手番ぶんの歩き（8.5.0）*/
   const here=u.q.id;
   let best=null,bd=Infinity;
   for(const o of playUnits){
@@ -27550,7 +27587,7 @@ function runWorkGain(siteId){
     const dan=w.cat==="開墾"?1:Math.max(0,objLv({label:w.label})-now);
     const kane=w.cat==="町"?dan*KANE_PER_MACHI*(runMachiBonus(w.cell)?MACHI_BONUS:1)
               :w.cat==="港"&&!w.up?KANE_PER_MINATO:0;
-    out.push({cat:w.cat, dan, kane, left:Math.max(1,Math.ceil(w.left||1))});
+    out.push({cat:w.cat, dan, kane, left:Math.max(1,Math.ceil((w.left||1)/TURNS_PER_MONTH))});   /* 残りは手番。見積りは月で */
   }
   return out;
 }
@@ -27575,7 +27612,7 @@ const runAIFeedShort=memoStamp(function runAIFeedShort0(siteId){
      **バグ**（v7.32.0〜7.97.4）：蔵の量だけで測り、穫れを数えていなかった。
      1年の穫れが食いの17倍ある三戸城でも、蔵が1年ぶんに届かないだけで「兵糧不足」と出ていた
      ------------------------------------------------------------ */
-  const eat=eatOf(st.hei);
+  const eat=eatMonthOf(st.hei);
   const d=runFarmDan(siteId);
   const now=(playProgress[0]||{}).month||1;
   /* **建てかけの畑・水田・開墾地は、できあがる月から穫れに足す**（依頼）*/
@@ -28163,7 +28200,7 @@ const riceMonthsLeft=()=>{
    畑は冬のほかは毎月入る（§21.3）ので、**畑で食いが賄えている城は
    蔵を厚く持たなくてよい。** 賄えていないぶんだけ買い足す */
 const riceWantOf=st=>{
-  const eat=eatOf(st.hei);
+  const eat=eatMonthOf(st.hei);
   const d=runFarmDan(st.id);
   const now=(playProgress[0]||{}).month||1;
   const m=riceMonthsLeft()+AI_RICE_SPARE;
@@ -28325,7 +28362,7 @@ function drawAI(){
     (playProgress[0].order||[])[playProgress[0].at]);
   el("aiEnd").hidden=!(mine&&now&&now.id===mine);
   const g=playProgress[0];
-  el("aiWhat").textContent=(g?g.year+"年"+g.month+"月　":"")+aiWhat;
+  el("aiWhat").textContent=(g?dateText(g)+"　":"")+aiWhat;
 }
 
 /* 1つだけ進める。返すのは、次に呼ぶまで置く間合い（ミリ秒）*/
@@ -28704,8 +28741,8 @@ function saveGame(){
 /* ファイルにする名。**年月を入れる。** どの時点の盤かが名で分かる */
 function saveName(){
   const g=playProgress[0];
-  const y=g?g.year:1551, m=g?String(g.month).padStart(2,"0"):"01";
-  return `sengoku_${y}${m}.json`;
+  const y=g?g.year:1551, m=g?String(g.month).padStart(2,"0"):"01", j=runJunOf(g);
+  return `sengoku_${y}${m}_${j}.json`;
 }
 
 /* **ロードの進み**（依頼）。盤を作る段の名と、進みの棒を出す。
