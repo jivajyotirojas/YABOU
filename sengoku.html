@@ -795,7 +795,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.4.4";
+const VERSION="8.4.5";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -25156,6 +25156,9 @@ function runAIGoal0(u){
    行き先ごとに覚えておく。覚える数にも上限を置く。**踏み代が変わったら捨てる**
    （雪の印が変わった月・治水・読み込み）*/
 const AI_FIELD_MAX=2600;       // 1つの行き先で広げる升の数
+/* **帰り道だけは広く測る**（依頼・8.4.5・§25.6）。遠くへ出た使いの帰り道が AI_FIELD_MAX の外にあると、
+   六角の歩数で寄る控えの道に落ち、山や海に突き当たった袋小路で二つの升を往復していた */
+const AI_FIELD_HOME=AI_FIELD_MAX*5;
 const AI_FIELD_KEEP=256;       // 覚えておく行き先の数（場は 2600 升まで。隊の数ぶんあっても軽い）
 const aiFieldCache=new Map();
 /* `budget` は隊がひと月に踏める重さ。**これを越える升は通り道にしない。**
@@ -25208,11 +25211,12 @@ function runStepTable(state){
 }
 /* 道の覚えをぜんぶ捨てる。踏み代が変わったとき（雪・治水・港・読み込み。§25.3）*/
 function runFieldsDrop(){ aiFieldCache.clear(); stepTable={sagyo:null, sui:null}; }
-function runAIField(goal,budget,state,avoid){
+function runAIField(goal,budget,state,avoid,max){
   state=state==="sui"?"sui":"sagyo";
   /* 歩き代（`budget`）は場の中身に効かない（重さは踏み代のまま数える）ので鍵に入れない。
      入れると同じ場が歩き代ごとに別に入り、覚えを食い潰す */
-  const key=goal+":"+state+(avoid?":a"+[...avoid].sort((a,b)=>a-b).join(","):"");
+  const cap=max||AI_FIELD_MAX;
+  const key=goal+":"+state+(avoid?":a"+[...avoid].sort((a,b)=>a-b).join(","):"")+(max?":m"+max:"");
   const hit=aiFieldCache.get(key);
   if(hit){                                       /* 使ったものを新しい側へ回す */
     aiFieldCache.delete(key); aiFieldCache.set(key,hit); return hit;
@@ -25233,7 +25237,7 @@ function runAIField(goal,budget,state,avoid){
     return [top,td];};
   let seen=1;
   const NB=runNb6(), ST=runStepTable(state);
-  while(hq.length&&seen<AI_FIELD_MAX){
+  while(hq.length&&seen<cap){
     const [id,bv]=hpop();
     if(dist.get(id)!==bv)continue;                /* 古い札。もっと近い道で取り出し済み */
     for(let d=0;d<6;d++){
@@ -25296,7 +25300,7 @@ function runAIField(goal,budget,state,avoid){
 
 /* 行き先へ寄る一歩。**いま行ける升のうち、行き先にいちばん近いもの。**
    近さは踏み代で測る。いまより近づけないなら動かない */
-function runAIStepTo(unitId,goal){
+function runAIStepTo(unitId,goal,max){
   const u=byId(playUnits,unitId); if(!u)return null;
   /* **道は姿ごとに違う**（§24.1）。陸の隊は陸の踏み代で、水の隊は水の踏み代で
      測る。ひとつの地図で測っていたため、**水の隊は自分の通れない陸の道で
@@ -25310,7 +25314,7 @@ function runAIStepTo(unitId,goal){
   const tl=isLink(u.type)?linkValue(u.type):"";
   const avoid=DOKU_AVOID_TYPES.includes(tl)&&isOpenUnit(u)?runDokuDanger():null;
   if(avoid&&avoid.size){
-    const fa=states.map(st=>runAIField(goal,moveOf(u),st,avoid));
+    const fa=states.map(st=>runAIField(goal,moveOf(u),st,avoid,max));
     const nearA=id=>{let v; for(const f of fa){const d=f.get(id);
       if(d!==undefined&&(v===undefined||d<v))v=d;} return v;};
     const hereA=nearA(u.q.id);
@@ -25324,7 +25328,7 @@ function runAIStepTo(unitId,goal){
     if(bestA!==null)return bestA;
     /* 避けると一歩も進めない。いつもの道で進む（私の判断）*/
   }
-  const fs=states.map(st=>runAIField(goal,moveOf(u),st));
+  const fs=states.map(st=>runAIField(goal,moveOf(u),st,undefined,max));
   const near=id=>{let v; for(const f of fs){const d=f.get(id);
     if(d!==undefined&&(v===undefined||d<v))v=d;} return v;};
   const here=near(u.q.id);
@@ -26535,10 +26539,17 @@ function runAIAct(u){
      だから**いまの自分の城を近い順に見て、一歩が出る城へ帰る** */
   const mine2=isLink(u.power)?u.power.id:null;
   const home2=runAIHome(u);
+  /* **帰る先は一度決めたら変えない**（依頼・8.4.5・§25.6）。
+     踏み代の広がりが届かない遠くの隊は、城ごとの遠さを六角の歩数で測って近い順に試す。
+     その遠さは立つ升ごとに変わるので、月ごとに別の城へ向かい、二つの升を往復していた
+     （北条家の使いが遠江の端で 64,444 と 63,442 を行き来した。依頼）。
+     歩き出した先（`u.homeTo`）を覚え、その城が自分の家のものであるあいだは変えない */
+  const homeTo=(u.homeTo!==undefined&&u.homeTo!==null&&runSiteOwner(u.homeTo)===mine2)?u.homeTo:null;
   const mySites=playSites.filter(x=>runSiteOwner(x.id)===mine2)
     .map(x=>({id:x.id, b:byId(BASE_SITES,x.id)}))
     .filter(x=>!!x.b)
-    .sort((a,b)=>(a.id===home2?-1:b.id===home2?1:0)
+    .sort((a,b)=>(a.id===homeTo?-1:b.id===homeTo?1:0)
+               ||(a.id===home2?-1:b.id===home2?1:0)
                ||runAIDist(u.q.id,a.b.cell)-runAIDist(u.q.id,b.b.cell));
   /* **味方の隊を通り抜けて城の隣まで届くなら、そのまま城に入る**（依頼）*/
   for(const h of mySites){
@@ -26566,8 +26577,8 @@ function runAIAct(u){
     }
   }
   for(const h of mySites){
-    const st2=runAIStepTo(u.id,h.b.cell);
-    if(st2!==null){runMoveUnit(u.id,st2);return name+"が城へ向かった";}
+    const st2=runAIStepTo(u.id,h.b.cell,AI_FIELD_HOME);
+    if(st2!==null){u.homeTo=h.id;runMoveUnit(u.id,st2);return name+"が城へ向かった";}
   }
   /* **それでも一歩が出ないなら、六角の歩数で近づく**（§25.6）。
      踏み代の広がりには上限（`AI_FIELD_MAX`＝2600升）があるので、
@@ -26585,7 +26596,7 @@ function runAIAct(u){
       const d9=runAIDist(n.id,to);
       if(d9<bd9){bd9=d9;pick=n.id;}
     }
-    if(pick!==null&&runMoveUnit(u.id,pick))return name+"が城へ向かった";
+    if(pick!==null&&runMoveUnit(u.id,pick)){u.homeTo=mySites[0].id;return name+"が城へ向かった";}
     /* **帰り道を味方の隊が塞いでいるなら、すれ違う**（`runAISwap`）*/
     if(runAISwap(u,mySites[0].b.cell))return name+"が味方とすれ違い、城へ向かった";
   }
