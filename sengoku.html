@@ -6684,23 +6684,49 @@ function* glBuildMeshGen(){
         if(vS<0.02)M.seg(W([S.apexX,S.apexY]),W(S.fr),Math.max(0.5,rad*0.04)/sRef/2,
               [111,116,112,128]);               /* 稜線は灰の縁取り（国絵図）。白は雪と街道の記号なので使わない */
         if(playCells[T.c.id-1].effect&32){        /* 冠雪（高い山の頂。10月〜5月・§10.16）*/
+          /* **冠雪は頂ごとに、雪線より上だけを切り出す**（依頼・8.5.0）。
+             山の横幅いっぱいの帯として描いていたため、鞍部が雪線より低い所にも帯が伸び、
+             山の端で垂直に切れて「つば」に見えた（帽子だけが浮く）。頂ごとの片に分け、
+             雪線は低周波で波打たせ、下の 65% は受光面・陰の面それぞれの色へ溶かす
+             （いちばん下は山肌そのもの）。白は青白でなく胡粉寄り。
+             半透明は重ねない（隣の山と重なると二重に塗られる）。色そのものを混ぜる */
           const rn=k=>rnd3(T.c.q,T.c.r,k);
-          const yc=S.apexY+S.tot*(0.30+0.10*rn(4)), cap=[];
+          const ycB=S.apexY+S.tot*(0.30+0.10*rn(4));
+          const jag=x=>ycB+S.tot*0.15*(2*vns(x/(rad*1.2)+T.c.q*1.7, T.c.r*2.3+0.37)-1);
+          const litC=vS<0.02?lt.concat(255):mixTo(lt,Math.min(0.92,vM+0.25));
+          const faceOf=p=>p[0]<S.apexX?litC:(vS<0.02?dk.concat(255):at(dk,W(p)));   /* 受光面は左半分（§10.21）*/
+          const capCol=p=>{
+            const h=Math.max(0,Math.min(1,(p[1]-S.apexY)/((ycB-S.apexY)||1)));
+            const sn=[246-38*h,246-32*h,240-30*h];
+            const f=Math.pow(Math.max(0,(h-0.35)/0.65),1.5), fc4=faceOf(p);
+            return [0,1,2].map(i=>Math.round(sn[i]*(1-f)+fc4[i]*f)).concat(255);
+          };
+          const cross=(a,b)=>{                     /* 線分と波打つ雪線の交点。直線の交点を詰める */
+            let t=0.5; for(let it=0;it<3;it++){ const x=a[0]+(b[0]-a[0])*t; t=(jag(x)-a[1])/((b[1]-a[1])||1); t=Math.max(0,Math.min(1,t)); }
+            const x=a[0]+(b[0]-a[0])*t; return [x,jag(x)];
+          };
+          let piece=null;
+          const flush=()=>{
+            if(!piece||piece.length<2){piece=null;return;}
+            const x0=piece[piece.length-1][0], x1=piece[0][0], K=6;   /* 下の縁。出た所から入った所へ、雪線に沿って戻る */
+            for(let k=1;k<K;k++){ const x=x0+(x1-x0)*k/K; piece.push([x,jag(x)]); }
+            let top=1e9, sx=0; for(const p of piece){ if(p[1]<top)top=p[1]; sx+=p[0]; }
+            const ctr=[sx/piece.length,(top+ycB)/2];
+            const sm=glSil(piece);
+            M.fan(W(ctr),sm.map(W),capCol(ctr),sm.map(capCol));
+            piece=null;
+          };
           for(let i=0;i<S.sil.length-1;i++){
             const a=S.sil[i],b=S.sil[i+1];
-            if(a[1]<yc)cap.push(a);
-            if((a[1]<yc)!==(b[1]<yc)){
-              const t=(yc-a[1])/(b[1]-a[1]);
-              cap.push([a[0]+(b[0]-a[0])*t,yc]);
+            const ua=a[1]<jag(a[0]), ub=b[1]<jag(b[0]);
+            if(ua&&piece)piece.push(a);
+            if(ua!==ub){
+              const c2=cross(a,b);
+              if(!ua){ piece=[c2]; }              /* 雪線に入る */
+              else { piece.push(c2); flush(); }   /* 雪線から出る */
             }
           }
-          if(cap.length>2){
-            const pc=glSil(cap).map(W);
-            const y0=S.apexY/sRef, y1=yc/sRef;
-            const cl=p=>{const t=Math.max(0,Math.min(1,(p[1]-y0)/((y1-y0)||1)));
-              return [Math.round(244-41*t),Math.round(248-32*t),Math.round(250-28*t),255];};
-            M.fan(W([S.apexX,yc]),pc,[220,232,238,255],pc.map(cl));
-          }
+          flush();
         }
         for(const p of prof)if(p[1]<ymin)ymin=p[1];
       };
