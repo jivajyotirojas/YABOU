@@ -22195,7 +22195,7 @@ function runRename(powerId,heir){
       u.label=pw.label+u.label.slice(was.length);
   }
   playStamp++;
-  runTell(heir.name+"が後を継ぎました","家督");    /* 苗字の違う者が継いで家の名が変わった。家督の札（依頼）*/
+  /* 家の名が変わったことは札にしない（依頼・8.5.0）。継いだことは家督の札（`runSuccession`）で出ている */
   return true;
 }
 
