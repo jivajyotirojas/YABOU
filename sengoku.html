@@ -806,7 +806,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.6.0";
+const VERSION="8.6.1";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -10998,7 +10998,7 @@ function runSecede(siteId,bid){
    }}
   runSetMind(before,id,MIND_MIN); runSetMind(id,before,MIND_MIN);
   /* **独立の札のあとに、興った札**（依頼）。独立したことと、家が興ったことは別の出来事 */
-  runTell(tellHome(b)+b.name+"が独立しました","家名",bs.cell);
+  runTell(tellHomeOf(b)+b.name+"が独立しました","家名",bs.cell);
   runTell(st.name+"で"+myoji+"家が興りました","家名",bs.cell);
   playStamp++;
   return true;
@@ -11015,7 +11015,7 @@ function runBetrayDokuritsu(u){
                    group:mkLink(19,id,"bushouNum"), colorUp:"#f2efe6", colorLow:"#f2efe6"});
   playBushouGroups.push({id, bushouNum:1, bushou:[bid]});
   runLeaveGroups(bid);
-  const home0=tellHome(b);                      /* 札に添える、離れる前の所属拠点名 */
+  const home0=tellHomeOf(b);                      /* 札に添える、離れる前の所属拠点名 */
   b.shozoku=mkLink(15,id,"label"); b.site="-"; b.ichimon=true; b.since=runNowMonthNo();
   b.rank=mkLink(22,RANK_TOP.dokuritsu,"label");
   runDelUnit(u.id);
@@ -11080,7 +11080,7 @@ function runBetrayTick(){
       const odds=runBetrayOdds(b,BETRAY_ODDS*SHUPPON_RATE); if(odds<=0)continue;
       if(runRand()>=odds)continue;
       const bs=byId(BASE_SITES,st.id);
-      runTell(tellHome(b)+b.name+"が出奔しました","家名",bs?bs.cell:null);
+      runTell(tellHomeOf(b)+b.name+"が出奔しました","家名",bs?bs.cell:null);
       runRonin(b.id,bs?bs.cell:undefined);
       betrayLog.shuppon=(betrayLog.shuppon||0)+1;
     }
@@ -11123,7 +11123,7 @@ function runKanyu(unitId,siteId){
   if(runRand()>=odds)return {ok:false, name:b.name};
   /* 寝返り。**勧誘した家の隊になる。** 城の前に移動の隊として出て、勧誘した家の城へ向かう */
   const cell=byId(BASE_SITES,siteId)?.cell??null;
-  const home0=tellHome(b);                      /* 札に添える、寝返る前の所属拠点名 */
+  const home0=tellHomeOf(b);                      /* 札に添える、寝返る前の所属拠点名 */
   runLeaveGroups(b.id);
   b.shozoku=mkLink(15,mine,"label"); b.site=mkLink(20,home,"name");
   b.since=runNowMonthNo(); b.ichimon=false;
@@ -11663,7 +11663,7 @@ function runLifeTick(){
     const past=age-(goal-LIFE_EARLY);
     if(past<0)continue;
     if(runRand()>=LIFE_ODDS*(past+1))continue;
-    runTell(tellHome(b)+b.name+"が死亡しました","病没",runBushouCell(b));
+    runTell(tellHomeOf(b)+b.name+"が死亡しました","病没",runBushouCell(b));
     runKillBushou(b.id);
   }
 }
@@ -15451,7 +15451,7 @@ let tellCell=null;
 /* **陣払いと元服の報せは、人が指す家のものだけ出す**（依頼。v8.1.7）。誰も指していないときは出さない */
 const tellMine=pw=>!!playerPower()&&pw===playerPower();
 /* 札の文に添える所属拠点名。「米沢城の伊達晴宗が…」。所属が無ければ名だけ（依頼・8.5.0）*/
-const tellHome=b=>b&&isLink(b.site)?linkValue(b.site)+"の":"";
+const tellHomeOf=b=>b&&isLink(b.site)?linkValue(b.site)+"の":"";
 function runTell(text,kind,cell){
   if(!text)return null;
   if(cell!==undefined&&cell!==null)tellCell=cell;
@@ -28627,7 +28627,7 @@ let aiMode=0;
 const aiModeOf=()=>AI_MODES[aiMode];
 const aiDiv =()=>aiModeOf().div;               /* 一般の間合いを割る */
 const batDiv=()=>aiModeOf().bat||4;            /* 戦の拍を割る（出さない段では使わない）*/
-const tellShow=k=>{const ks=aiModeOf().kinds; return !ks||ks.has(k);};   /* この段で出す札か */
+const isTellShown=k=>{const ks=aiModeOf().kinds; return !ks||ks.has(k);};   /* この段で出す札か */
 let aiOn=false, aiTimer=0, aiWhat="", aiMoved=false;
 
 /* 知らせの帯。**ここは読むだけ。** 盤面には触らない */
@@ -28845,7 +28845,7 @@ function onTellPump(){
   tellBusy=true;
   /* **この段で出さない種の札は読まずに流す**（依頼・§25.5）*/
   tellNow=runTellTake();
-  while(tellNow&&!tellShow(tellNow.kind))tellNow=runTellTake();
+  while(tellNow&&!isTellShown(tellNow.kind))tellNow=runTellTake();
   /* **札を出してから盤を飛ばす。** 逆にすると、飛ぶ途中でここが呼び返される */
   drawTell();
   /* **報せを出すときは、それが起きた升へ盤が飛ぶ**（依頼・§31.5）。
