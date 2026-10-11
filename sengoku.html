@@ -10984,6 +10984,8 @@ function runSecede(siteId,bid){
      if(!playUnits.some(u=>isLink(u.bushou)&&u.bushou.id===mid))runPutIdou(mid,home.id,bs.cell);
    }}
   runSetMind(before,id,MIND_MIN); runSetMind(id,before,MIND_MIN);
+  /* **独立の札のあとに、興った札**（依頼）。独立したことと、家が興ったことは別の出来事 */
+  runTell(tellHome(b)+b.name+"が独立しました","家名",bs.cell);
   runTell(st.name+"で"+myoji+"家が興りました","家名",bs.cell);
   playStamp++;
   return true;
@@ -11017,6 +11019,7 @@ function runBetrayDokuritsu(u){
   playUnits.push(row); g.units.push(row.id); g.unitNum=g.units.length;
   runSetMind(before,id,MIND_MIN);
   runTell(home0+b.name+"が独立しました","家名",cell);
+  runTell(myoji+"氏が興りました","家名",cell);   /* 独立の札のあとに、興った札（依頼）*/
   playStamp++;
   return true;
 }
