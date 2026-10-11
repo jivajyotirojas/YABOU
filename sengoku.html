@@ -3850,7 +3850,7 @@ function runTurnNext(){
      滅んだ家の枠が残る。枠ごと詰めると、その旬にまだ動いていない家が
      繰り上がって二度動くことになる。飛ばすだけにする */
   while(g.at<g.turnNum&&!playPowers.some(p=>p.id===g.order[g.at]))g.at++;
-  if(g.at<g.turnNum)return;
+  if(g.at<g.turnNum){runTellTurn(g); return;}
   g.jun=runJunOf(g)+1;
   const newMonth=g.jun>TURNS_PER_MONTH;
   if(newMonth){
@@ -3893,6 +3893,12 @@ function runTurnNext(){
   runRoninTick();                  /* 浪人が歩き、仕え、旗を挙げる（§19.2）*/
   if(newMonth)runGrowTouchi();     /* 統治力が伸び、届けば升を取り込む */
   g.order=runOrder(); g.turnNum=g.order.length; g.at=0;
+  runTellTurn(g);
+}
+/* **番の札**（依頼・8.5.0）。手番が次の家へ移るたびに「〇〇家の番になりました」を積む */
+function runTellTurn(g){
+  const pw=g.at<g.turnNum?byId(playPowers,g.order[g.at]):null;
+  if(pw)runTell(pw.label+"の番になりました","番");
 }
 
 /* ユニットの拍。作業や歩みの姿が動く。1秒ごとに1コマ */
@@ -24090,6 +24096,9 @@ function runRepair(siteId,n,powerId){
     /* 屋敷が建つ。**領有を先に移してから耐久度を積む。**
        積んでから移すと、耐久度が 1 以上なのに主のいない一瞬ができる */
     runSetSiteOwner(siteId,powerId);
+    /* **開拓の札**（依頼・8.5.0）。「〇〇家が△△城を開拓しました」 */
+    const pw=byId(playPowers,powerId), bs=byId(BASE_SITES,siteId);
+    if(pw)runTell(pw.label+"が"+st.name+"を開拓しました","開拓",bs?bs.cell:null);
   }
   return runSetTaikyu(siteId,st.taikyu+n);
 }
