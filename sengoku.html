@@ -745,7 +745,7 @@
     <div class="ctl" id="aiCtl">
       <button id="aiRun"   title="自動で進める">▶</button>
       <button id="aiNext"  title="1つだけ進める">▶|</button>
-      <button id="aiSpeed" title="速さを変える">×1</button>
+      <button id="aiSpeed" title="見せ方を変える（じっくり／ふつう／早送り／要点）">じっくり</button>
       <button id="aiEnd" title="自分の手番を終える" hidden>手番を終える</button>
       <button id="aiSave" title="いまの盤を保存する">保存</button>
       <button id="aiLoad" title="保存した盤を読み込む">読込</button>
@@ -3898,7 +3898,14 @@ function runTurnNext(){
 /* **番の札**（依頼・8.5.0）。手番が次の家へ移るたびに「〇〇家の番になりました」を積む */
 function runTellTurn(g){
   const pw=g.at<g.turnNum?byId(playPowers,g.order[g.at]):null;
-  if(pw)runTell(pw.label+"の番になりました","番");
+  if(!pw)return;
+  /* 札の升は当主の居城（無ければ当主の居る升、それも無ければ家の拠点の一つ）。札が出ると盤がそこへ飛ぶ（§31.5.1）*/
+  const t=runToushuOf(pw.id);
+  let cell=null;
+  if(t&&isLink(t.site)){const bs=byId(BASE_SITES,t.site.id); cell=bs?bs.cell:null;}
+  if(cell===null&&t)cell=runBushouCell(t);
+  if(cell===null){const st=runPowerSites(pw.id)[0]; const bs=st?byId(BASE_SITES,st.id):null; cell=bs?bs.cell:null;}
+  runTell(pw.label+"の番になりました","番",cell);
 }
 
 /* ユニットの拍。作業や歩みの姿が動く。1秒ごとに1コマ */
@@ -5062,7 +5069,7 @@ function onBatStepTick(){
   batEv=batEvNow();
   drawBattle();
   if(batStepAt<batStepList.length)
-    batStepTimer=setTimeout(onBatStepTick,BAT_ARROW_MS/Math.max(1,aiSpeed));
+    batStepTimer=setTimeout(onBatStepTick,BAT_ARROW_MS/batDiv());
 }
 function batStepStop(){ clearTimeout(batStepTimer); batStepTimer=0; }
 /* その番の段を頭から送り出す */
@@ -5074,7 +5081,7 @@ function batStepPlay(side){
   batStepAt=0;
   batEv=batEvNow();
   if(batStepList.length)
-    batStepTimer=setTimeout(onBatStepTick,BAT_ARROW_MS/Math.max(1,aiSpeed));
+    batStepTimer=setTimeout(onBatStepTick,BAT_ARROW_MS/batDiv());
 }
 /* 半拍だけ進める。返すのは、いま出した番の名 */
 /* **見せる順は、盤が動いた順と同じにする**（依頼・§31.5）。
@@ -28601,8 +28608,27 @@ const AI_TURN_MS=1200;         // 手番と手番のあいだ
 const AI_SKIP_MS=140;          // 何もしなかった勢力を飛ばすあいだ
 /* **速さは ×1・×2・→ の3つ**（依頼）。×1 は以前の ×4 の速さ、×2 はその倍。
    → は待ちを置かず最速で回す（間合いを 0 にする。報せを読ませる間だけは残る）*/
-const AI_SPEEDS=[{v:4,label:"×1"},{v:8,label:"×2"},{v:Infinity,label:"→"}];
-let aiOn=false, aiSpeed=AI_SPEEDS[0].v, aiTimer=0, aiWhat="", aiMoved=false;
+/* ------------------------------------------------------------
+   **再生の段は 4 つ**（依頼・8.5.0・§25.5）。倍率（×1）ではなく、何を見せるかで名を付ける。
+   div    一般の間合い（§25.5 の表）を割る数。Infinity は待ちを置かない
+   tellMs 札を出しておく時間。kinds は出す札の種（null は全部）
+   bat    戦闘画面を出すか。0 は出さない（計算だけ回す）。数は拍の間合いを割る数
+   camUnit 手番の隊ごとに盤をそこへ飛ばす（じっくり だけ）
+   ------------------------------------------------------------ */
+const TELL_MAIN=new Set(["落城","逃避","討死","捕縛","滅亡","家督","家名","病没","一揆","開拓"]);
+const TELL_KEY =new Set(["落城","滅亡","家名","開拓"]);
+const AI_MODES=[
+ {label:"じっくり", div:1,        tellMs:3000, kinds:null,      bat:4, camUnit:true},   /* 全部の札。隊の動きを追える。戦は等速。手番ごとに本拠と隊へ飛ぶ */
+ {label:"ふつう",   div:4,        tellMs:2000, kinds:TELL_MAIN, bat:6},                 /* 主な札。速いが速すぎない。戦は 1.5 倍 */
+ {label:"早送り",   div:Infinity, tellMs:1000, kinds:TELL_MAIN, bat:0},                 /* 主な札。できるだけ速く。戦は見せない */
+ {label:"要点",     div:Infinity, tellMs:1000, kinds:TELL_KEY,  bat:0},                 /* 落城・滅亡・家名・開拓だけ。できるだけ速く */
+];
+let aiMode=0;
+const aiModeOf=()=>AI_MODES[aiMode];
+const aiDiv =()=>aiModeOf().div;               /* 一般の間合いを割る */
+const batDiv=()=>aiModeOf().bat||4;            /* 戦の拍を割る（出さない段では使わない）*/
+const tellShow=k=>{const ks=aiModeOf().kinds; return !ks||ks.has(k);};   /* この段で出す札か */
+let aiOn=false, aiTimer=0, aiWhat="", aiMoved=false;
 
 /* 知らせの帯。**ここは読むだけ。** 盤面には触らない */
 function drawAI(){
@@ -28616,7 +28642,7 @@ function drawAI(){
   const b=el("aiRun");
   b.textContent=aiOn?"■":"▶";
   aiOn?b.setAttribute("aria-pressed","true"):b.removeAttribute("aria-pressed");
-  el("aiSpeed").textContent=(AI_SPEEDS.find(x=>x.v===aiSpeed)||AI_SPEEDS[0]).label;
+  el("aiSpeed").textContent=aiModeOf().label;
   /* 人の手番のあいだだけ「手番を終える」を出す */
   const mine=playerPower();
   const now=playProgress[0]&&byId(playPowers,
@@ -28634,7 +28660,7 @@ function onAIOnce(){
   /* **報せを出しているあいだは盤を進めない**（§31.5）。読ませるために出す札を、
      読み終わる前に次の出来事で流しては、出す意味がない */
   if(tellTimer)return tellMs();
-  if(playTells.length){ onTellPump(); return tellMs(); }
+  if(playTells.length){ onTellPump(); if(tellTimer)return tellMs(); }   /* この段で出さない札だけなら待たない */
   /* **戦が開いているあいだは手番を進めない**（§31.1）。
      閉じるまで盤は動かないので、待つよりほかにない */
   const B=playBattle[0];
@@ -28646,22 +28672,21 @@ function onAIOnce(){
          `batPhase` が 0 に戻るのは受け手の番を**送り始めた**ときで、
          矢はまだ 0.5 秒ずつ流れている。ここで閉じると、
          **最後の番の打ち合いを見せる前に画面が消える** */
-      if(B.over&&batPhase===0&&batToldOver()){ onBatClose(); drawAI(); return AI_STEP_MS/aiSpeed; }
+      if(B.over&&batPhase===0&&batToldOver()){ onBatClose(); drawAI(); return AI_STEP_MS/aiDiv(); }
       /* **画面が出るまで打ち合わない**（§31.3）。
          盤が戦う升へ飛び、そこを見せてから最初の拍へ入る */
       if(!batShow){
         onBatOpen();
         aiWhat=B.atk.label+"　対　"+B.def.label+"　"+(B.field||"")+"にて";
         drawAI();
-        return BAT_OPEN_MS/aiSpeed;
+        return BAT_OPEN_MS/batDiv();
       }
       onBatHalf();
       aiWhat=B.atk.label+"　対　"+B.def.label+"　"+batTurn;
       drawAI(); drawBattle();
       /* **番の間合いは、矢を送り終えるまでの時よりは長く取る**（§31.5）。人が開いた戦（`onBatTick`）と同じ。
          バグ：観戦では間合いを固定していたため、備えの多い城攻めで最後の矢が出る前に次の拍へ進んでいた */
-      return isFinite(aiSpeed)
-        ?Math.max(BAT_MS/aiSpeed,batStepList.length*BAT_ARROW_MS/aiSpeed+600):0;
+      return Math.max(BAT_MS/batDiv(),batStepList.length*BAT_ARROW_MS/batDiv()+600);
     }
     aiOn=false; clearTimeout(aiTimer); aiTimer=0;
     aiWhat="戦のさなか";
@@ -28682,19 +28707,26 @@ function onAIOnce(){
     const act=runAIStep(pw.id);
     if(act!==null){
       aiWhat=pw.label+"　"+act; aiMoved=true;
+      /* **じっくり の段では、手番の隊ごとに盤をそこへ飛ばす**（依頼・§25.5）。
+         いま動いた隊は、手番の済んだ隊の控えのいちばん後ろ（0 は城の下知）*/
+      if(aiModeOf().camUnit){
+        const g0=playProgress[0], last=g0&&g0.acted?g0.acted[g0.acted.length-1]:0;
+        const u0=last?byId(playUnits,last):null;
+        if(u0&&isLink(u0.q))drawLookAt(u0.q.id);
+      }
       /* **戦が開いたら、その手でただちに盤を飛ばす**（§31.3）。
          次の呼びまで待つと、盤は前の土地を映したまま一拍置くことになる */
       if(playBattle[0]){
         onBatOpen();
         aiWhat=pw.label+"　"+act;
         drawAI(); drawHud(); drawSite();
-        return BAT_OPEN_MS/aiSpeed;
+        return BAT_OPEN_MS/batDiv();
       }
       drawAI(); drawHud(); drawSite(); queueDraw();
-      return AI_STEP_MS/aiSpeed;
+      return AI_STEP_MS/aiDiv();
     }
   }
-  const wait=(aiMoved?AI_TURN_MS:AI_SKIP_MS)/aiSpeed;
+  const wait=(aiMoved?AI_TURN_MS:AI_SKIP_MS)/aiDiv();
   aiMoved=false;
   runTurnNext();
   const nx=runNowPower();
@@ -28757,8 +28789,8 @@ function onBatTick(){
   /* **番の間合いは、矢を送り終えるまでの時よりは長く取る**（§31.5）。
      1部隊ずつ 0.5 秒で送るので、備えが5つなら 2.5 秒かかる。
      間合いを詰めると、**最後の備えの矢が出る前に次の拍へ進む** */
-  const need=batStepList.length*BAT_ARROW_MS/Math.max(1,aiSpeed)+600;
-  batTimer=setTimeout(onBatTick,Math.max(BAT_MS/aiSpeed,need));
+  const need=batStepList.length*BAT_ARROW_MS/batDiv()+600;
+  batTimer=setTimeout(onBatTick,Math.max(BAT_MS/batDiv(),need));
 }
 function onBatStop(){ batOn=false; clearTimeout(batTimer); batTimer=0; batStepStop(); }
 
@@ -28782,11 +28814,9 @@ function onBatStop(){ batOn=false; clearTimeout(batTimer); batTimer=0; batStepSt
 
    **出しておく時間は速さの段で決まる**（依頼）。×1 は 3秒、×2 は 1秒、→ は出さない。
    ------------------------------------------------------------ */
-const TELL_MS=3000;            // 報せを出しておく間合い（×1）
-const TELL_MS2=1000;           // ×2 のとき
-/* いまの速さで報せを出しておく間合い。→ なら 0（出さない）*/
-/* **上から見る向きのときも 0（出さない）。速さは問わない**（依頼）*/
-const tellMs=()=>(view.cam==="top"||!isFinite(aiSpeed))?0:aiSpeed>=AI_SPEEDS[1].v?TELL_MS2:TELL_MS;
+/* いまの段で報せを出しておく間合い（`AI_MODES`）。
+   **上から見る向きのときは 0（出さない）。段は問わない**（依頼）*/
+const tellMs=()=>view.cam==="top"?0:aiModeOf().tellMs;
 let tellNow=null, tellTimer=0;
 function drawTell(){
   const box=document.getElementById("tell"); if(!box)return;
@@ -28806,14 +28836,16 @@ let tellBusy=false;
 function backToCursor(){ if(sel!==null&&sel!==undefined)drawLookAt(sel); }
 function onTellPump(){
   if(tellTimer||tellBusy)return;
-  /* **→ のときは札を出さない**（依頼）。溜まった報せは読まずに流す */
+  /* **上から見る向きでは札を出さない**（依頼）。溜まった報せは読まずに流す */
   if(tellMs()===0){
     while(runTellTake());
     tellNow=null; drawTell();
     return;
   }
   tellBusy=true;
+  /* **この段で出さない種の札は読まずに流す**（依頼・§25.5）*/
   tellNow=runTellTake();
+  while(tellNow&&!tellShow(tellNow.kind))tellNow=runTellTake();
   /* **札を出してから盤を飛ばす。** 逆にすると、飛ぶ途中でここが呼び返される */
   drawTell();
   /* **報せを出すときは、それが起きた升へ盤が飛ぶ**（依頼・§31.5）。
@@ -28837,7 +28869,7 @@ function onBatOpen(){
   batOpenTimer=setTimeout(()=>{
     batOpenTimer=0; batShow=true;
     drawBattle(); drawAI();
-  },BAT_OPEN_MS/aiSpeed);
+  },BAT_OPEN_MS/batDiv());
   return true;
 }
 function onBatForget(){
@@ -28948,14 +28980,13 @@ function onAINext(){                             /* 1つだけ進める */
   onAIOnce();
 }
 function onAISpeed(){
-  const i=AI_SPEEDS.findIndex(x=>x.v===aiSpeed);
-  aiSpeed=AI_SPEEDS[(i+1)%AI_SPEEDS.length].v;
+  aiMode=(aiMode+1)%AI_MODES.length;
   onSkipShow();
   drawAI();
 }
-/* 戦闘画面を出すかを run へ渡す（依頼）。上から見る向き、または斜めで → のときは出さない */
+/* 戦闘画面を出すかを run へ渡す（依頼）。上から見る向き、または戦を見せない段（早送り・要点）のときは出さない */
 function onSkipShow(){
-  runSkipShow=view.cam==="top"||!isFinite(aiSpeed);
+  runSkipShow=view.cam==="top"||aiModeOf().bat===0;
 }
 
 /* ============================================================
