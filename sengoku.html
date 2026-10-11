@@ -745,7 +745,7 @@
     <div class="ctl" id="aiCtl">
       <button id="aiRun"   title="自動で進める">▶</button>
       <button id="aiNext"  title="1つだけ進める">▶|</button>
-      <button id="aiSpeed" title="見せ方を変える（じっくり／ふつう／早送り／要点）">じっくり</button>
+      <button id="aiSpeed" title="見せ方を変える（詳細／標準／快速／要点）">詳細</button>
       <button id="aiEnd" title="自分の手番を終える" hidden>手番を終える</button>
       <button id="aiSave" title="いまの盤を保存する">保存</button>
       <button id="aiLoad" title="保存した盤を読み込む">読込</button>
@@ -1961,7 +1961,7 @@ const lowFac=m=>{const t=Math.max(0,Math.min(1,m/LOWM));return t*t*(3-2*t);};
 
 /* 倍率。**100% は盤全体が収まる大きさの10倍で、起動したときの倍率**（依頼）。
    引けば 50%（盤全体が収まる大きさの5倍）まで、寄れば 200% まで */
-const ZOOM_BASE=20, ZOOM_MIN=0.5, ZOOM_MAX=2;   /* 升を3kmにしたので倍（升の見た目の大きさを保つ。依頼）*/
+const ZOOM_BASE=20, ZOOM_MIN=0.05, ZOOM_MAX=2;  /* 升を3kmにしたので倍（升の見た目の大きさを保つ。依頼）。斜めでも 5% まで引ける（依頼・8.5.0。それまでは 50%）*/
 const ZOOM_MIN_TOP=0.01;         // 上から見る向きでは 1% まで引ける（依頼）
 let view={cam:"obl", z:1, ox:0, oy:0};   // 見る向き・倍率・ずらし
 let drawCache=null;              // 升ごとの高さと陰。データが変わるまで使い回す
@@ -24306,7 +24306,7 @@ function runPlanAt(type,site,cellId,free,unitId,want,ask){
          潰せば、足りないものを足りないもので埋めるだけになる。
 
          **建てられる分類が変わったのに升が埋まっている**という場は、
-         盤が育ちきった城でふつうに起きる。逃げ道を閉ざすと、
+         盤が育ちきった城で標準に起きる。逃げ道を閉ざすと、
          **その城はそこで育つのをやめる**
          ------------------------------------------------------------ */
       if(!runTearOK(site,cellId))return null;
@@ -28613,14 +28613,14 @@ const AI_SKIP_MS=140;          // 何もしなかった勢力を飛ばすあい�
    div    一般の間合い（§25.5 の表）を割る数。Infinity は待ちを置かない
    tellMs 札を出しておく時間。kinds は出す札の種（null は全部）
    bat    戦闘画面を出すか。0 は出さない（計算だけ回す）。数は拍の間合いを割る数
-   camUnit 手番の隊ごとに盤をそこへ飛ばす（じっくり だけ）
+   camUnit 手番の隊ごとに盤をそこへ飛ばす（詳細 だけ）
    ------------------------------------------------------------ */
 const TELL_MAIN=new Set(["落城","逃避","討死","捕縛","滅亡","家督","家名","病没","一揆","開拓"]);
 const TELL_KEY =new Set(["落城","滅亡","家名","開拓"]);
 const AI_MODES=[
- {label:"じっくり", div:1,        tellMs:3000, kinds:null,      bat:4, camUnit:true},   /* 全部の札。隊の動きを追える。戦は等速。手番ごとに本拠と隊へ飛ぶ */
- {label:"ふつう",   div:4,        tellMs:2000, kinds:TELL_MAIN, bat:6},                 /* 主な札。速いが速すぎない。戦は 1.5 倍 */
- {label:"早送り",   div:Infinity, tellMs:1000, kinds:TELL_MAIN, bat:0},                 /* 主な札。できるだけ速く。戦は見せない */
+ {label:"詳細", div:1,        tellMs:3000, kinds:null,      bat:4, camUnit:true},   /* 全部の札。隊の動きを追える。戦は等速。手番ごとに本拠と隊へ飛ぶ */
+ {label:"標準",   div:4,        tellMs:2000, kinds:TELL_MAIN, bat:6},                 /* 主な札。速いが速すぎない。戦は 1.5 倍 */
+ {label:"快速",   div:Infinity, tellMs:1000, kinds:TELL_MAIN, bat:0},                 /* 主な札。できるだけ速く。戦は見せない */
  {label:"要点",     div:Infinity, tellMs:1000, kinds:TELL_KEY,  bat:0},                 /* 落城・滅亡・家名・開拓だけ。できるだけ速く */
 ];
 let aiMode=0;
@@ -28707,7 +28707,7 @@ function onAIOnce(){
     const act=runAIStep(pw.id);
     if(act!==null){
       aiWhat=pw.label+"　"+act; aiMoved=true;
-      /* **じっくり の段では、手番の隊ごとに盤をそこへ飛ばす**（依頼・§25.5）。
+      /* **詳細 の段では、手番の隊ごとに盤をそこへ飛ばす**（依頼・§25.5）。
          いま動いた隊は、手番の済んだ隊の控えのいちばん後ろ（0 は城の下知）*/
       if(aiModeOf().camUnit){
         const g0=playProgress[0], last=g0&&g0.acted?g0.acted[g0.acted.length-1]:0;
@@ -28984,7 +28984,7 @@ function onAISpeed(){
   onSkipShow();
   drawAI();
 }
-/* 戦闘画面を出すかを run へ渡す（依頼）。上から見る向き、または戦を見せない段（早送り・要点）のときは出さない */
+/* 戦闘画面を出すかを run へ渡す（依頼）。上から見る向き、または戦を見せない段（快速・要点）のときは出さない */
 function onSkipShow(){
   runSkipShow=view.cam==="top"||aiModeOf().bat===0;
 }
