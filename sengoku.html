@@ -4689,7 +4689,11 @@ function drawSite(){
     if(playerPower()===0)P.push('<div class="row cmd"><button data-sc="take">この家を継ぐ</button></div>');
   }
   const body=el("siteBody");
+  /* **武将の表の横の滑りは描き直しても戻さない**（依頼）。自動進行のたびに札を描き直すが、
+     表ごと入れ替えるので滑りが 0 に戻り、動かしながらでは右の列が見られなかった */
+  const btw0=body.querySelector(".btw"), slideX=btw0?btw0.scrollLeft:0;
   body.innerHTML=P.join("");
+  if(slideX){ const btw1=body.querySelector(".btw"); if(btw1)btw1.scrollLeft=slideX; }
   /* 押し口は描き直すたびに作り直す。中身ごと入れ替えているため */
   for(const x of body.querySelectorAll("[data-go]"))
     x.addEventListener("click",()=>onSitePick(+x.dataset.go));
@@ -4802,7 +4806,7 @@ function unitCmds(u){
     /* 拠点の普請には期間が無い（依頼）。耐久度と目当てを出す */
     const fx=u.work.fix, fst=(fx!==null&&fx!==undefined)?byId(playSites,fx):null;
     out.push({k:"none", t:u.work.label+"　"+(fst&&fst.fushin
-      ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to):"あと"+turnsText(u.work.left))});
+      ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to,fst.id):"あと"+turnsText(u.work.left))});
   }else{
     const w=inDom?runBuildAt(u,u.q.id):null;
     /* **開墾は「起こす」と出す**（§24.5）。開墾地は建築物の行になるが、
@@ -4823,7 +4827,7 @@ function unitCmds(u){
      const to0=st0&&st0.fushin?st0.fushin.to:runRepairTo(sid);
      const men=runFushinMen(sid).length;
      out.push({k:"repair",
-       t:(got?"起こす":"普請")+"（耐久度"+(st0?st0.taikyu:0)+"／"+(to0!==null?repairTaikyuOf(to0):"-")
+       t:(got?"起こす":"普請")+"（耐久度"+(st0?st0.taikyu:0)+"／"+(to0!==null?repairTaikyuOf(to0,sid):"-")
          +(men?"・"+men+"人が普請中":"")+"）"});
    }}
   if(type==="外交"&&envoySites.length){
@@ -6516,6 +6520,7 @@ function* glBuildMeshGen(){
      手前の行の面に下半分が隠される）。名のある峰と高山は円錐のまま（岩山として読み分ける）。
      本数は倍率で 3〜7 本。升が小さい（半径 11px 未満）ときは描かない */
   const treeRows=[];
+  const TREE_NB=[[COLW,0,0],[-COLW,0,0],[COLW/2,ROWH,1],[-COLW/2,ROWH,1],[COLW/2,-ROWH,-1],[-COLW/2,-ROWH,-1]];
   if(obl&&rad>=LOD_TONGUE){                      /* 50% では木を描かない（1〜2px の木は柄に見える）。山地は円錐で（下）*/
     const nMax=rad>=45?7:5;
     for(const c of drawCache){
@@ -6527,7 +6532,13 @@ function* glBuildMeshGen(){
         const ax=rnd3(c.q,c.r,500+k*7), ay=rnd3(c.q,c.r,600+k*7);
         const x=c.x+(ax-0.5)*2*R*1.05, y=c.y+(ay-0.5)*2*R*0.92;
         const h=R*(0.35+0.40*rnd3(c.q,c.r,700+k*7)), w=R*(0.16+0.12*rnd3(c.q,c.r,800+k*7));
-        const rr=rowOf(y); (treeRows[rr]||(treeRows[rr]=[])).push({c,x,y,h,w,lt:rnd3(c.q,c.r,900+k*7)<0.5});
+        /* **根元が実際に立つ升の行に入れる。** y だけで行を決めると、隣の行の升に
+           はみ出した根元が、あとから描くその行の面に隠されて木の下が切れる（依頼）。
+           升は中心がいちばん近い六角なので、自分と隣 6 升の中心で比べる */
+        let br=c.r, bd=(x-c.x)**2+(y-c.y)**2;
+        for(const [dx,dy,dr] of TREE_NB){ const d=(x-c.x-dx)**2+(y-c.y-dy)**2; if(d<bd){bd=d;br=c.r+dr;} }
+        const rr=Math.max(0,Math.min(cellSpan.r1-cellSpan.r0,br-cellSpan.r0));
+        (treeRows[rr]||(treeRows[rr]=[])).push({c,x,y,h,w,lt:rnd3(c.q,c.r,900+k*7)<0.5});
       }
     }
   }
@@ -6537,6 +6548,20 @@ function* glBuildMeshGen(){
     const row=glRows[r]; const start=M.n;
     let ymin=1e9,ymax=-1e9;
     M.z=zOf(r);
+    /* 木 1 本。根元は升の面色、梢ほど暗い。行の ymin/ymax を更新する */
+    const drawTree=t=>{
+        const c=t.c, fc=c.own||glShade(color.get(c.paint)||"#000",c.sh);
+        const vS=snowAt(c);
+        const px=t.x*sRef, py=(t.y*ys)*sRef-c.g*sRef;
+        const top=fc.map(v=>Math.round(v*(t.lt?0.84:0.68)));
+        const base=vS<0.02?fc.concat(255):snowMix(fc,vS);
+        /* 雪の森は梢を白くしない。梢の色から雪影の青灰 #dfe6e0 へ 3 割だけ寄せる（白い三角の群れは静電気のノイズに見え、
+           灰緑一色だと幽霊の森に見える。梢が暗いまま残ることが「雪の下の山地」の印）*/
+        const apex=vS<0.02?top.concat(255):top.map((v,i)=>Math.round(v+([223,230,224][i]-v)*0.30)).concat(255);
+        const A=W([px,py-t.h*sRef]), Bl=W([px-t.w*sRef,py]), Br=W([px+t.w*sRef,py]);
+        M.tri(Bl,Br,A,base,base,apex);
+        if(A[1]<ymin)ymin=A[1]; if(Bl[1]>ymax)ymax=Bl[1];
+    };
     if(row){
       for(const c of row){
         const cx=c.x*sRef, cy=(c.y*ys)*sRef;
@@ -6667,7 +6692,7 @@ function* glBuildMeshGen(){
         mts.push({c,px:c.x*sRef,py:(c.y*ys)*sRef-c.g*sRef,
                   hh:(c.type===MT_B?0.86:0.68)*grow*(c.named?1.18:1)}); }
       mts.sort((a,b)=>b.hh-a.hh);
-      for(const T of mts){
+      const drawMt=T=>{
         const S=mountainSil(T.c,T.px,T.py,rad);
         const prof=glSil(S.sil).map(W), base=S.base/sRef;
         /* 積雪。**半透明を上から重ねない。** 隣り合う山どうしが重なると
@@ -6721,25 +6746,14 @@ function* glBuildMeshGen(){
           }
         }
         for(const p of prof)if(p[1]<ymin)ymin=p[1];
-      }
-    }
-    /* 木の群れ。奥（y の小さい）から順に */
-    const trees=treeRows[r];
-    if(trees){
-      trees.sort((a,b)=>a.y-b.y);
-      for(const t of trees){
-        const c=t.c, fc=c.own||glShade(color.get(c.paint)||"#000",c.sh);
-        const vS=snowAt(c);
-        const px=t.x*sRef, py=(t.y*ys)*sRef-c.g*sRef;
-        const top=fc.map(v=>Math.round(v*(t.lt?0.84:0.68)));
-        const base=vS<0.02?fc.concat(255):snowMix(fc,vS);
-        /* 雪の森は梢を白くしない。梢の色から雪影の青灰 #dfe6e0 へ 3 割だけ寄せる（白い三角の群れは静電気のノイズに見え、
-           灰緑一色だと幽霊の森に見える。梢が暗いまま残ることが「雪の下の山地」の印）*/
-        const apex=vS<0.02?top.concat(255):top.map((v,i)=>Math.round(v+([223,230,224][i]-v)*0.30)).concat(255);
-        const A=W([px,py-t.h*sRef]), Bl=W([px-t.w*sRef,py]), Br=W([px+t.w*sRef,py]);
-        M.tri(Bl,Br,A,base,base,apex);
-        if(A[1]<ymin)ymin=A[1]; if(Bl[1]>ymax)ymax=Bl[1];
-      }
+      };
+      /* **山と木は、根元の y の順に一つの列で描く**（依頼）。山を先に全部、木をあとに全部と
+         分けていたため、峰より奥に根元のある木が峰の斜面の上に乗っていた。
+         山の根元は升の中心。同じ y なら山が先（背の高い順はそのまま） */
+      const items=mts.map(T=>({y:T.c.y,k:0,T}));
+      for(const t of (treeRows[r]||[]))items.push({y:t.y,k:1,t});
+      items.sort((a,b)=>a.y-b.y||a.k-b.k);
+      for(const it of items){ if(it.k===0)drawMt(it.T); else drawTree(it.t); }
     }
     terAt[r]={start,count:M.n-start,ymin,ymax};
   }
@@ -18421,7 +18435,7 @@ function runBuildTick(newMonth=true){
        **最低でも「普請している人数＋`REPAIR_STEP`」は上がる**（依頼）。
        持ち主のいない更地は、積んだ月に屋敷が建ち、その家のものになる（`runRepair`）
        ------------------------------------------------------------ */
-    const to=st.fushin.to, goal=repairTaikyuOf(to);
+    const to=st.fushin.to, goal=repairTaikyuOf(to,sid);
     let add=0; for(const u of us)add+=runFushinRate(u.id,to);
     /* **拠点の普請（城の改築）は雪でも遅れない**（依頼）*/
     add=Math.max(add,(us.length+REPAIR_STEP)/TURNS_PER_MONTH)+(st.fushin.acc||0);   /* 最低の上がりは月で「人数＋1」（8.5.0）*/
@@ -24546,7 +24560,15 @@ function runRepairTo(siteId){
      段0〜2は屋敷、国造りは館、段3は城Lv.1、段4は城Lv.2、段5は城Lv.3。
      目指す段を越えた城を下げることはしない。無主の拠点を起こすとき（屋敷）と、人が指す家の城は縛らない */
   const ow=runSiteOwner(siteId);
-  if(ow&&ow!==playerPower()&&lv+1>shiGoalLv(runAIShishin(siteId).id))return null;
+  if(ow&&ow!==playerPower()){
+    const goal=shiGoalLv(runAIShishin(siteId).id);
+    if(lv<goal)return lv+1;
+    /* **目指す段に居るあいだは、その段を保つ**（依頼・8.5.0）。耐久度が帯のまん中
+       （城 Lv.2 なら 700）を切ったら、同じ段のまま帯の上限（799）まで上げ直す。
+       段が一つ落ちてから上げ直すのではない */
+    if(lv===goal&&lv>0&&st.taikyu<startTaikyu(lv))return lv;
+    return null;
+  }
   return lv+1;
 }
 /* **一人がひと月に積む耐久度**（§27.1）。帯の幅 `FUSHIN_WIDTH` を、上げる先の素の月数
@@ -24557,8 +24579,23 @@ function runFushinRate(unitId,to){
   const raw=SITE_MONTHS[Math.max(1,to||1)-1]??SITE_MONTHS[SITE_MONTHS.length-1];
   return FUSHIN_WIDTH/(raw*TURNS_PER_MONTH)/SKILL_MONTH[runSkillOf(unitId,"ken")-1];   /* 一人が 1 手番に積む量（8.5.0）*/
 }
-/* 普請の目当ての耐久度。段を上げるならその帯のまん中、Max なら上限 */
-const repairTaikyuOf=to=>to>=REPAIR_MAX?TAIKYU_MAX:startTaikyu(to);
+/* 帯の上限の耐久度。次の帯の下限の一つ下（城 Lv.2 なら 799）。いちばん上の帯は 1000 */
+const topTaikyu=level=>{
+  const lab={0:"更地",1:"屋敷",2:"館",3:"城 Lv.1",4:"城 Lv.2",5:"城 Lv.3"}[level];
+  const i=TAIKYU_BAND.findIndex(b=>b.obj===lab);
+  return i<0||i+1>=TAIKYU_BAND.length?TAIKYU_MAX:TAIKYU_BAND[i+1].min-1;
+};
+/* 普請の目当ての耐久度。段を上げるならその帯のまん中、Max なら上限。
+   **NPC の城で、上げる先（または保つ段）が指針の目指す段そのものなら、その帯の上限**（依頼・8.5.0）。
+   城 Lv.2 を目指す城は 799 まで上げ、700 を切ったらまた 799 まで上げ直す */
+function repairTaikyuOf(to,siteId){
+  if(to>=REPAIR_MAX)return TAIKYU_MAX;
+  if(siteId!==undefined){
+    const ow=runSiteOwner(siteId);
+    if(ow&&ow!==playerPower()&&to===shiGoalLv(runAIShishin(siteId).id))return topTaikyu(to);
+  }
+  return startTaikyu(to);
+}
 function runNeedsRepair(siteId,mine){
   const st=byId(playSites,siteId); if(!st)return false;
   const ow=runSiteOwner(siteId);
@@ -24620,7 +24657,7 @@ function runStartRepair(unitId,siteId){
      どの城を普請しているのかを言う */
   u.dir=runFaceTo(u.q.id,bs.cell);
   playStamp++;
-  return {site:siteId, name:st.name, taikyu:st.taikyu, goal:repairTaikyuOf(st.fushin.to), got,
+  return {site:siteId, name:st.name, taikyu:st.taikyu, goal:repairTaikyuOf(st.fushin.to,siteId), got,
           men:runFushinMen(siteId).length};
 }
 /* いまその拠点を普請している隊。**隣に立っている者だけ数える** */
@@ -26419,7 +26456,7 @@ function runAIHere(u,name,type,mine,moved){
       const men=fix?runFushinMen(w.fix).length:1;
       const fst=fix?byId(playSites,w.fix):null;
       return name+"が"+nm+"を普請している（"+(fst&&fst.fushin
-          ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to):"あと"+turnsText(w.left))
+          ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to,fst.id):"あと"+turnsText(w.left))
         +(men>1?"・"+men+"人":"")+"）";
     }
     /* 離れてしまったなら、戻る。**動いたあとにここへ来たなら、もう一度は動かない**
