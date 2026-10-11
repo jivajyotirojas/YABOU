@@ -10984,7 +10984,7 @@ function runSecede(siteId,bid){
      if(!playUnits.some(u=>isLink(u.bushou)&&u.bushou.id===mid))runPutIdou(mid,home.id,bs.cell);
    }}
   runSetMind(before,id,MIND_MIN); runSetMind(id,before,MIND_MIN);
-  runTell(b.name+"、"+st.name+"にて"+myoji+"家を興し離反","家名",bs.cell);
+  runTell(st.name+"で"+myoji+"家が興りました","家名",bs.cell);
   playStamp++;
   return true;
 }
@@ -11000,6 +11000,7 @@ function runBetrayDokuritsu(u){
                    group:mkLink(19,id,"bushouNum"), colorUp:"#f2efe6", colorLow:"#f2efe6"});
   playBushouGroups.push({id, bushouNum:1, bushou:[bid]});
   runLeaveGroups(bid);
+  const home0=tellHome(b);                      /* 札に添える、離れる前の所属拠点名 */
   b.shozoku=mkLink(15,id,"label"); b.site="-"; b.ichimon=true; b.since=runNowMonthNo();
   b.rank=mkLink(22,RANK_TOP.dokuritsu,"label");
   runDelUnit(u.id);
@@ -11015,7 +11016,7 @@ function runBetrayDokuritsu(u){
   };
   playUnits.push(row); g.units.push(row.id); g.unitNum=g.units.length;
   runSetMind(before,id,MIND_MIN);
-  runTell(b.name+"、支城にて離反し独立","家名",cell);
+  runTell(home0+b.name+"が独立しました","家名",cell);
   playStamp++;
   return true;
 }
@@ -11063,7 +11064,7 @@ function runBetrayTick(){
       const odds=runBetrayOdds(b,BETRAY_ODDS*SHUPPON_RATE); if(odds<=0)continue;
       if(runRand()>=odds)continue;
       const bs=byId(BASE_SITES,st.id);
-      runTell(b.name+"、出奔","家名",bs?bs.cell:null);
+      runTell(tellHome(b)+b.name+"が出奔しました","家名",bs?bs.cell:null);
       runRonin(b.id,bs?bs.cell:undefined);
       betrayLog.shuppon=(betrayLog.shuppon||0)+1;
     }
@@ -11106,6 +11107,7 @@ function runKanyu(unitId,siteId){
   if(runRand()>=odds)return {ok:false, name:b.name};
   /* 寝返り。**勧誘した家の隊になる。** 城の前に移動の隊として出て、勧誘した家の城へ向かう */
   const cell=byId(BASE_SITES,siteId)?.cell??null;
+  const home0=tellHome(b);                      /* 札に添える、寝返る前の所属拠点名 */
   runLeaveGroups(b.id);
   b.shozoku=mkLink(15,mine,"label"); b.site=mkLink(20,home,"name");
   b.since=runNowMonthNo(); b.ichimon=false;
@@ -11115,7 +11117,7 @@ function runKanyu(unitId,siteId){
   runDeed(mine,owner,SHO_KUBI);
   if(isLink(u.bushou)){runAddKunkou(u.bushou.id,KUNKOU_WIN); if(kind==="忍者")runGrowSkill(u.bushou.id,"ninja");}
   betrayLog.kanyu++;
-  runTell(b.name+"、"+(byId(playPowers,mine)||{}).label+"に寝返る","家名",cell);
+  runTell(home0+b.name+"が"+(byId(playPowers,mine)||{}).label+"に寝返りました","家名",cell);
   playStamp++;
   return {ok:true, name:b.name};
 }
@@ -11482,7 +11484,7 @@ function runNameEvents(){
       const was=b.name;
       b.name=ev.to+b.name.slice(ev.from.length);
       if(b.myoji!==undefined)b.myoji=ev.to;
-      runTell(was+"、姓を"+ev.to+"と改め、"+b.name+"と名乗る","家名",runBushouCell(b));
+      runTell(was+"が姓を"+ev.to+"に改めました","家名",runBushouCell(b));
       const pr=pw?byId(playPowers,pw):null;
       if(pr&&isLink(pr.toushu)&&pr.toushu.id===b.id)lords.push([pw,b]);
       g.seiDone.includes(i)||g.seiDone.push(i);
@@ -11497,7 +11499,7 @@ function runNameEvents(){
     const was=b.name;
     b.name=runMyojiOf(b)+ev.to;
     g.meiDone.push(i);
-    runTell(was+"、名を"+ev.to+"と改め、"+b.name+"と名乗る","家名",runBushouCell(b));
+    runTell(was+"が名を"+ev.to+"に改めました","家名",runBushouCell(b));
     playStamp++;
   });
 }
@@ -11586,7 +11588,7 @@ function runLaterHeir(powerId,deadId){
   playBushou.push(row);
   runJoinGroups(L.id,powerId,site);
   g.laterEarly=early.concat([L.id]);
-  if(tellMine(powerId))runTell(row.name+"、元服し"+pwRow.label+"の跡目となる","元服",runBushouCell(row));
+  /* 元服は札で報せない（依頼・8.5.0）*/
   playStamp++;
   return row;
 }
@@ -11627,12 +11629,10 @@ function runAppearTick(){
       const hired=ks!==null&&runLaterAsk(L.id,ks);
       if(hired){
         const pw2=byId(playPowers,runSiteOwner(ks));
-        if(pw2&&tellMine(pw2.id))runTell(row.name+"、元服し"+pw2.label+"に仕う","元服",cell);
         playStamp++; continue;
       }
       if(cell!==null)runRoninOut(L.id,cell);
     }
-    if(pwRow&&tellMine(pwRow.id))runTell(row.name+"、元服（"+pwRow.label+"）","元服",cell);
     playStamp++;
   }
 }
@@ -11647,7 +11647,7 @@ function runLifeTick(){
     const past=age-(goal-LIFE_EARLY);
     if(past<0)continue;
     if(runRand()>=LIFE_ODDS*(past+1))continue;
-    runTell(b.name+"、病没（"+age+"歳）","病没",runBushouCell(b));
+    runTell(tellHome(b)+b.name+"が死亡しました","病没",runBushouCell(b));
     runKillBushou(b.id);
   }
 }
@@ -15360,7 +15360,7 @@ function runDelPower(id){
      返すと滅んだ家の番号が新しい家に付き、残っていた縁がその家のものになる */
   /* **滅びた大名家は報せる**（§31.5）。独立勢力は取り込まれても滅亡とは言わない。
      落城で滅ぶときは、城の報せを先に積んであるので、この報せは後に出る */
-  if(pw&&pw.kind==="daimyo")runTell(pw.label+"、滅亡","滅亡");
+  if(pw&&pw.kind==="daimyo")runTell(pw.label+"が滅亡しました","滅亡");
   return true;
 }
 
@@ -15434,6 +15434,8 @@ const TELL_KEEP=32;            // 溜めておける報せの数
 let tellCell=null;
 /* **陣払いと元服の報せは、人が指す家のものだけ出す**（依頼。v8.1.7）。誰も指していないときは出さない */
 const tellMine=pw=>!!playerPower()&&pw===playerPower();
+/* 札の文に添える所属拠点名。「米沢城の伊達晴宗が…」。所属が無ければ名だけ（依頼・8.5.0）*/
+const tellHome=b=>b&&isLink(b.site)?linkValue(b.site)+"の":"";
 function runTell(text,kind,cell){
   if(!text)return null;
   if(cell!==undefined&&cell!==null)tellCell=cell;
@@ -15657,7 +15659,7 @@ function runRaiseDokuritsu(u,cell){
   const row=runUnitRow({label:"独立勢力 "+myoji+"氏", type:tb.id, state:"sagyo", power:id, bushou:bid,
     cell, hei:RONIN_FLAG_HEI, sonae:runSonaeFlat(RONIN_FLAG_HEI)});
   playUnits.push(row); g.units.push(row.id); g.unitNum=g.units.length;
-  runTell(b.name+"、支城にて旗を挙ぐ","家名",cell);
+  runTell("支城で"+b.name+"が"+myoji+"氏を興しました","家督",cell);
   playStamp++;
   return true;
 }
@@ -15681,7 +15683,7 @@ function runRaiseHouse(u,siteId){
   st.touchi=0;
   runJoinGroups(bid,id,siteId);
   if(!isLink(st.group))runMakeDomain(siteId);
-  runTell(b.name+"、"+st.name+"にて旗を挙ぐ（"+myoji+"家）","家名",bs.cell);
+  runTell(st.name+"で"+b.name+"が"+myoji+"家を興しました","家督",bs.cell);
   playStamp++;
   return true;
 }
@@ -15807,7 +15809,7 @@ function runIkkiRise(siteId){
     cell, hei, hyoro:eatMonthOf(hei)*12, sonae:runSonaeFlat(hei)});
   row.ikki=siteId;                               /* 一揆の隊だけが持つ欄（§21.4）*/
   playUnits.push(row); gc.units.push(row.id); gc.unitNum=gc.units.length;
-  runTell(st.name+"の領内で"+kind+"（"+name+"・兵"+hei+"）","一揆",cell);
+  runTell(st.name+"の領内で"+kind+"が発生しました","一揆",cell);
   playStamp++;
   return row;
 }
@@ -15905,7 +15907,7 @@ function runIkkiFound(powerId,siteId,before){
     if(typeof u.label==="string"&&/一揆 /.test(u.label))u.label=pw.label+" "+u.label.replace(/^.*一揆 /,"");}
   /* **もとの主の家とは友好 0、外交方針は強気**（依頼）*/
   if(before){ runSetMind(powerId,before,0); pw.shiseiForce={[before]:"強気"}; }
-  runTell(b.name+"、一揆にて"+st.name+"を奪い、旗を挙ぐ（"+pw.label+"）","家名",bs?bs.cell:null);
+  runTell(st.name+"で"+pw.label+"が興りました","家名",bs?bs.cell:null);
   playStamp++;
   return true;
 }
@@ -15926,7 +15928,7 @@ function runRoninMeet(u,cell){
     if(!runHire(bid,home,lead.id))continue;
     runDelUnit(u.id);
     runPutIdou(bid,home,cell);                   /* 移動の隊になって城へ向かう */
-    runTell(b.name+"、"+pw.label+"に仕う","捕縛",cell);
+    runTell(b.name+"は"+pw.label+"に登用されました","捕縛",cell);
     return true;
   }
   return false;
@@ -15950,7 +15952,7 @@ function runRoninVisit(u,siteId){
   if(runRand()>=odds)return false;
   if(!runHire(bid,siteId,best?best.id:null))return false;
   runDelUnit(u.id);
-  runTell(b.name+"、"+pw.label+"に仕う","捕縛",byId(BASE_SITES,siteId).cell);
+  runTell(b.name+"は"+pw.label+"に登用されました","捕縛",byId(BASE_SITES,siteId).cell);
   return true;
 }
 /* ============================================================
@@ -17262,7 +17264,7 @@ function runFeedUnits(newMonth=true){
        立て直している最中なのだから、追い返す謂れがない */
     if(lb==="軍勢"&&(u.hei||0)>0&&(u.hei||0)<IKUSA_MIN){
       const r=runWithdraw(u.id);
-      if(r&&tellMine(isLink(u.power)?u.power.id:null))runTell(r.name+"、陣を払いたり",
+      if(r&&tellMine(isLink(u.power)?u.power.id:null))runTell(r.name+"は撤退しました",
                    "撤退",u.q?u.q.id:null);
     }
   }
@@ -19475,11 +19477,7 @@ function runSekiStop(u,cellId){
   if(runRand()>=SEKI_STOP)return false;
   /* **人の隊が止められたなら、そのことを報せる**（§31.5）。
      黙って動かないのでは、指した人には何が起きたのか分からない */
-  const me0=playProgress[0]?playProgress[0].player|0:0;
-  if(me0&&mine===me0){
-    const nm=isLink(u.bushou)?linkValue(u.bushou):"隊";
-    runTell(nm+"、関所に阻まれる","関所",cellId);
-  }
+  /* 関所に止められたことは札で報せない（依頼・8.5.0）*/
   return true;
 }
 /* **支城に守りの倍は持たせない**（依頼・§27.4）。
@@ -21614,14 +21612,14 @@ function runBattleClose(){
     if(B.kind==="攻城"&&B.def.site!==null){
       const st0=byId(playSites,B.def.site);
       const bs0=byId(BASE_SITES,B.def.site);
-      if(st0)runTell(st0.name+"、持ちこたえたり","落城",bs0?bs0.cell:null);
+      if(st0)runTell(st0.name+"を攻め落とせませんでした","落城",bs0?bs0.cell:null);
     }
   }else if(B.back){
     /* **人が「退く」を選んだ**（§26.3）。居座らず撤退する */
     if(B.kind==="攻城"&&B.def.site!==null){
       const st0=byId(playSites,B.def.site);
       const bs0=byId(BASE_SITES,B.def.site);
-      if(st0)runTell(st0.name+"、持ちこたえたり","落城",bs0?bs0.cell:null);
+      if(st0)runTell(st0.name+"を攻め落とせませんでした","落城",bs0?bs0.cell:null);
       if(a&&a.hei>0)out.retreat=runRetreat(a.id,B.def.power);
       if(a2&&playUnits.some(x=>x.id===a2.id)&&a2.hei>0)out.retreat2=runRetreat(a2.id,B.def.power);
     }else if(a&&playUnits.some(x=>x.id===a.id)&&a.hei>0)out.withdraw=runWithdraw(a.id);
@@ -21632,7 +21630,7 @@ function runBattleClose(){
     if(B.kind==="攻城"&&B.def.site!==null){
       const st0=byId(playSites,B.def.site);
       const bs0=byId(BASE_SITES,B.def.site);
-      if(st0)runTell(st0.name+"、持ちこたえたり","落城",bs0?bs0.cell:null);
+      if(st0)runTell(st0.name+"を攻め落とせませんでした","落城",bs0?bs0.cell:null);
     }
     if(a&&a.hei<=0)runRout(a.id,null);
     else if(a&&B.kind==="攻城"){
@@ -21677,7 +21675,7 @@ function runBattleClose(){
     const r=runWithdraw(u.id);
     if(r){
       (out.worn=out.worn||[]).push(r);
-      if(tellMine(isLink(u.power)?u.power.id:null))runTell(r.name+"、陣を払いたり",
+      if(tellMine(isLink(u.power)?u.power.id:null))runTell(r.name+"は撤退しました",
               "撤退",u.q?u.q.id:null);
     }
   }
@@ -21769,7 +21767,7 @@ function runRetreat(unitId,byPowerId,byName){
       /* **振り切ったことを報せるのは、捕縛の判じを受けたときだけ**（§31.5）。
          兵を連れて退いただけの隊にまで出すと、**攻城のたびに札が出て、
          人に読ませたい出来事が札の列に埋もれる** */
-      if(b&&hei<=0)runTell(b.name+"、落ち延びたり","落ち延び",u?u.q.id:null);
+      if(b&&hei<=0)runTell(b.name+"は追撃を振り切りました","逃避",u?u.q.id:null);
     }
   }
   playStamp++;
@@ -21974,7 +21972,7 @@ function runCapture(bushouId,byPowerId,siteId,cell,byName,wasWar){
        家の名が変わり、その報せが積まれる。**後に回すと
        「清水が継いだ」が「最上が切られた」より先に出る。**
        継ぐ理由がまだ起きていないのに継いでいることになる */
-    runTell(name+"、"+taker+"に斬られる","捕縛",cell);
+    runTell(name+"は"+taker+"に斬られました","捕縛",cell);
     /* **プレイデータから消える。** 大名なら跡目を立てる（§19.3）*/
     runBehead(bushouId,byPowerId,wasWar);
     return {how, name};
@@ -21988,7 +21986,7 @@ function runCapture(bushouId,byPowerId,siteId,cell,byName,wasWar){
        バグ：先に浪人にしてから登用に失敗すると、隊も家も無い武将が表にだけ残った */
     if(st===undefined||st===null){
       runFreeBushou(bushouId,cell);
-      runTell(name+"、解き放たれる","捕縛",cell);
+      runTell(name+"は解放されました","捕縛",cell);
       return {how:"見逃", name};
     }
     const lv0=capRankLv(b);                       /* 捕らえる前の格（浪人にする前に控える）*/
@@ -22002,16 +22000,16 @@ function runCapture(bushouId,byPowerId,siteId,cell,byName,wasWar){
       if(rk&&typeof rk.kunkou==="number")b.kunkou=rk.kunkou;
       runPutIdou(bushouId,st,cell);
       const pw=byPowerId?byId(playPowers,byPowerId):null;
-      runTell(name+"、"+(pw?pw.label:"敵方")+"に仕う","捕縛",cell);
+      runTell(name+"は"+(pw?pw.label:"敵方")+"に登用されました","捕縛",cell);
       return {how, name};
     }
     runRonin(bushouId,cell);                      /* 召し抱えられなかった。浪人として盤に出す */
-    runTell(name+"、解き放たれる","捕縛",cell);
+    runTell(name+"は解放されました","捕縛",cell);
     return {how:"見逃", name};
   }
   /* 見逃（解放）。**その者の家がまだ拠点を持っているかで行き先が分かれる** */
   runFreeBushou(bushouId,cell);
-  runTell(name+"、解き放たれる","捕縛",cell);
+  runTell(name+"は解放されました","捕縛",cell);
   return {how:"見逃", name};
 }
 
@@ -22197,7 +22195,7 @@ function runRename(powerId,heir){
       u.label=pw.label+u.label.slice(was.length);
   }
   playStamp++;
-  runTell(myoji+"家、旗を挙ぐ","家名");
+  runTell(was+"は"+myoji+"家に改まりました","家督");   /* 苗字の違う者が継いで家の名が変わった（依頼：家督の札）*/
   return true;
 }
 
@@ -22252,7 +22250,7 @@ function runSuccession(powerId){
      名が変わったときだけ報せていたため、**同じ苗字の者が継ぐと
      当主が代わったことが盤のどこにも出なかった。**
      家の名を変える前に報せるので、ここでは前の名で呼ぶ */
-  runTell(heir.name+"、"+pw.label+"の家督を継ぐ","家督",
+  runTell(heir.name+"が後を継ぎました","家督",
           runBushouCell(heir));
   /* **苗字の違う者が継げば、家の名も旗も変わる**（§19.3）。
      縁（友好・同盟）は家のIDに付いているので、そのまま引き継がれる。
@@ -22329,7 +22327,7 @@ function runRout(unitId,byUnitId,byPowerId=null){
       /* **討ち死には札で報せる**（依頼・§31.5）。報せずに消すと、盤の上では
          武将がただ消えたように見える。殺す前に積む。当主なら、このあと家督の札が続く */
       const bk=byId(playBushou,b);
-      if(bk)runTell(bk.name+"、討ち死に","討ち死に",cell);
+      if(bk)runTell(bk.name+"は討ち死にしました","討死",cell);
       runKillBushou(b);
     }
     else{
@@ -22342,8 +22340,7 @@ function runRout(unitId,byUnitId,byPowerId=null){
       if(home!==null)runPutIdou(b,home,cell,u.state);
       /* **軍勢を率いていた者と、鍬を持っていた者では言い方が違う**（依頼）。
          戦って敗れたのなら「落ち延びた」、鍬を捨てて逃げたのなら「逃げ果せた」 */
-      if(bb)runTell(bb.name+(wasWar?"、落ち延びたり":"、逃げ果せたり"),
-                    "落ち延び",cell);
+      if(bb)runTell(bb.name+"は追撃を振り切りました","逃避",cell);
     }
     /* **独立勢力の隊が崩れれば、その家は無くなる**（§28.3・§19.2）。
        独立勢力は拠点を持たず、隊そのものが家である。逃げ果せた者も、
@@ -22412,7 +22409,7 @@ function runFallSite(siteId,powerId,atkId){
   /* **城の報せは、この先で起こることより先に積む**（§31.5）。
      落城の始末の中で武将が捕らえられ、家が滅ぶ。ここで先に積まなければ
      「〇〇家が滅亡しました」が城の報せより前に出る */
-  runTell(st.name+"、陥落","落城",bs0?bs0.cell:null);
+  runTell(st.name+"が陥落しました","落城",bs0?bs0.cell:null);
   /* **拠点を落とされた家の忠誠が下がる**（§19.6）*/
   runHouseChusei(before,CHUSEI_FALL);
   /* **跡目も滅亡も、この始末がぜんぶ済んでから**（依頼・§19.3・§31.5）。
@@ -22461,7 +22458,7 @@ function runFallSite(siteId,powerId,atkId){
          尽きていれば浪人になる */
       const nm=m.name;
       runFreeBushou(m.id,bs0?bs0.cell:null);
-      runTell(nm+"、落ち延びたり","落ち延び",bs0?bs0.cell:null);
+      runTell(nm+"は追撃を振り切りました","逃避",bs0?bs0.cell:null);
       f={how:"逃げた", name:nm, id:m.id};
     }
     if(f)fates.push(f);
@@ -23215,6 +23212,7 @@ function runFortStrip(cellId,powerId){
 }
 /* 占拠の報せ（§31.5）。**取り込んだのか、切り離しただけなのかを分ける。**
    同じ「押さえた」でも、盤の上で起きたことが違う */
+/* 占めた結果を言葉にする。上端の帯の 2 段目（§31.1）の文に使う。札にはしない（8.5.0）*/
 const occText=o=>{
   const what=o.fort?"支城を":"土地を";
   if(o.took>0)return "が"+what+"押さえた（"+o.took+"升を領域に入れた）";
@@ -23276,11 +23274,7 @@ function runOccupyTick(){
   for(const u of playUnits.slice()){
     if(!u.occ||!u.occ.man)continue;
     if(u.occ.cell!==u.q.id){u.occ=null;continue;}   /* 離れれば積んだ月は消える */
-    const r=runOccupy(u.id);
-    if(r&&r.took!==undefined){
-      const nm=isLink(u.bushou)?linkValue(u.bushou):"";
-      runTell(nm+occText(r),"占拠",u.q.id);
-    }
+    runOccupy(u.id);                           /* 占めたことは札で報せない（依頼・8.5.0）*/
   }
 }
 /* 1月ぶん積む。積み切ったら升を取る。返すのは残りの月数、または取った印 */
@@ -24409,7 +24403,7 @@ function runGrowSkill(bushouId,key,odds){
   if(key==="ninja"){                             /* 心得は有るか無いか */
     if(b.ninja)return false;
     b.ninja=true; playStamp++;
-    runTell(b.name+"、忍びの術を会得","技能",runBushouCell(b));
+    runTell(b.name+"が忍術を会得しました","技能",runBushouCell(b));
     return true;
   }
   const v=Math.max(1,Math.min(5,b[key]||SKILL_MID));
@@ -24417,7 +24411,7 @@ function runGrowSkill(bushouId,key,odds){
   /* **鉄騎は騎馬の上に立つ**（§31.2）。騎馬の適性を超えては上がらない */
   if(key==="kiki"&&v>=Math.max(1,Math.min(5,b.kiba||SKILL_MID)))return false;
   b[key]=v+1; playStamp++;
-  runTell(b.name+"の"+(SKILL_NAME[key]||key)+"、上達","技能",runBushouCell(b));
+  runTell(b.name+"の"+(SKILL_NAME[key]||key)+"が"+"DCBAS"[v]+"に上達しました","技能",runBushouCell(b));
   return true;
 }
 const SKILL_NAME={nou:"農業", shou:"商業", ken:"建築", tou:"登用",
