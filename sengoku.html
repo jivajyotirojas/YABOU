@@ -6511,57 +6511,15 @@ function* glBuildMeshGen(){
             sRef, cam:view.cam};
   }
 
-  /* ------------------------------------------------------------
-     **森（山地）は木の群れで描く**（§10.21・8.4.0）
-     ------------------------------------------------------------
-     升ごとの低ポリの円錐は「濃緑の塊」にしか見えなかった。木の冠（三角）を升の中心から
-     1.05R まで散らし、**升の縁を越えて群れさせる**。根元の色は升の面色そのもので、梢ほど暗い。
-     升の縁を越えた木は根元の行（手前）の束に入れ、その行の面の上に積む（自分の行に積むと
-     手前の行の面に下半分が隠される）。名のある峰と高山は円錐のまま（岩山として読み分ける）。
-     本数は倍率で 3〜7 本。升が小さい（半径 11px 未満）ときは描かない */
-  const treeRows=[];
-  const TREE_NB=[[COLW,0,0],[-COLW,0,0],[COLW/2,ROWH,1],[-COLW/2,ROWH,1],[COLW/2,-ROWH,-1],[-COLW/2,-ROWH,-1]];
-  if(obl&&rad>=LOD_TONGUE){                      /* 50% では木を描かない（1〜2px の木は柄に見える）。山地は円錐で（下）*/
-    const nMax=rad>=45?7:5;
-    for(const c of drawCache){
-      if(c.type!==MT_A||c.named)continue;
-      /* 本数は低周波の揺らぎで 2〜7 本。升の 1/4 ほどは 2 本以下にして地面を見せる */
-      const dens=vns(c.x*0.18+3.1,c.y*0.18+7.7);
-      const nTree=Math.max(2,Math.round(nMax*(0.35+0.65*dens)));
-      for(let k=0;k<nTree;k++){
-        const ax=rnd3(c.q,c.r,500+k*7), ay=rnd3(c.q,c.r,600+k*7);
-        const x=c.x+(ax-0.5)*2*R*1.05, y=c.y+(ay-0.5)*2*R*0.92;
-        const h=R*(0.35+0.40*rnd3(c.q,c.r,700+k*7)), w=R*(0.16+0.12*rnd3(c.q,c.r,800+k*7));
-        /* **根元が実際に立つ升の行に入れる。** y だけで行を決めると、隣の行の升に
-           はみ出した根元が、あとから描くその行の面に隠されて木の下が切れる（依頼）。
-           升は中心がいちばん近い六角なので、自分と隣 6 升の中心で比べる */
-        let br=c.r, bd=(x-c.x)**2+(y-c.y)**2;
-        for(const [dx,dy,dr] of TREE_NB){ const d=(x-c.x-dx)**2+(y-c.y-dy)**2; if(d<bd){bd=d;br=c.r+dr;} }
-        const rr=Math.max(0,Math.min(cellSpan.r1-cellSpan.r0,br-cellSpan.r0));
-        (treeRows[rr]||(treeRows[rr]=[])).push({c,x,y,h,w,lt:rnd3(c.q,c.r,900+k*7)<0.5});
-      }
-    }
-  }
+  /* **山地はどの倍率でも円錐の山で描く**（依頼・8.5.0）。8.4.0 で 100% 以上を木の群れにしたが、
+     倍率で絵が変わり、木どうし・木と峰の前後も読みにくかったので、50% と同じ多峰の円錐に戻した。
+     名のある峰と高山は一つの峰（岩山として読み分ける） */
   /* --- 一の巻き。地形だけを行の順に積む --- */
   for(let r=0;r<span;r++){
     yield;
     const row=glRows[r]; const start=M.n;
     let ymin=1e9,ymax=-1e9;
     M.z=zOf(r);
-    /* 木 1 本。根元は升の面色、梢ほど暗い。行の ymin/ymax を更新する */
-    const drawTree=t=>{
-        const c=t.c, fc=c.own||glShade(color.get(c.paint)||"#000",c.sh);
-        const vS=snowAt(c);
-        const px=t.x*sRef, py=(t.y*ys)*sRef-c.g*sRef;
-        const top=fc.map(v=>Math.round(v*(t.lt?0.84:0.68)));
-        const base=vS<0.02?fc.concat(255):snowMix(fc,vS);
-        /* 雪の森は梢を白くしない。梢の色から雪影の青灰 #dfe6e0 へ 3 割だけ寄せる（白い三角の群れは静電気のノイズに見え、
-           灰緑一色だと幽霊の森に見える。梢が暗いまま残ることが「雪の下の山地」の印）*/
-        const apex=vS<0.02?top.concat(255):top.map((v,i)=>Math.round(v+([223,230,224][i]-v)*0.30)).concat(255);
-        const A=W([px,py-t.h*sRef]), Bl=W([px-t.w*sRef,py]), Br=W([px+t.w*sRef,py]);
-        M.tri(Bl,Br,A,base,base,apex);
-        if(A[1]<ymin)ymin=A[1]; if(Bl[1]>ymax)ymax=Bl[1];
-    };
     if(row){
       for(const c of row){
         const cx=c.x*sRef, cy=(c.y*ys)*sRef;
@@ -6687,7 +6645,6 @@ function* glBuildMeshGen(){
       }
       const mts=[];                               /* 山は背の高い順に */
       for(const c of row){ if(!c.mtn)continue;
-        if(rad>=LOD_TONGUE&&c.type===MT_A&&!c.named)continue;   /* 100% 以上の山地は木の群れで（上）。50% は多峰の円錐のまま（引いても山と読める）*/
         const grow=0.60+Math.min(1,c.m/2300)*0.62;
         mts.push({c,px:c.x*sRef,py:(c.y*ys)*sRef-c.g*sRef,
                   hh:(c.type===MT_B?0.86:0.68)*grow*(c.named?1.18:1)}); }
@@ -6747,13 +6704,7 @@ function* glBuildMeshGen(){
         }
         for(const p of prof)if(p[1]<ymin)ymin=p[1];
       };
-      /* **山と木は、根元の y の順に一つの列で描く**（依頼）。山を先に全部、木をあとに全部と
-         分けていたため、峰より奥に根元のある木が峰の斜面の上に乗っていた。
-         山の根元は升の中心。同じ y なら山が先（背の高い順はそのまま） */
-      const items=mts.map(T=>({y:T.c.y,k:0,T}));
-      for(const t of (treeRows[r]||[]))items.push({y:t.y,k:1,t});
-      items.sort((a,b)=>a.y-b.y||a.k-b.k);
-      for(const it of items){ if(it.k===0)drawMt(it.T); else drawTree(it.t); }
+      for(const T of mts)drawMt(T);
     }
     terAt[r]={start,count:M.n-start,ymin,ymax};
   }
