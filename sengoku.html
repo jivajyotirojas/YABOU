@@ -15659,7 +15659,7 @@ function runRaiseDokuritsu(u,cell){
   const row=runUnitRow({label:"独立勢力 "+myoji+"氏", type:tb.id, state:"sagyo", power:id, bushou:bid,
     cell, hei:RONIN_FLAG_HEI, sonae:runSonaeFlat(RONIN_FLAG_HEI)});
   playUnits.push(row); g.units.push(row.id); g.unitNum=g.units.length;
-  runTell(b.name+"が後を継ぎました","家督",cell);  /* 浪人が支城で旗を挙げた。家督の札（依頼）*/
+  runTell(myoji+"氏が興りました","家督",cell);    /* 浪人が支城で旗を挙げた（依頼）*/
   playStamp++;
   return true;
 }
@@ -15683,7 +15683,7 @@ function runRaiseHouse(u,siteId){
   st.touchi=0;
   runJoinGroups(bid,id,siteId);
   if(!isLink(st.group))runMakeDomain(siteId);
-  runTell(b.name+"が後を継ぎました","家督",bs.cell);  /* 浪人が城で旗を挙げた。家督の札（依頼）*/
+  runTell(st.name+"で"+myoji+"家が興りました","家督",bs.cell);  /* 浪人が城で旗を挙げた（依頼）*/
   playStamp++;
   return true;
 }
