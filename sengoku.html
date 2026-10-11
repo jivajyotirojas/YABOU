@@ -6178,6 +6178,14 @@ function* glBuildMeshGen(){
        そのまま結ぶと河口の手前でヘアピンになる。終わりの3升のうち、水の升に隣り合っていて
        そこへ向かう折れが 90 度未満のいちばん手前の節点で切り、水の升の中心へ繋ぐ。
        終点が陸なら、先（2升以内）の水の升を同じやり方で繋ぐ（鵡川・大野川） */
+    /* **湖へは岸の辺で入る**（依頼・8.5.0）。湖の升は周りより低く、岸に壁が立つ。湖の中心まで帯を伸ばすと、
+       川が壁を越えて湖面の上に寝そべり、湖の真ん中で丸く途切れる（山中湖と桂川）。
+       岸の辺のすぐ陸側（陸の高さ）と、すぐ湖側（湖面の高さ）の二つの節点で終える。帯は壁を下りて湖面で終わる */
+    const lakeEdge=(cL,W)=>{
+      const ex=(cL.x+W.x)/2, ey=(cL.y+W.y)/2;
+      return [{x:ex+(cL.x-ex)*0.06, y:ey+(cL.y-ey)*0.06, g:cL.g},
+              {x:ex+(W.x-ex)*0.10,  y:ey+(W.y-ey)*0.10,  g:W.g, water:true}];
+    };
     if(ln.type===3&&!trib&&nd.length>=2){
       const cellAtNode=n=>cellNear(n.x,n.y);
       let W=null;
@@ -6193,12 +6201,39 @@ function* glBuildMeshGen(){
           if(cos>0){kk=k;break;}
         }
         nd=nd.slice(0,kk+1); wid=wid.slice(0,kk+1);
-        nd.push({x:W.x,y:W.y,g:W.g,water:true}); wid.push(wid[wid.length-1]);
+        const cL=cellRow.get((cellAtNode(nd[kk])||{}).id);
+        if(W.type===T_LAKE&&cL&&cL.id!==W.id&&hexSteps(cL.q,cL.r,W.q,W.r)===1){
+          const [a,b]=lakeEdge(cL,W), ww=wid[wid.length-1];
+          if(Math.hypot(nd[kk].x-a.x,nd[kk].y-a.y)<R*0.2&&nd.length>2){nd.pop();wid.pop();}
+          nd.push(a,b); wid.push(ww,ww);
+        }else{
+          nd.push({x:W.x,y:W.y,g:W.g,water:true}); wid.push(wid[wid.length-1]);
+        }
       }
     }
     if(ln.type===3&&!ln.src&&nd.length>=2){                /* 湖のそばから始まる川 */
       const rev=nd.slice().reverse(); const wa=waterAhead(rev);
-      if(wa&&wa.c.type===T_LAKE&&!wa.drop){ nd.unshift({x:wa.c.x, y:wa.c.y, g:wa.c.g, water:true}); wid.unshift(wid[0]); shift=1; }
+      if(wa&&wa.c.type===T_LAKE&&!wa.drop){
+        const cL=cellRow.get((cellNear(nd[0].x,nd[0].y)||{}).id), W=wa.c;
+        if(cL&&cL.id!==W.id&&hexSteps(cL.q,cL.r,W.q,W.r)===1){   /* 岸の辺から出る（上と同じ）*/
+          const [a,b]=lakeEdge(cL,W);
+          nd.unshift(b,a); wid.unshift(wid[0],wid[0]); shift=2;
+        }else{ nd.unshift({x:W.x, y:W.y, g:W.g, water:true}); wid.unshift(wid[0]); shift=1; }
+      }
+    }
+    /* **湖の中から始まる川**（`src` の節点が湖の升にある。桂川は山中湖の中心から）も、岸の辺から出す */
+    if(ln.type===3&&ln.src&&nd.length>=4){
+      const c0=cellNear(nd[0].x,nd[0].y), W=c0&&cellRow.get(c0.id);
+      if(W&&W.type===T_LAKE){
+        let d=0;
+        while(nd.length>3&&(cellNear(nd[0].x,nd[0].y)||{}).id===W.id){nd.shift();wid.shift();d++;}
+        const cL=cellRow.get((cellNear(nd[0].x,nd[0].y)||{}).id);
+        if(cL&&cL.id!==W.id&&hexSteps(cL.q,cL.r,W.q,W.r)===1){
+          const [a,b]=lakeEdge(cL,W);
+          if(Math.hypot(nd[0].x-a.x,nd[0].y-a.y)<R*0.2){nd.shift();wid.shift();d++;}
+          nd.unshift(b,a); wid.unshift(wid[0],wid[0]); shift=2-d;
+        }else{ nd.unshift({x:W.x, y:W.y, g:W.g, water:true}); wid.unshift(wid[0]); shift=1-d; }
+      }
     }
     const N=nd.length;
     const Pp=nd.map(n=>{const g=n.water?n.g:(ln.type===3?surfG(n):n.g);
