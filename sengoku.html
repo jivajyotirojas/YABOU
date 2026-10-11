@@ -149,11 +149,13 @@
      空の欄は消さずに「—」を出し、区画そのものは残す */
   /* 幅は em で決め打ち、字の大きさを窓の幅に合わせて縮める。
      こうすると桁の揃いを保ったまま、狭い画面でもはみ出さない */
-  /* **1行に収める。** 地図の上に載る帯なので、縦は取れるだけ詰める。
+  /* **1 段目は 1 行に収める。** 地図の上に載る帯なので、縦は取れるだけ詰める。
      横は端から端まで使い、入りきらない項目は「…」で切る。
-     中身の無い項目は畳んで、そのぶんを他へ回す */
+     中身の無い項目は畳んで、そのぶんを他へ回す。
+     **2 段目は自動進行の文**（§31.1）。下端の操作帯に入れていたときは、
+     文の長さで帯の幅が変わり、押し口の位置が動いた（依頼） */
   #hud{position:absolute;left:0;right:0;top:0;z-index:4;
-    display:flex;align-items:center;gap:0;pointer-events:none;
+    display:flex;flex-wrap:wrap;align-items:center;gap:0;pointer-events:none;
     background:rgba(20,17,10,.86);border-bottom:1px solid var(--line);
     padding:calc(3px + env(safe-area-inset-top,0px))
             calc(clamp(10px,1.2vw,24px) + env(safe-area-inset-right,0px))
@@ -181,6 +183,11 @@
   #hud #hObject{flex:0 1 auto;flex-shrink:4}
   #hud #hUnit  {flex:0 1 auto;flex-shrink:1;min-width:5em}
   #hud span:empty{display:none}
+  /* 2 段目。幅いっぱいの 1 行。空なら畳む。升を選んでいなくても薄くしない */
+  #hud #hMsg{flex:1 0 100%;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;color:var(--dim);font-size:.9em;letter-spacing:.06em;
+    border-top:1px solid var(--line2);margin-top:2px;padding-top:2px}
+  #hud #hMsg:empty{display:none}
   #hud.empty #hDate{opacity:.85}         /* 年月は升を選んでいなくても効いている */
   @media (max-width:520px){ #hud{letter-spacing:0} }
   #hud.empty span{opacity:.25}
@@ -345,9 +352,6 @@
   #aiCtl #aiEnd{color:var(--ki)}
   #aiCtl button[hidden]{display:none}
   #aiCtl input[type=file]{display:none}
-  #aiCtl #aiWhat{display:flex;align-items:center;padding:0 12px;
-    border-left:1px solid var(--line);font-size:11px;letter-spacing:.06em;
-    color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #zoomCtl span{color:var(--dim);font-size:9px;text-align:center;padding:4px 0;
     font-variant-numeric:tabular-nums;border-top:1px solid var(--line);
     border-bottom:1px solid var(--line)}
@@ -666,6 +670,8 @@
       <span id="hUnit">—</span>
       <!-- 版。主版.副版.修正（§1.7）。狭い画面では隠す -->
       <span id="hVer"></span>
+      <!-- 2 段目。自動進行で直前に起きたこと（§31.1）。年月は 1 段目にあるので添えない -->
+      <div id="hMsg"></div>
     </div>
     <!-- 隊の札。選んだ升に立つ隊にできることを並べる -->
     <div id="unit" hidden>
@@ -734,7 +740,8 @@
       <button id="zoomOut">−</button>
     </div>
     <!-- 自動進行。押すと NPC が順に手番を進める。
-         いま何が起きたかを右の一行に出す -->
+         いま何が起きたかは上端の帯の 2 段目に出す（§10.19・§31.1）。
+         **帯に文を入れない。** 文の長さで帯の幅が変わり、押し口の位置が動く -->
     <div class="ctl" id="aiCtl">
       <button id="aiRun"   title="自動で進める">▶</button>
       <button id="aiNext"  title="1つだけ進める">▶|</button>
@@ -743,7 +750,6 @@
       <button id="aiSave" title="いまの盤を保存する">保存</button>
       <button id="aiLoad" title="保存した盤を読み込む">読込</button>
       <input id="aiFile" type="file" accept="application/json,.json" hidden>
-      <span id="aiWhat"></span>
     </div>
     <div id="list" hidden>
       <div id="listHead">
@@ -28596,8 +28602,8 @@ function drawAI(){
   const now=playProgress[0]&&byId(playPowers,
     (playProgress[0].order||[])[playProgress[0].at]);
   el("aiEnd").hidden=!(mine&&now&&now.id===mine);
-  const g=playProgress[0];
-  el("aiWhat").textContent=(g?dateText(g)+"　":"")+aiWhat;
+  /* **文は上端の帯の 2 段目へ**（依頼・§10.19）。年月は 1 段目にあるので添えない */
+  el("hMsg").textContent=aiWhat;
 }
 
 /* 1つだけ進める。返すのは、次に呼ぶまで置く間合い（ミリ秒）*/
