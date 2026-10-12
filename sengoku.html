@@ -806,7 +806,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.6.1";
+const VERSION="8.6.2";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -3606,9 +3606,12 @@ const SONAE_ART={
   },
 };
 
+const GUN_FIG_K=0.88;   /* 盤の軍勢・独立勢力の人物の倍（依頼）*/
 const UNITS={
-  gun         : (f,up,lo)=>gunSolids(f,W_HEI,up,lo),
-  dokuritsuGun: (f,up,lo)=>gunSolids(f,W_HEI,up||OBJ_SHIRO,lo||OBJ_SHIRO),
+  /* **軍勢と独立勢力の人物は 0.88 倍**（依頼）。6 人の隊形は一人の隊より横に広く、同じ背丈でもほかの隊より大きく見えた。
+     戦闘画面の備えの姿（`riderSolids` など）は別の作りなので変えない */
+  gun         : (f,up,lo)=>gunSolids(f,W_HEI,up,lo).map(sd=>oScale(sd,GUN_FIG_K)),
+  dokuritsuGun: (f,up,lo)=>gunSolids(f,W_HEI,up||OBJ_SHIRO,lo||OBJ_SHIRO).map(sd=>oScale(sd,GUN_FIG_K)),
   nogyo       : f=>nogyoSolids(f),      nogyoIdou   : f=>nogyoIdouSolids(f),
   kenchiku    : f=>kenchikuSolids(f),   kenchikuIdou: f=>kenchikuIdouSolids(f),
   shogyo      : f=>shogyoSolids(f),     shogyoIdou  : f=>shogyoIdouSolids(f),
