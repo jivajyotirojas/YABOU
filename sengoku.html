@@ -806,7 +806,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.6.4";
+const VERSION="8.6.5";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -16799,9 +16799,42 @@ function runDomainTrim(siteId){
   playStamp++;
   return off;
 }
-/* 盤ぜんたいの域を測り直す。**盤を作ったときと、読み込んだときに一度** */
+/* ------------------------------------------------------------
+   **独立勢力の升と隣接1升は、どの実効支配域からも外す**（依頼・§11.2.2）
+   ------------------------------------------------------------
+   不可侵の升（`runBanIndex`）は、新しく取れないだけで、すでに域に入っている升は落とさない。
+   盤を作るときは独立勢力の周りを初めから域に入れない（`makeEffBlock`）が、
+   遊んでいる途中で軍勢ごと独立した者（`runBetrayDokuritsu`）や、空の支城で旗を挙げた浪人（`runRaiseDokuritsu`）の周りは
+   元の家の域に残っていた。**その家の内政の隊が、域の中だと思って独立勢力の隣へ何度も入っていった**（室住氏・塩尻峠）。
+   手番ごとに外すので、古いセーブもその手番で揃う。拠点の升そのものは外さない。
+   友好は動かさない（剥がしたのではなく、その家が押さえられない土地だった）
+   ------------------------------------------------------------ */
+function runCarveDokuritsu(){
+  const carve=new Set();
+  for(const u of playUnits){
+    if(u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="独立勢力"||!isLink(u.q))continue;
+    const c=BASE_CELLS[u.q.id-1]; if(!c)continue;
+    carve.add(c.id);
+    for(const [dq,dr] of DIR6[c.r&1]){const n=cellOf(c.q+dq,c.r+dr); if(n)carve.add(n.id);}
+  }
+  if(!carve.size)return 0;
+  let off=0;
+  for(const st of playSites){
+    if(!isLink(st.group))continue;
+    const g=byId(playCellGroups,st.group.id); if(!g)continue;
+    const bs=byId(BASE_SITES,st.id);
+    const keep=g.cells.filter(id=>!carve.has(id)||(bs&&id===bs.cell));
+    if(keep.length===g.cells.length)continue;
+    off+=g.cells.length-keep.length;
+    g.cells=keep; g.cellNum=keep.length;
+    playStamp++;
+    off+=runDomainTrim(st.id);                    /* 切れた先は域から落ちる */
+  }
+  return off;
+}
+/* 盤ぜんたいの域を測り直す。**手番ごと**（独立勢力の周りを外し、飛び地を落とす）*/
 function runDomainTrimAll(){
-  let n=0;
+  let n=runCarveDokuritsu();
   for(const st of playSites)n+=runDomainTrim(st.id);
   return n;
 }

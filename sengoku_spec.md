@@ -2012,6 +2012,13 @@ Civilization VI・Dorfromantik・Shogun 2 の地図（限定パレット、升�
 独立勢力の周りも同じで、**独立勢力は討つか取り込むかしなければ、
 その足元を取り上げることはできない**（§28.3・§28.4）。
 
+**独立勢力の升と隣接1升は、すでに域に入っていても外す**（依頼・8.6.5）。新しく取れないだけでは、
+遊んでいる途中で軍勢ごと独立した者や、空の支城で旗を挙げた浪人の周りが、元の家の域に残る。
+**その家の内政の隊が、域の中だと思って独立勢力の隣へ入っていった**（室住氏・塩尻峠）。
+手番ごとに、独立勢力の隊の升と隣接1升をどの拠点の域からも外し、切れた先も落とす（`runCarveDokuritsu`。
+`runDomainTrimAll` の中で行うので、古いセーブもその手番で揃う）。拠点の升そのものは外さない。
+剥がしたのではなく押さえられない土地だったので、友好は動かさない。
+
 **この問いに答える先は1か所にする**（`runBanIndex`）。統治力の道と軍勢の道が別々に判じていると、
 片方だけに例外が残る。
 
@@ -3652,7 +3659,7 @@ NPCは、領内を踏まれて籠城に徹する城が、留守＋1000 に届く
 
 **升に問う**
 
-`runCanStand`　`runCanPass`　`runPostureTo`　`runReachAs`　`runIsMinato`　`runCanBuild`　`runIsHarborSpot`　`runCanWork`　`runCanPut`　`runCanSettle`　`runStepCost`　`runReach`　`runGates`　`runSeaGates`　`runAIMinatoWant`　`runIsFort`　`runIsWild`　`runIsBroken`　`runIsFresh`　`runGuard`　`runFacing`　`runDomainIndex`　`runDomainOf`　`runDomainOwnerSite`　`runMakeDomain`　`runGrowDomain`　`runGrowByFort`　`runBanIndex`　`runCanHold`　`runTakeCell`　`runKuniOwner`　`runOccMonths`　`runCanOccupy`　`runOccupy`　`runCanPutAny`　`runCanPutAny2`　`runCanPutFree`　`runCanPutNew`　`runCanWalk`　`runDomainNear`　`runDomainTrim`　`runDomainTrimAll`　`runDropCell`　`runInKuni`　`runKuniIndex`　`runKuniSite`　`runSiteOwnIndex`　`runCatIndex`　`runCatNum`　`runHasCat`　`runHasCatKuni`　`runTownCells`　`runFortCells`　`runFreeCellsFor`　`runNearFort`　`runGrowCost`　`runGrowCtx`　`runGrowOK`　`runJunnoAtCell`　`runBehindCell`　`runIsSeki`　`runSekiInKuni`　`runSekiStop`　`runSekiHalts`　`runSekiStopOnPath`　`runSekiSpot`　`runSekiFace`　`runSekiBadCells`　`runSekiWant`　`runSekiCells`　`runSekiWorkInKuni`　`runEnterByPass`　`runFortGain`　`runFortStrip`　`runFortFeeds`　`runFortFeedsFor`
+`runCanStand`　`runCanPass`　`runPostureTo`　`runReachAs`　`runIsMinato`　`runCanBuild`　`runIsHarborSpot`　`runCanWork`　`runCanPut`　`runCanSettle`　`runStepCost`　`runReach`　`runGates`　`runSeaGates`　`runAIMinatoWant`　`runIsFort`　`runIsWild`　`runIsBroken`　`runIsFresh`　`runGuard`　`runFacing`　`runDomainIndex`　`runDomainOf`　`runDomainOwnerSite`　`runMakeDomain`　`runGrowDomain`　`runGrowByFort`　`runBanIndex`　`runCanHold`　`runTakeCell`　`runKuniOwner`　`runOccMonths`　`runCanOccupy`　`runOccupy`　`runCanPutAny`　`runCanPutAny2`　`runCanPutFree`　`runCanPutNew`　`runCanWalk`　`runDomainNear`　`runDomainTrim`　`runDomainTrimAll`　`runCarveDokuritsu`　`runDropCell`　`runInKuni`　`runKuniIndex`　`runKuniSite`　`runSiteOwnIndex`　`runCatIndex`　`runCatNum`　`runHasCat`　`runHasCatKuni`　`runTownCells`　`runFortCells`　`runFreeCellsFor`　`runNearFort`　`runGrowCost`　`runGrowCtx`　`runGrowOK`　`runJunnoAtCell`　`runBehindCell`　`runIsSeki`　`runSekiInKuni`　`runSekiStop`　`runSekiHalts`　`runSekiStopOnPath`　`runSekiSpot`　`runSekiFace`　`runSekiBadCells`　`runSekiWant`　`runSekiCells`　`runSekiWorkInKuni`　`runEnterByPass`　`runFortGain`　`runFortStrip`　`runFortFeeds`　`runFortFeedsFor`
 
 **設営**
 
