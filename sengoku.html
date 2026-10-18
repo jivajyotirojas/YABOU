@@ -149,11 +149,13 @@
      空の欄は消さずに「—」を出し、区画そのものは残す */
   /* 幅は em で決め打ち、字の大きさを窓の幅に合わせて縮める。
      こうすると桁の揃いを保ったまま、狭い画面でもはみ出さない */
-  /* **1行に収める。** 地図の上に載る帯なので、縦は取れるだけ詰める。
+  /* **1 段目は 1 行に収める。** 地図の上に載る帯なので、縦は取れるだけ詰める。
      横は端から端まで使い、入りきらない項目は「…」で切る。
-     中身の無い項目は畳んで、そのぶんを他へ回す */
+     中身の無い項目は畳んで、そのぶんを他へ回す。
+     **2 段目は自動進行の文**（§31.1）。下端の操作帯に入れていたときは、
+     文の長さで帯の幅が変わり、押し口の位置が動いた（依頼） */
   #hud{position:absolute;left:0;right:0;top:0;z-index:4;
-    display:flex;align-items:center;gap:0;pointer-events:none;
+    display:flex;flex-wrap:wrap;align-items:center;gap:0;pointer-events:none;
     background:rgba(20,17,10,.86);border-bottom:1px solid var(--line);
     padding:calc(3px + env(safe-area-inset-top,0px))
             calc(clamp(10px,1.2vw,24px) + env(safe-area-inset-right,0px))
@@ -181,6 +183,11 @@
   #hud #hObject{flex:0 1 auto;flex-shrink:4}
   #hud #hUnit  {flex:0 1 auto;flex-shrink:1;min-width:5em}
   #hud span:empty{display:none}
+  /* 2 段目。幅いっぱいの 1 行。空なら畳む。升を選んでいなくても薄くしない */
+  #hud #hMsg{flex:1 0 100%;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;color:var(--dim);font-size:.9em;letter-spacing:.06em;
+    border-top:1px solid var(--line2);margin-top:2px;padding-top:2px}
+  #hud #hMsg:empty{display:none}
   #hud.empty #hDate{opacity:.85}         /* 年月は升を選んでいなくても効いている */
   @media (max-width:520px){ #hud{letter-spacing:0} }
   #hud.empty span{opacity:.25}
@@ -345,9 +352,6 @@
   #aiCtl #aiEnd{color:var(--ki)}
   #aiCtl button[hidden]{display:none}
   #aiCtl input[type=file]{display:none}
-  #aiCtl #aiWhat{display:flex;align-items:center;padding:0 12px;
-    border-left:1px solid var(--line);font-size:11px;letter-spacing:.06em;
-    color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #zoomCtl span{color:var(--dim);font-size:9px;text-align:center;padding:4px 0;
     font-variant-numeric:tabular-nums;border-top:1px solid var(--line);
     border-bottom:1px solid var(--line)}
@@ -612,19 +616,12 @@
   #site table.bt th.so{color:rgba(255,255,255,.7)}
   #site table.bt th.so.on{color:var(--shiro)}
   #site table.bt td.c,#site table.bt th.c{text-align:center}
-  #site .sec .tabs{float:right;display:inline-flex;gap:0;margin-top:-3px}
-  #site .sec .tb{background:transparent;color:var(--dim);border:1px solid var(--line);font:inherit;font-size:11px;
-    letter-spacing:.1em;padding:1px 10px;cursor:pointer}
-  #site .sec .tb+.tb{border-left:0}
-  #site .sec .tb.on{background:rgba(255,255,255,.10);color:var(--shiro)}
-  #site .sec .tb.on{background:var(--ki);border-color:var(--ki);color:#1d1a14;font-weight:700}
   #site table.bt th.so{color:rgba(255,255,255,.85)}
   /* 武将の表：名・役職の幅は決まった幅、余りは忠誠の手前 */
   #site table.bt th:nth-child(1),#site table.bt td:nth-child(1){width:5.6em;min-width:5.6em;max-width:5.6em;overflow:hidden;text-overflow:ellipsis}
   #site table.bt th:nth-child(2),#site table.bt td:nth-child(2){width:3.9em;min-width:3.9em}
   #site table.bt tr.g th:nth-child(1),#site table.bt tr.g th:nth-child(2){width:auto}
-  #site table.bt .fill{width:100%;padding:0}
-  #site table.bt .bl{padding-left:12px}
+  #site table.bt .fill{width:100%;min-width:12px;padding:0}
   #site table.bt th{color:var(--dim)}
   #site table.bt th.so{color:var(--shiro)}
   #site table.bt th.so.on{color:var(--ki)}
@@ -635,6 +632,18 @@
     #site table.bt th:last-child,#site table.bt td:last-child{padding-right:8px}}
   @media (max-width:640px){#site table.bt td.r,#site table.bt th.r{padding-left:5px}}
   #site table.bt td:first-child,#site table.bt th:first-child{padding-right:6px}
+  /* **値の列は同じ幅**（依頼・8.5.0）。3桁の数（表の字）と全角2字（見出しの字）の広いほうに揃える */
+  #site table.bt td.v,#site table.bt th.v{box-sizing:content-box;width:var(--vw);min-width:var(--vw);max-width:var(--vw);
+    padding-left:3px;padding-right:3px;overflow:hidden;text-overflow:clip}
+  #site table.bt{--vw:max(3ch,22px)}
+  #site table.bt td.v{font-variant-numeric:tabular-nums}
+  /* **武将の表は窓に収まらなければ横へ滑らせる**（依頼・8.5.0）。名の列は左に残す */
+  #site .btw{overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+  #site .btw table.bt{width:max-content;min-width:100%}
+  #site .btw table.bt th:first-child,#site .btw table.bt td:first-child{position:sticky;left:0;z-index:1;background:var(--sumi2)}
+  #site .btw table.bt tr.sel:hover td:first-child{background:linear-gradient(rgba(201,162,39,.06),rgba(201,162,39,.06)),var(--sumi2)}
+  #site .btw table.bt tr.on td:first-child{background:linear-gradient(rgba(201,162,39,.14),rgba(201,162,39,.14)),var(--sumi2)}
+  @media (max-width:640px){#site table.bt td.v,#site table.bt th.v{padding-left:2px;padding-right:2px}}
   /* **ロードの進み**（依頼）。盤を作るあいだだけ出して、終わったら消す */
   #loading{position:fixed;inset:0;z-index:50;background:var(--sumi);display:flex;
     flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--ki)}
@@ -661,6 +670,8 @@
       <span id="hUnit">—</span>
       <!-- 版。主版.副版.修正（§1.7）。狭い画面では隠す -->
       <span id="hVer"></span>
+      <!-- 2 段目。自動進行で直前に起きたこと（§31.1）。年月は 1 段目にあるので添えない -->
+      <div id="hMsg"></div>
     </div>
     <!-- 隊の札。選んだ升に立つ隊にできることを並べる -->
     <div id="unit" hidden>
@@ -729,16 +740,16 @@
       <button id="zoomOut">−</button>
     </div>
     <!-- 自動進行。押すと NPC が順に手番を進める。
-         いま何が起きたかを右の一行に出す -->
+         いま何が起きたかは上端の帯の 2 段目に出す（§10.19・§31.1）。
+         **帯に文を入れない。** 文の長さで帯の幅が変わり、押し口の位置が動く -->
     <div class="ctl" id="aiCtl">
       <button id="aiRun"   title="自動で進める">▶</button>
       <button id="aiNext"  title="1つだけ進める">▶|</button>
-      <button id="aiSpeed" title="速さを変える">×1</button>
+      <button id="aiSpeed" title="見せ方を変える（詳細／標準／快速／要点）">詳細</button>
       <button id="aiEnd" title="自分の手番を終える" hidden>手番を終える</button>
       <button id="aiSave" title="いまの盤を保存する">保存</button>
       <button id="aiLoad" title="保存した盤を読み込む">読込</button>
       <input id="aiFile" type="file" accept="application/json,.json" hidden>
-      <span id="aiWhat"></span>
     </div>
     <div id="list" hidden>
       <div id="listHead">
@@ -795,7 +806,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.4.5";
+const VERSION="8.6.7";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -1950,7 +1961,7 @@ const lowFac=m=>{const t=Math.max(0,Math.min(1,m/LOWM));return t*t*(3-2*t);};
 
 /* 倍率。**100% は盤全体が収まる大きさの10倍で、起動したときの倍率**（依頼）。
    引けば 50%（盤全体が収まる大きさの5倍）まで、寄れば 200% まで */
-const ZOOM_BASE=20, ZOOM_MIN=0.5, ZOOM_MAX=2;   /* 升を3kmにしたので倍（升の見た目の大きさを保つ。依頼）*/
+const ZOOM_BASE=20, ZOOM_MIN=0.05, ZOOM_MAX=2;  /* 升を3kmにしたので倍（升の見た目の大きさを保つ。依頼）。斜めでも 5% まで引ける（依頼・8.5.0。それまでは 50%）*/
 const ZOOM_MIN_TOP=0.01;         // 上から見る向きでは 1% まで引ける（依頼）
 let view={cam:"obl", z:1, ox:0, oy:0};   // 見る向き・倍率・ずらし
 let drawCache=null;              // 升ごとの高さと陰。データが変わるまで使い回す
@@ -2901,8 +2912,7 @@ const OBJECTS={
       out.push(oRod([sg*0.09,z,0],[sg*0.09,z,0.18],0.02,0,OBJ_ITAYA,5));   // 杭
     for(const sg of [-1,1])                                               // 和船 2 隻。桟橋から少し離して平行に
       out.push(...kobayaSolids(sg*0.42,0.26).map(sd=>oScale(sd,0.90,1.0)));
-    out.push(oRod([0.38,0.22,0.16],[0.38,0.22,0.90],0.02,0,OBJ_SAO,5),      // 帆柱と帆（1 隻だけ）。100% で白い帆 1 枚が港の印
-             oBox(0.24,0.21,0.52,0.23,0.34,0.84,0,OBJ_HO));
+    /* 帆柱と帆は立てない（依頼）。白い帆が家の旗と紛れる。船の形と桟橋が港の印 */
     return out;
   },
   /* 畑と水田。地面に寝かせた面だけなので高さを持たない。段階は面積・区画の
@@ -3792,15 +3802,15 @@ const objectAtCell=id=>{
 /* ============================================================
    手番
    ------------------------------------------------------------
-   1ターン＝1か月。**全勢力が1回ずつ動いたら月が1つ進む。**
+   1ターン＝1/4月（1 旬）。**全勢力が1回ずつ動いたら旬が1つ進み、4 旬で月が1つ進む**（依頼・8.5.0）。
 
    順は 大名家 → 独立勢力。それぞれの中は**規模の小さい順**で、
    規模は「領有する拠点の数 → 属する武将の数 → 勢力ID」で測る。
    小さいところから動かすのは、大きいところの決めた形に
    小さいところが従うだけ、という展開を避けるため。
 
-   **順は月の初めに決めて、その月のあいだは動かさない。** 途中で拠点を
-   失った勢力が同じ月に二度動いたり、飛ばされたりしないようにする。
+   **順は旬の初めに決めて、その旬のあいだは動かさない。** 途中で拠点を
+   失った勢力が同じ旬に二度動いたり、飛ばされたりしないようにする。
    ------------------------------------------------------------ */
 const runOrder=()=>{
   /* 規模。拠点の数と武将の数から出す。どちらも表から数える */
@@ -3827,49 +3837,74 @@ const runNowPower=()=>{
   return byId(playPowers,g.order[g.at])||null;
 };
 
-/* 手番を1つ進める。ひと回りしたら月を1つ進めて順を組み直す */
+/* 手番を1つ進める。**ひと回りしたら旬を1つ進め、晦の次に月を進める**（§22.1・8.5.0）。
+   手番の時計の処理は毎回、月の時計の処理は月が変わった手番にだけ回す */
 function runTurnNext(){
   const g=playProgress[0]; if(!g)return;
   g.at++;
   /* **済んだ隊の控えは手番ごとに空にする。** 次の勢力は自分の隊を
      まだ1つも動かしていない */
   g.acted=[];
-  /* **滅んだ家の手番は飛ばす。** 順は月の初めに決めてあるので、途中で
-     滅んだ家の枠が残る。枠ごと詰めると、その月にまだ動いていない家が
+  /* **滅んだ家の手番は飛ばす。** 順は旬の初めに決めてあるので、途中で
+     滅んだ家の枠が残る。枠ごと詰めると、その旬にまだ動いていない家が
      繰り上がって二度動くことになる。飛ばすだけにする */
   while(g.at<g.turnNum&&!playPowers.some(p=>p.id===g.order[g.at]))g.at++;
-  if(g.at<g.turnNum)return;
-  g.month++;
-  if(g.month>12){g.month=1;g.year++;}
-  runSnowTick(g.month);          /* その月の雪が積もり、解ける（§10.16）*/
-  runDecayRonin();               /* 浪人は月ごとに勲功が減る */
-  runBetrayTick();               /* 忠誠の低い者の分裂・独立（§19.6）*/
-  /* **域は拠点から地続きでなければならない**（依頼・`runDomainTrim`）。月ごとに確かめ、飛び地を落とす */
+  if(g.at<g.turnNum){runTellTurn(g); return;}
+  g.jun=runJunOf(g)+1;
+  const newMonth=g.jun>TURNS_PER_MONTH;
+  if(newMonth){
+    g.jun=1;
+    g.month++;
+    if(g.month>12){g.month=1;g.year++;}
+  }
+  /* ---- 月の時計（月の初めの手番だけ）---- */
+  if(newMonth){
+    runSnowTick(g.month);          /* その月の雪が積もり、解ける（§10.16）*/
+    runDecayRonin();               /* 浪人は月ごとに勲功が減る */
+    runLifeTick();                 /* 寿命の尽きた者は病没する（§19.7）*/
+    if(g.month===1)runHealMind();  /* 年の初めに、友好が既定へ1だけ寄る（§32.2）*/
+    if(g.month===1)runHireTick();  /* 年の初めに、弱い武将が仕官してくる（§19.5）*/
+    if(g.month===1)runAppearTick();/* 年の初めに、後の世代の武将が元服する（§19.8）*/
+    if(g.month===1)runManzokuTick();/* 年の初めに、満足度で忠誠が上がる（§19.6）*/
+    if(g.month===1)runJunnoYear(); /* 年の初めに、順応が1上がる（§21.4）*/
+    runDecayTaikyu();              /* 拠点の耐久度が1落ちる */
+    runSeniDecay();                /* 戦意が1下がる（§32.3）*/
+    runWearTick();                 /* 手の入らない建築物が朽ちる（§24.7）*/
+  }
+  /* ---- 手番の時計（毎回）---- */
+  runBetrayTick();                 /* 忠誠の低い者の分裂・独立（§19.6。籤は旬ごと）*/
+  /* **域は拠点から地続きでなければならない**（依頼・`runDomainTrim`）。手番ごとに確かめ、飛び地を落とす */
   runDomainTrimAll();
   /* **古いセーブも揃える**（依頼）。勲功は上限（500）に収め、小大名（廃した）の当主は大名へ直す */
   for(const b of playBushou)if(typeof b.kunkou==="number"&&b.kunkou>KUNKOU_MAX)b.kunkou=KUNKOU_MAX;
-  runFixDaimyoRanks();           /* 大名の位は当主だけ（依頼）*/
-  runLifeTick();                 /* 寿命の尽きた者は病没する（§19.7）*/
-  runDecayAlly();                /* 期限の切れた同盟が解ける */
-  if(g.month===1)runHealMind();  /* 年の初めに、友好が既定へ1だけ寄る（§32.2）*/
-  if(g.month===1)runHireTick();  /* 年の初めに、弱い武将が仕官してくる（§19.5）*/
-  if(g.month===1)runAppearTick();/* 年の初めに、後の世代の武将が元服する（§19.8）*/
-  if(g.month===1)runManzokuTick();/* 年の初めに、満足度で忠誠が上がる（§19.6）*/
-  if(g.month===1)runJunnoYear(); /* 年の初めに、順応が1上がる（§21.4）*/
-  runNameEvents();               /* 改姓・改名（§19.9）*/
-  runDecayTaikyu();              /* 拠点の耐久度が1落ちる */
-  runSeniDecay();                /* 戦意が1下がる（§32.3）*/
-  runWearTick();                 /* 手の入らない建築物が朽ちる（§24.7）*/
-  runGrowSites();                /* 兵糧・金銭・兵・順応が動く */
-  runIkkiTick();                 /* 順応の低い拠点で一揆が起きる（§21.4）*/
-  runBuildTick();                /* 普請の月が進む（§24.6）*/
-  runOccupyTick();               /* 人が始めた占拠の月が進む（§27.7）*/
-  runFeedUnits();                /* 盤に出ている隊が食う（§21.3）*/
-  runDokuritsuHeal();            /* 独立勢力の兵が戻る（§28.3）*/
-  runMerchantMove();             /* 商人が次の城へ渡る（§27.5）*/
-  runRoninTick();                /* 浪人が歩き、仕え、旗を挙げる（§19.2）*/
-  runGrowTouchi();               /* 統治力が伸び、届けば升を取り込む */
+  runFixDaimyoRanks();             /* 大名の位は当主だけ（依頼）*/
+  runDecayAlly();                  /* 期限の切れた同盟が解ける */
+  runNameEvents();                 /* 改姓・改名（§19.9）*/
+  runGrowSites(newMonth);          /* 兵糧を食う・逃げる（手番ごと）。銭・兵・兵糧の入りと俸禄（月の初め）*/
+  runIkkiTick();                   /* 順応の低い拠点で一揆が起きる（§21.4。籤は旬ごと）*/
+  runBuildTick(newMonth);          /* 普請の手番が進む（§24.6）*/
+  runOccupyTick();                 /* 人が始めた占拠の手番が進む（§27.7）*/
+  runFeedUnits(newMonth);          /* 盤に出ている隊が食う（手番ごと）。支城の兵の戻り（月の初め）*/
+  if(newMonth){
+    runDokuritsuHeal();            /* 独立勢力の兵が戻る（§28.3）*/
+    runMerchantMove();             /* 商人が次の城へ渡る（§27.5）*/
+  }
+  runRoninTick();                  /* 浪人が歩き、仕え、旗を挙げる（§19.2）*/
+  if(newMonth)runGrowTouchi();     /* 統治力が伸び、届けば升を取り込む */
   g.order=runOrder(); g.turnNum=g.order.length; g.at=0;
+  runTellTurn(g);
+}
+/* **番の札**（依頼・8.5.0）。手番が次の家へ移るたびに「〇〇家の番になりました」を積む */
+function runTellTurn(g){
+  const pw=g.at<g.turnNum?byId(playPowers,g.order[g.at]):null;
+  if(!pw)return;
+  /* 札の升は当主の居城（無ければ当主の居る升、それも無ければ家の拠点の一つ）。札が出ると盤がそこへ飛ぶ（§31.5.1）*/
+  const t=runToushuOf(pw.id);
+  let cell=null;
+  if(t&&isLink(t.site)){const bs=byId(BASE_SITES,t.site.id); cell=bs?bs.cell:null;}
+  if(cell===null&&t)cell=runBushouCell(t);
+  if(cell===null){const st=runPowerSites(pw.id)[0]; const bs=st?byId(BASE_SITES,st.id):null; cell=bs?bs.cell:null;}
+  runTell(pw.label+"の番になりました","番",cell);
 }
 
 /* ユニットの拍。作業や歩みの姿が動く。1秒ごとに1コマ */
@@ -3926,7 +3961,7 @@ function drawHud(){
   /* 一覧が出ているあいだは隠す。地図が見えていないので出す意味がない */
   hud.hidden=listTab!==0;
   const g=playProgress[0];
-  el("hDate").textContent=g?(g.year+"年"+g.month+"月"):"";
+  el("hDate").textContent=dateText(g);
   /* **版はここ一箇所だけが持つ**（§1.6・§1.7）*/
   el("hVer").textContent="v"+VERSION;
   const b=sel===null?null:BASE_CELLS[sel-1];
@@ -4258,7 +4293,7 @@ function siteUnits(siteId){
 
 /* 派遣で選んでいる武将。選んでいなければ null */
 let siteGoBushou=null;
-let siteMenAll=null, siteRelAll=null, siteSort=null, siteTab="nai";   /* 武将を全員見せている城・並べ替えの列 */
+let siteMenAll=null, siteRelAll=null, siteSort=null;   /* 武将を全員見せている城・並べ替えの列 */
 
 /* ============================================================
    盤の上で選ぶ
@@ -4430,7 +4465,7 @@ function onSiteGo(typeId){
 }
 /* 城の下知を受ける。**受けて渡すだけ**（§2.4）*/
 /* 城の下知で売り買いする量。**決まった量だけ**（依頼）*/
-const SITE_BUY_RICE=200, SITE_SELL_RICE=600;
+const SITE_BUY_RICE=800, SITE_SELL_RICE=2400;   /* 一度に売り買いする兵糧。値が 1/4 なので量を 4 倍（8.5.0）*/
 const siteBuyOK =st=>st.kane>=SITE_BUY_RICE/RICE_BUY&&st.hyoro+SITE_BUY_RICE<=HYORO_MAX;
 const siteSellOK=st=>st.hyoro>=SITE_SELL_RICE&&st.kane+SITE_SELL_RICE/RICE_SELL<=KANE_MAX;
 function onSiteCmd(key){
@@ -4495,7 +4530,7 @@ function drawSite(){
   if(owner){
     kp=runKaneParts(st.id);
     for(let mo=1;mo<=12;mo++)crop+=runHarvestNow(st.id,mo);
-    eat=eatOf(st.hei)*12;
+    eat=eatMonthOf(st.hei)*12;
     yKane=(kp.take-kp.pay)*12; yRice=crop-eat;
     yHei=Math.min(heiHealOf(st)*12,Math.max(0,heiMaxOf(st)-st.hei));
   }
@@ -4508,7 +4543,7 @@ function drawSite(){
   if(owner&&yKane<0){const m=Math.floor(st.kane/(-yKane/12));
     P.push(`<div class="warn"><span>${m<=0?"銭が尽きた":"銭 あと"+ym(m)+"で尽きる"}</span></div>`);}
   if(owner&&(st.junno||0)<50)
-    P.push(`<div class="warn"><span>一揆のおそれ（毎月5%）</span>`
+    P.push(`<div class="warn"><span>一揆のおそれ（旬ごとに2%）</span>`
       +'</div>');
 
   /* 蓄え。今の値・1年の増減・収入と支出 */
@@ -4591,7 +4626,7 @@ function drawSite(){
   /* **適性は五段階で S・A・B・C・D**（依頼）。値は1〜5で持ち、5が S */
   const tekiLabel=v=>v>=1&&v<=5?"DCBAS"[v-1]:"";
   const SK={nou:b=>b.nou||0, shou:b=>b.shou||0, ken:b=>b.ken||0, tou:b=>b.tou||0,
-    ashi:b=>b.ashi||0, kiba:b=>b.kiba||0, tepp:b=>b.tepp||0, kiki:b=>b.kiki||0, sui:b=>b.sui||0, gaikou:b=>b.gaikou||0, sentou:b=>b.sentou||0, chibou:b=>b.chibou||0, ninja:b=>b.ninja?1:0, kunkou:b=>b.kunkou||0, age:b=>b.birth?-b.birth:0, kageki:b=>b.kageki??kifuOf(b.name)[0], kaitaku:b=>b.kaitaku??kifuOf(b.name)[1], chusei:b=>runIsToushu(b)?999:(b.chusei??CHUSEI_START)};
+    ashi:b=>b.ashi||0, kiba:b=>b.kiba||0, tepp:b=>b.tepp||0, kiki:b=>b.kiki||0, sui:b=>b.sui||0, gaikou:b=>b.gaikou||0, sentou:b=>b.sentou||0, chibou:b=>b.chibou||0, ninja:b=>b.ninja?1:0, kunkou:b=>b.kunkou||0, age:b=>b.birth?-b.birth:0, ichimon:b=>b.ichimon?1:0, kageki:b=>b.kageki??kifuOf(b.name)[0], kaitaku:b=>b.kaitaku??kifuOf(b.name)[1], chusei:b=>runIsToushu(b)?999:(b.chusei??CHUSEI_START)};
   const sk=siteSort&&SK[siteSort]?SK[siteSort]:null;
   const ms=men.map(m=>({m,b:byId(playBushou,m.id)})).filter(x=>x.b)
     .sort((a,b)=>(sk?sk(b.b)-sk(a.b):0)||(lord&&b.b.id===lord.id)-(lord&&a.b.id===lord.id)||((rkOf(b.b)||{hei:0}).hei-(rkOf(a.b)||{hei:0}).hei));
@@ -4600,33 +4635,33 @@ function drawSite(){
     const vis=all||ms.length<=SHOW+1?ms:ms.slice(0,SHOW);
     /* **仕事ごとの能力**（依頼）。内政と戦の二つに分けて出す。忠誠は内政の側 */
     const T=v=>({v:tekiLabel(v),c:"c"});
-    /* 並びは どちらも 能力 → 適性 → 忠誠。忠誠はいつも右端。広い画面では全部を1つの表に */
-    /* 窓の幅（CSS の #site と同じ式）で決める。全部の列には約700px要る */
-    const winW=Math.min(window.innerWidth*0.94,Math.max(520,Math.min(window.innerWidth*0.42,760)));
-    const wide=winW>=700;
-    const tab=wide?"all":["cho","ikusa","mi"].includes(siteTab)?siteTab:"nai";
-    const C={gaikou:["gaikou","外交",b=>({v:b.gaikou,c:"r"})], chibou:["chibou","智謀",b=>({v:b.chibou,c:"r"})], ninja:["ninja","忍び",b=>({v:b.ninja?"○":"",c:"c"})],
+    /* **全部を1つの表に出す。窓に収まらなければ横へ滑らせる**（依頼・8.5.0。それまでは狭い窓でタブを切り替えていた）。
+       名の列は滑らせても左に残す */
+    const C={gaikou:["gaikou","外交",b=>({v:b.gaikou,c:"r"})], chibou:["chibou","智謀",b=>({v:b.chibou,c:"r"})], ninja:["ninja","忍者",b=>({v:b.ninja?"○":"✕",c:"c"})],
       kunkou:["kunkou","勲功",b=>({v:b.kunkou??0,c:"r"})],
-      kageki:["kageki","過激度",b=>({v:b.kageki??kifuOf(b.name)[0],c:"r"})], kaitaku:["kaitaku","開拓",b=>({v:b.kaitaku??kifuOf(b.name)[1],c:"r"})], age:["age","年齢",b=>({v:b.birth?(playProgress[0]?playProgress[0].year:0)-b.birth:"",c:"r"})],
+      ichimon:["ichimon","一門",b=>({v:b.ichimon?"○":"",c:"c"})],
+      kageki:["kageki","過激",b=>({v:b.kageki??kifuOf(b.name)[0],c:"r"})], kaitaku:["kaitaku","開拓",b=>({v:b.kaitaku??kifuOf(b.name)[1],c:"r"})], age:["age","年齢",b=>({v:b.birth?(playProgress[0]?playProgress[0].year:0)-b.birth:"",c:"r"})],
       sentou:["sentou","戦闘",b=>({v:b.sentou,c:"r"})],
-      nou:["nou","農",b=>T(b.nou)], shou:["shou","商",b=>T(b.shou)], ken:["ken","建",b=>T(b.ken)], tou:["tou","登用",b=>T(b.tou)],
+      nou:["nou","農業",b=>T(b.nou)], shou:["shou","商業",b=>T(b.shou)], ken:["ken","建築",b=>T(b.ken)], tou:["tou","登用",b=>T(b.tou)],
       ashi:["ashi","足軽",b=>T(b.ashi)], kiba:["kiba","騎馬",b=>T(b.kiba)], tepp:["tepp","鉄砲",b=>T(b.tepp)], kiki:["kiki","鉄騎",b=>T(b.kiki)], sui:["sui","水軍",b=>T(b.sui)],
       chusei:["chusei","忠誠",b=>({v:runIsToushu(b)?"—":(b.chusei??CHUSEI_START),c:"r"})]};
     const pick=ks=>ks.map(k=>C[k]);
-    /* **武将の基礎の値は全部出す**（依頼）。**派遣する仕事ごとにまとめる**（レビュー）。
-       内政 → 調略 → 戦 → 身上 → 忠誠（右端）。まとまりの中は 数 → ○ → S〜D。内政は派遣の一覧の順（農業・建築・商業）*/
-    const G={nai:["内政",pick(["nou","ken","shou"])], cho:["調略",pick(["gaikou","chibou","ninja","tou"])],
-      ikusa:["戦",pick(["sentou","ashi","kiba","tepp","kiki","sui"])], mi:["身上",pick(["kunkou","age"])], ki:["気質",pick(["kageki","kaitaku"])]};
-    /* 気質（過激度・開拓）は、その武将が当主になったときの家の性格。経歴（身上）とは分ける。狭い画面では身上のタブに並べる */
-    const COLS=(tab==="all"?["nai","cho","ikusa","mi","ki"].map(k=>G[k]):tab==="mi"?[G.mi,G.ki]:[G[tab]]).concat([["",pick(["chusei"])]]);
-    P.push('<div class="sec">武将 '+ms.length+'人'+(wide?'':'<span class="tabs">'
-      +[["nai","内政"],["cho","調略"],["ikusa","戦"],["mi","身上"]].map(([k,l])=>`<button class="tb${tab===k?" on":""}" data-tab="${k}">${l}</button>`).join("")+'</span>')+'</div>');
+    /* **武将の基礎の値は全部出す**（依頼）。
+       内政・調略 → 戦 → 身上 → 気質 → 忠誠（右端）。**内政と調略は一つのまとまり**（依頼・8.5.0）：
+       外交・智謀・農業・建築・商業・登用・忍者の順。忍者は ○ か ✕ */
+    const G={sei:["内政・調略",pick(["gaikou","chibou","nou","ken","shou","tou","ninja"])],
+      ikusa:["戦",pick(["sentou","ashi","kiba","tepp","kiki","sui"])], mi:["身上",pick(["kunkou","age","ichimon"])], ki:["気質",pick(["kageki","kaitaku"])]};
+    /* **一門かどうかは身上に出す**（依頼・8.5.0）。
+       気質（過激度・開拓）は、その武将が当主になったときの家の性格。経歴（身上）とは分ける。狭い画面では身上のタブに並べる */
+    const COLS=["sei","ikusa","mi","ki"].map(k=>G[k]).concat([["",pick(["chusei"])]]);
+    P.push('<div class="sec">武将 '+ms.length+'人</div>');
     const sepH=i=>i===COLS.length-1?'<th class="fill"></th>':'<th class="gap"></th>';
     const sepD=i=>i===COLS.length-1?'<td class="fill"></td>':'<td class="gap"></td>';
-    const bl=(cs,j)=>j>0&&cs[j][2](ms[0].b).c!=="r"&&cs[j-1][2](ms[0].b).c==="r"?" bl":"";
+    /* **値の列はどれも同じ幅**（依頼・8.5.0）。値は3桁の数・S〜D・○ だけなので、3桁の数に揃える（`.v`）。
+       見出しは全角2字まで（過激度は「過激」）*/
     const g1=COLS.map(([g,cs],i)=>(i?sepH(i):'')+(g?`<th colspan="${cs.length}" class="grp">${g}</th>`:`<th colspan="${cs.length}"></th>`)).join("");
-    const g2=COLS.map(([g,cs],i)=>(i?sepH(i):'')+cs.map(([k,l,f],j)=>`<th class="${f(ms[0].b).c}${bl(cs,j)} so${siteSort===k?" on":""}" data-sort="${k}">${l}</th>`).join("")).join("");
-    P.push('<table class="bt">'+(wide?'<tr class="g"><th></th><th></th>'+g1+(mine?'<th></th>':'')+'</tr>':'')
+    const g2=COLS.map(([g,cs],i)=>(i?sepH(i):'')+cs.map(([k,l,f],j)=>`<th class="${f(ms[0].b).c} v so${siteSort===k?" on":""}" data-sort="${k}">${l}</th>`).join("")).join("");
+    P.push('<div class="btw"><table class="bt"><tr class="g"><th></th><th></th>'+g1+(mine?'<th></th>':'')+'</tr>'
       +`<tr><th>名</th><th class="so${siteSort?"":" on"}" data-sort="">役職</th>`+g2+(mine?'<th></th>':'')+'</tr>'
       +vis.map(({m,b})=>{
         const r=rkOf(b); const u=playUnits.find(x=>isLink(x.bushou)&&x.bushou.id===m.id);
@@ -4634,9 +4669,9 @@ function drawSite(){
         return `<tr class="${m.busy?"out":can?"sel":""}${siteGoBushou===b.id?" on":""}"${can?` data-go="${b.id}"`:""}><td>${esc(b.name)}`
           +(m.busy&&u?'<span class="tag">'+esc(linkValue(u.type))+'中</span>':"")
           +`</td><td>${esc(r?r.label:"—")}</td>`
-          +COLS.map(([g,cs],i)=>(i?sepD(i):'')+cs.map(([k,l,f],j)=>{const x=f(b); return `<td class="${x.c}${bl(cs,j)}">${x.v}</td>`;}).join("")).join("")
+          +COLS.map(([g,cs],i)=>(i?sepD(i):'')+cs.map(([k,l,f],j)=>{const x=f(b); return `<td class="${x.c} v">${x.v}</td>`;}).join("")).join("")
           +(mine?`<td class="r go">${can?"›":""}</td>`:"")+'</tr>';
-      }).join("")+'</table>');
+      }).join("")+'</table></div>');
     if(vis.length<ms.length)P.push(`<button class="more" data-more="1">ほか${ms.length-vis.length}人を見る</button>`);
     if(siteGoBushou!==null){
       const b=byId(playBushou,siteGoBushou);
@@ -4666,12 +4701,14 @@ function drawSite(){
     if(playerPower()===0)P.push('<div class="row cmd"><button data-sc="take">この家を継ぐ</button></div>');
   }
   const body=el("siteBody");
+  /* **武将の表の横の滑りは描き直しても戻さない**（依頼）。自動進行のたびに札を描き直すが、
+     表ごと入れ替えるので滑りが 0 に戻り、動かしながらでは右の列が見られなかった */
+  const btw0=body.querySelector(".btw"), slideX=btw0?btw0.scrollLeft:0;
   body.innerHTML=P.join("");
+  if(slideX){ const btw1=body.querySelector(".btw"); if(btw1)btw1.scrollLeft=slideX; }
   /* 押し口は描き直すたびに作り直す。中身ごと入れ替えているため */
   for(const x of body.querySelectorAll("[data-go]"))
     x.addEventListener("click",()=>onSitePick(+x.dataset.go));
-  for(const x of body.querySelectorAll("[data-tab]"))
-    x.addEventListener("click",()=>{if(siteTab!==x.dataset.tab){siteTab=x.dataset.tab; siteSort=null;} drawSite();});
   for(const x of body.querySelectorAll("[data-sort]"))
     x.addEventListener("click",()=>{siteSort=x.dataset.sort||null; drawSite();});
   for(const x of body.querySelectorAll("[data-more]"))
@@ -4766,10 +4803,10 @@ function unitCmds(u){
   /* **占める**（依頼・§27.7）。人の軍勢も、立っている升を占拠できる。
      選んだ月から月末ごとに1月ずつ積み、積み切れば有効領域になる。離れれば積んだ月は消える */
   if(type==="軍勢"&&runCanOccupy(u.id,u.q.id)&&!(u.occ&&u.occ.cell===u.q.id))
-    out.push({k:"occupy", t:"占める（"+runOccMonths(u.id,u.q.id)+"か月）"});
+    out.push({k:"occupy", t:"占める（"+turnsText(runOccMonths(u.id,u.q.id))+"）"});
   /* **待っている理由を書く**（§26.3・依頼）*/
   if(type==="軍勢"&&campWait&&!foeCells.length)
-    out.push({k:"none", t:"陣を敷いている（次の月から寄せられる）"});
+    out.push({k:"none", t:"陣を敷いている（次の手番から寄せられる）"});
   /* **荒らす**（§27.6）。いま立っている升に、よその家の建てたものがあるとき */
   if(type==="軍勢"&&runCanRavage(u.id,u.q.id))out.push({k:"ravage", t:"荒らす"});
   /* **築港はそれと分かる名で出す**（§24.1）。水の姿の建築の隊が港適地に
@@ -4781,7 +4818,7 @@ function unitCmds(u){
     /* 拠点の普請には期間が無い（依頼）。耐久度と目当てを出す */
     const fx=u.work.fix, fst=(fx!==null&&fx!==undefined)?byId(playSites,fx):null;
     out.push({k:"none", t:u.work.label+"　"+(fst&&fst.fushin
-      ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to):"あと"+Math.ceil(u.work.left)+"月")});
+      ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to,fst.id):"あと"+turnsText(u.work.left))});
   }else{
     const w=inDom?runBuildAt(u,u.q.id):null;
     /* **開墾は「起こす」と出す**（§24.5）。開墾地は建築物の行になるが、
@@ -4789,10 +4826,10 @@ function unitCmds(u){
     if(w)out.push({k:"build",
       t:(w.cat==="港"?"築港":w.cat==="開墾"?"起こす"
          :(w.up?"段を上げる":"建てる"))
-        +"（"+w.months+"月）"});
+        +"（"+turnsText(w.months)+"）"});
   }
   /* **土手は岸から盛る**（§24.4）。立っている升でも、隣の川でもよい */
-  if(!u.work&&runLeveeAt(u.id)!==null)out.push({k:"levee", t:"治水（"+LEVEE_MONTHS+"月・銭"+LEVEE_COST+"）"});
+  if(!u.work&&runLeveeAt(u.id)!==null)out.push({k:"levee", t:"治水（"+turnsText(LEVEE_MONTHS*TURNS_PER_MONTH)+"・銭"+LEVEE_COST+"）"});
   /* 普請の先は、隣り合う自分の城と無主の拠点（§21.1・§27.1）。
      **月数のある仕事なので、何月かかるかを札に出す**（§24.6）*/
   {const sid=u.work?null:runRepairAt(u.id);
@@ -4802,7 +4839,7 @@ function unitCmds(u){
      const to0=st0&&st0.fushin?st0.fushin.to:runRepairTo(sid);
      const men=runFushinMen(sid).length;
      out.push({k:"repair",
-       t:(got?"起こす":"普請")+"（耐久度"+(st0?st0.taikyu:0)+"／"+(to0!==null?repairTaikyuOf(to0):"-")
+       t:(got?"起こす":"普請")+"（耐久度"+(st0?st0.taikyu:0)+"／"+(to0!==null?repairTaikyuOf(to0,sid):"-")
          +(men?"・"+men+"人が普請中":"")+"）"});
    }}
   if(type==="外交"&&envoySites.length){
@@ -5031,7 +5068,7 @@ function onBatStepTick(){
   batEv=batEvNow();
   drawBattle();
   if(batStepAt<batStepList.length)
-    batStepTimer=setTimeout(onBatStepTick,BAT_ARROW_MS/Math.max(1,aiSpeed));
+    batStepTimer=setTimeout(onBatStepTick,BAT_ARROW_MS/batDiv());
 }
 function batStepStop(){ clearTimeout(batStepTimer); batStepTimer=0; }
 /* その番の段を頭から送り出す */
@@ -5043,7 +5080,7 @@ function batStepPlay(side){
   batStepAt=0;
   batEv=batEvNow();
   if(batStepList.length)
-    batStepTimer=setTimeout(onBatStepTick,BAT_ARROW_MS/Math.max(1,aiSpeed));
+    batStepTimer=setTimeout(onBatStepTick,BAT_ARROW_MS/batDiv());
 }
 /* 半拍だけ進める。返すのは、いま出した番の名 */
 /* **見せる順は、盤が動いた順と同じにする**（依頼・§31.5）。
@@ -5595,7 +5632,7 @@ function drawBattle(){
      同じ数が画面に二か所あった。ここは年月と土地だけにする */
   {const g2=playProgress[0];
    const fa=B.atk.gr&&B.atk.gr.field, fd=B.def.gr&&B.def.gr.field;
-   const txt=(g2?g2.year+"年 "+g2.month+"月":"")+"　"+((fa&&fd&&fa!==fd)?("攻め手 "+fa+"・受け手 "+fd):(B.field||""));
+   const txt=dateText(g2," ")+"　"+((fa&&fd&&fa!==fd)?("攻め手 "+fa+"・受け手 "+fd):(B.field||""));
    g.textAlign="right"; g.font=fpx(12);
    g.fillStyle="rgba(16,14,8,0.80)";
    g.fillRect(w-12-g.measureText(txt).width-10,h-40,g.measureText(txt).width+20,22);
@@ -6163,6 +6200,14 @@ function* glBuildMeshGen(){
        そのまま結ぶと河口の手前でヘアピンになる。終わりの3升のうち、水の升に隣り合っていて
        そこへ向かう折れが 90 度未満のいちばん手前の節点で切り、水の升の中心へ繋ぐ。
        終点が陸なら、先（2升以内）の水の升を同じやり方で繋ぐ（鵡川・大野川） */
+    /* **湖へは岸の辺で入る**（依頼・8.5.0）。湖の升は周りより低く、岸に壁が立つ。湖の中心まで帯を伸ばすと、
+       川が壁を越えて湖面の上に寝そべり、湖の真ん中で丸く途切れる（山中湖と桂川）。
+       岸の辺のすぐ陸側（陸の高さ）と、すぐ湖側（湖面の高さ）の二つの節点で終える。帯は壁を下りて湖面で終わる */
+    const lakeEdge=(cL,W)=>{
+      const ex=(cL.x+W.x)/2, ey=(cL.y+W.y)/2;
+      return [{x:ex+(cL.x-ex)*0.06, y:ey+(cL.y-ey)*0.06, g:cL.g},
+              {x:ex+(W.x-ex)*0.10,  y:ey+(W.y-ey)*0.10,  g:W.g, water:true}];
+    };
     if(ln.type===3&&!trib&&nd.length>=2){
       const cellAtNode=n=>cellNear(n.x,n.y);
       let W=null;
@@ -6178,12 +6223,39 @@ function* glBuildMeshGen(){
           if(cos>0){kk=k;break;}
         }
         nd=nd.slice(0,kk+1); wid=wid.slice(0,kk+1);
-        nd.push({x:W.x,y:W.y,g:W.g,water:true}); wid.push(wid[wid.length-1]);
+        const cL=cellRow.get((cellAtNode(nd[kk])||{}).id);
+        if(W.type===T_LAKE&&cL&&cL.id!==W.id&&hexSteps(cL.q,cL.r,W.q,W.r)===1){
+          const [a,b]=lakeEdge(cL,W), ww=wid[wid.length-1];
+          if(Math.hypot(nd[kk].x-a.x,nd[kk].y-a.y)<R*0.2&&nd.length>2){nd.pop();wid.pop();}
+          nd.push(a,b); wid.push(ww,ww);
+        }else{
+          nd.push({x:W.x,y:W.y,g:W.g,water:true}); wid.push(wid[wid.length-1]);
+        }
       }
     }
     if(ln.type===3&&!ln.src&&nd.length>=2){                /* 湖のそばから始まる川 */
       const rev=nd.slice().reverse(); const wa=waterAhead(rev);
-      if(wa&&wa.c.type===T_LAKE&&!wa.drop){ nd.unshift({x:wa.c.x, y:wa.c.y, g:wa.c.g, water:true}); wid.unshift(wid[0]); shift=1; }
+      if(wa&&wa.c.type===T_LAKE&&!wa.drop){
+        const cL=cellRow.get((cellNear(nd[0].x,nd[0].y)||{}).id), W=wa.c;
+        if(cL&&cL.id!==W.id&&hexSteps(cL.q,cL.r,W.q,W.r)===1){   /* 岸の辺から出る（上と同じ）*/
+          const [a,b]=lakeEdge(cL,W);
+          nd.unshift(b,a); wid.unshift(wid[0],wid[0]); shift=2;
+        }else{ nd.unshift({x:W.x, y:W.y, g:W.g, water:true}); wid.unshift(wid[0]); shift=1; }
+      }
+    }
+    /* **湖の中から始まる川**（`src` の節点が湖の升にある。桂川は山中湖の中心から）も、岸の辺から出す */
+    if(ln.type===3&&ln.src&&nd.length>=4){
+      const c0=cellNear(nd[0].x,nd[0].y), W=c0&&cellRow.get(c0.id);
+      if(W&&W.type===T_LAKE){
+        let d=0;
+        while(nd.length>3&&(cellNear(nd[0].x,nd[0].y)||{}).id===W.id){nd.shift();wid.shift();d++;}
+        const cL=cellRow.get((cellNear(nd[0].x,nd[0].y)||{}).id);
+        if(cL&&cL.id!==W.id&&hexSteps(cL.q,cL.r,W.q,W.r)===1){
+          const [a,b]=lakeEdge(cL,W);
+          if(Math.hypot(nd[0].x-a.x,nd[0].y-a.y)<R*0.2){nd.shift();wid.shift();d++;}
+          nd.unshift(b,a); wid.unshift(wid[0],wid[0]); shift=2-d;
+        }else{ nd.unshift({x:W.x, y:W.y, g:W.g, water:true}); wid.unshift(wid[0]); shift=1-d; }
+      }
     }
     const N=nd.length;
     const Pp=nd.map(n=>{const g=n.water?n.g:(ln.type===3?surfG(n):n.g);
@@ -6451,30 +6523,9 @@ function* glBuildMeshGen(){
             sRef, cam:view.cam};
   }
 
-  /* ------------------------------------------------------------
-     **森（山地）は木の群れで描く**（§10.21・8.4.0）
-     ------------------------------------------------------------
-     升ごとの低ポリの円錐は「濃緑の塊」にしか見えなかった。木の冠（三角）を升の中心から
-     1.05R まで散らし、**升の縁を越えて群れさせる**。根元の色は升の面色そのもので、梢ほど暗い。
-     升の縁を越えた木は根元の行（手前）の束に入れ、その行の面の上に積む（自分の行に積むと
-     手前の行の面に下半分が隠される）。名のある峰と高山は円錐のまま（岩山として読み分ける）。
-     本数は倍率で 3〜7 本。升が小さい（半径 11px 未満）ときは描かない */
-  const treeRows=[];
-  if(obl&&rad>=LOD_TONGUE){                      /* 50% では木を描かない（1〜2px の木は柄に見える）。山地は円錐で（下）*/
-    const nMax=rad>=45?7:5;
-    for(const c of drawCache){
-      if(c.type!==MT_A||c.named)continue;
-      /* 本数は低周波の揺らぎで 2〜7 本。升の 1/4 ほどは 2 本以下にして地面を見せる */
-      const dens=vns(c.x*0.18+3.1,c.y*0.18+7.7);
-      const nTree=Math.max(2,Math.round(nMax*(0.35+0.65*dens)));
-      for(let k=0;k<nTree;k++){
-        const ax=rnd3(c.q,c.r,500+k*7), ay=rnd3(c.q,c.r,600+k*7);
-        const x=c.x+(ax-0.5)*2*R*1.05, y=c.y+(ay-0.5)*2*R*0.92;
-        const h=R*(0.35+0.40*rnd3(c.q,c.r,700+k*7)), w=R*(0.16+0.12*rnd3(c.q,c.r,800+k*7));
-        const rr=rowOf(y); (treeRows[rr]||(treeRows[rr]=[])).push({c,x,y,h,w,lt:rnd3(c.q,c.r,900+k*7)<0.5});
-      }
-    }
-  }
+  /* **山地はどの倍率でも円錐の山で描く**（依頼・8.5.0）。8.4.0 で 100% 以上を木の群れにしたが、
+     倍率で絵が変わり、木どうし・木と峰の前後も読みにくかったので、50% と同じ多峰の円錐に戻した。
+     名のある峰と高山は一つの峰（岩山として読み分ける） */
   /* --- 一の巻き。地形だけを行の順に積む --- */
   for(let r=0;r<span;r++){
     yield;
@@ -6606,12 +6657,11 @@ function* glBuildMeshGen(){
       }
       const mts=[];                               /* 山は背の高い順に */
       for(const c of row){ if(!c.mtn)continue;
-        if(rad>=LOD_TONGUE&&c.type===MT_A&&!c.named)continue;   /* 100% 以上の山地は木の群れで（上）。50% は多峰の円錐のまま（引いても山と読める）*/
         const grow=0.60+Math.min(1,c.m/2300)*0.62;
         mts.push({c,px:c.x*sRef,py:(c.y*ys)*sRef-c.g*sRef,
                   hh:(c.type===MT_B?0.86:0.68)*grow*(c.named?1.18:1)}); }
       mts.sort((a,b)=>b.hh-a.hh);
-      for(const T of mts){
+      const drawMt=T=>{
         const S=mountainSil(T.c,T.px,T.py,rad);
         const prof=glSil(S.sil).map(W), base=S.base/sRef;
         /* 積雪。**半透明を上から重ねない。** 隣り合う山どうしが重なると
@@ -6646,44 +6696,53 @@ function* glBuildMeshGen(){
         if(vS<0.02)M.seg(W([S.apexX,S.apexY]),W(S.fr),Math.max(0.5,rad*0.04)/sRef/2,
               [111,116,112,128]);               /* 稜線は灰の縁取り（国絵図）。白は雪と街道の記号なので使わない */
         if(playCells[T.c.id-1].effect&32){        /* 冠雪（高い山の頂。10月〜5月・§10.16）*/
+          /* **冠雪は頂ごとに、雪線より上だけを切り出す**（依頼・8.5.0）。
+             山の横幅いっぱいの帯として描いていたため、鞍部が雪線より低い所にも帯が伸び、
+             山の端で垂直に切れて「つば」に見えた（帽子だけが浮く）。頂ごとの片に分け、
+             雪線は低周波で波打たせ、下の 65% は受光面・陰の面それぞれの色へ溶かす
+             （いちばん下は山肌そのもの）。白は青白でなく胡粉寄り。
+             半透明は重ねない（隣の山と重なると二重に塗られる）。色そのものを混ぜる */
           const rn=k=>rnd3(T.c.q,T.c.r,k);
-          const yc=S.apexY+S.tot*(0.30+0.10*rn(4)), cap=[];
+          const ycB=S.apexY+S.tot*(0.30+0.10*rn(4));
+          const jag=x=>ycB+S.tot*0.15*(2*vns(x/(rad*1.2)+T.c.q*1.7, T.c.r*2.3+0.37)-1);
+          const litC=vS<0.02?lt.concat(255):mixTo(lt,Math.min(0.92,vM+0.25));
+          const faceOf=p=>p[0]<S.apexX?litC:(vS<0.02?dk.concat(255):at(dk,W(p)));   /* 受光面は左半分（§10.21）*/
+          const capCol=p=>{
+            const h=Math.max(0,Math.min(1,(p[1]-S.apexY)/((ycB-S.apexY)||1)));
+            const sn=[246-38*h,246-32*h,240-30*h];
+            const f=Math.pow(Math.max(0,(h-0.35)/0.65),1.5), fc4=faceOf(p);
+            return [0,1,2].map(i=>Math.round(sn[i]*(1-f)+fc4[i]*f)).concat(255);
+          };
+          const cross=(a,b)=>{                     /* 線分と波打つ雪線の交点。直線の交点を詰める */
+            let t=0.5; for(let it=0;it<3;it++){ const x=a[0]+(b[0]-a[0])*t; t=(jag(x)-a[1])/((b[1]-a[1])||1); t=Math.max(0,Math.min(1,t)); }
+            const x=a[0]+(b[0]-a[0])*t; return [x,jag(x)];
+          };
+          let piece=null;
+          const flush=()=>{
+            if(!piece||piece.length<2){piece=null;return;}
+            const x0=piece[piece.length-1][0], x1=piece[0][0], K=6;   /* 下の縁。出た所から入った所へ、雪線に沿って戻る */
+            for(let k=1;k<K;k++){ const x=x0+(x1-x0)*k/K; piece.push([x,jag(x)]); }
+            let top=1e9, sx=0; for(const p of piece){ if(p[1]<top)top=p[1]; sx+=p[0]; }
+            const ctr=[sx/piece.length,(top+ycB)/2];
+            const sm=glSil(piece);
+            M.fan(W(ctr),sm.map(W),capCol(ctr),sm.map(capCol));
+            piece=null;
+          };
           for(let i=0;i<S.sil.length-1;i++){
             const a=S.sil[i],b=S.sil[i+1];
-            if(a[1]<yc)cap.push(a);
-            if((a[1]<yc)!==(b[1]<yc)){
-              const t=(yc-a[1])/(b[1]-a[1]);
-              cap.push([a[0]+(b[0]-a[0])*t,yc]);
+            const ua=a[1]<jag(a[0]), ub=b[1]<jag(b[0]);
+            if(ua&&piece)piece.push(a);
+            if(ua!==ub){
+              const c2=cross(a,b);
+              if(!ua){ piece=[c2]; }              /* 雪線に入る */
+              else { piece.push(c2); flush(); }   /* 雪線から出る */
             }
           }
-          if(cap.length>2){
-            const pc=glSil(cap).map(W);
-            const y0=S.apexY/sRef, y1=yc/sRef;
-            const cl=p=>{const t=Math.max(0,Math.min(1,(p[1]-y0)/((y1-y0)||1)));
-              return [Math.round(244-41*t),Math.round(248-32*t),Math.round(250-28*t),255];};
-            M.fan(W([S.apexX,yc]),pc,[220,232,238,255],pc.map(cl));
-          }
+          flush();
         }
         for(const p of prof)if(p[1]<ymin)ymin=p[1];
-      }
-    }
-    /* 木の群れ。奥（y の小さい）から順に */
-    const trees=treeRows[r];
-    if(trees){
-      trees.sort((a,b)=>a.y-b.y);
-      for(const t of trees){
-        const c=t.c, fc=c.own||glShade(color.get(c.paint)||"#000",c.sh);
-        const vS=snowAt(c);
-        const px=t.x*sRef, py=(t.y*ys)*sRef-c.g*sRef;
-        const top=fc.map(v=>Math.round(v*(t.lt?0.84:0.68)));
-        const base=vS<0.02?fc.concat(255):snowMix(fc,vS);
-        /* 雪の森は梢を白くしない。梢の色から雪影の青灰 #dfe6e0 へ 3 割だけ寄せる（白い三角の群れは静電気のノイズに見え、
-           灰緑一色だと幽霊の森に見える。梢が暗いまま残ることが「雪の下の山地」の印）*/
-        const apex=vS<0.02?top.concat(255):top.map((v,i)=>Math.round(v+([223,230,224][i]-v)*0.30)).concat(255);
-        const A=W([px,py-t.h*sRef]), Bl=W([px-t.w*sRef,py]), Br=W([px+t.w*sRef,py]);
-        M.tri(Bl,Br,A,base,base,apex);
-        if(A[1]<ymin)ymin=A[1]; if(Bl[1]>ymax)ymax=Bl[1];
-      }
+      };
+      for(const T of mts)drawMt(T);
     }
     terAt[r]={start,count:M.n-start,ymin,ymax};
   }
@@ -10165,7 +10224,7 @@ const SCENARIO_POWERS=[
    **遊ぶための値であって、史実の測りではない。** 名の知られた戦を残した者を
    高く、政に重きを置いた者を低く当て、名指ししない者は 50 に置く */
 const BUSHOU_SENTOU={
- /* 後の世代（§19.8）*/ "伊達政宗":88,"伊達輝宗":62,"伊達成実":84,"片倉景綱":72,"最上義光":80,"南部信直":72,"津軽為信":78,"上杉景勝":82,"直江兼続":74,"戸沢盛安":86,"蘆名盛隆":64,"安東愛季":76,"秋田実季":62,"相馬義胤":80,"大内定綱":66,"鬼庭綱元":60,"新発田重家":84,"松前慶広":62,"九戸実親":72,"延沢満延":88,"楯岡満茂":66,"志村光安":66,"白石宗実":68,"後藤信康":76,"原田宗時":76,"支倉常長":52,"岩城常隆":66,"東禅寺義長":70,"仁賀保挙誠":64,"畠山義継":64,"留守政景":64,"石川昭光":60,"亘理重宗":62,"伊達忠宗":58,"片倉重長":78,"八戸政栄":64,"大崎義隆":52,"小野寺義道":60,"大宝寺義氏":58,"最上家親":56,
+ /* 後の世代（§19.8）*/ "伊達政宗":84,"伊達輝宗":62,"伊達成実":84,"片倉景綱":72,"最上義光":80,"南部信直":66,"津軽為信":78,"上杉景勝":82,"直江兼続":74,"戸沢盛安":86,"蘆名盛隆":64,"安東愛季":76,"秋田実季":62,"相馬義胤":80,"大内定綱":66,"鬼庭綱元":60,"新発田重家":84,"松前慶広":62,"九戸実親":72,"延沢満延":88,"楯岡満茂":66,"志村光安":66,"白石宗実":68,"後藤信康":76,"原田宗時":76,"支倉常長":52,"岩城常隆":66,"東禅寺義長":70,"仁賀保挙誠":72,"畠山義継":64,"留守政景":64,"石川昭光":60,"亘理重宗":62,"伊達忠宗":58,"片倉重長":78,"八戸政栄":64,"大崎義隆":52,"小野寺義道":60,"大宝寺義氏":58,"最上家親":56,
  "寒河江兼広":52,"鮎川清長":60,
  "小梁川宗朝":60,"石母田光頼":52,"白石宗利":60,"原田宗政":64,"富塚宗綱":56,"泉田重光":62,"針生盛幸":58,"富田滋実":62,"猪苗代盛国":64,"南長義":58,"七戸家国":60,"桜庭光康":62,"二本松盛国":54,"堀越能登":56,"大崎義宣":52,"氏家直継":58,"葛西晴胤":56,"柏山明吉":60,"岩城親隆":54,"須田盛秀":66,"田村顕基":54,"成沢道忠":58,"長尾政景":74,"本庄実乃":60,"色部勝長":72,"黒川晴氏":58,"中条藤資":66,"白鳥長久":64,
  "蠣崎季広":62,"長門広益":52,"南条広継":58,
@@ -10180,7 +10239,7 @@ const BUSHOU_SENTOU={
  "大宝寺義増":50,"土佐林禅棟":56,
  "最上義守":58,"氏家定直":60,"氏家守棟":64,"天童頼貞":56,
  "上山義忠":58,"清水義高":60,"延沢満重":72,"小笠原光貞":54,
- "伊達晴宗":70,"伊達実元":74,"鬼庭良直":80,"遠藤基信":52,
+ "伊達晴宗":62,"伊達実元":74,"鬼庭良直":80,"遠藤基信":52,
  "中野宗時":58,"牧野久仲":56,"亘理元宗":72,"桑折景長":60,
  "蘆名盛氏":84,"金上盛備":70,"佐瀬種常":62,"松本氏輔":58,
  "平田舜範":58,"長沼実国":56,
@@ -10192,20 +10251,28 @@ const BUSHOU_SENTOU={
  "安東舜季":62,"安東堯季":58,"豊島重村":60,"千徳政吉":54,
  "本庄繁長":86,"長尾景虎":96,"山吉政久":64,"北条高広":74,"新発田綱貞":66,
  "ハシタイン":58,"チコモタイン":58,
- /* 関東・越後・佐渡（R2・R3。遊ぶための値）*/ "北条氏康":88,"北条綱成":90,"北条宗哲":50,"北条氏尭":58,"北条康成":76,"北条綱高":74,"北条綱房":64,"大道寺周勝":58,"松田盛秀":60,"松田憲秀":56,"遠山綱景":70,"富永直勝":68,"多目元忠":66,"間宮康俊":64,"石巻家貞":40,"大藤信基":74,"太田康資":78,"吉良頼康":40,"上田朝直":56,"藤田泰邦":62,"大石綱周":56,"那波宗俊":60,"長尾景総":56,"小幡憲重":70,"上杉憲政":42,"長尾当長":58,"長尾憲景":66,"長尾景孝":50,"桐生助綱":62,"安中重繁":60,"倉賀野尚行":60,"上杉憲盛":54,"足利晴氏":42,"足利藤氏":46,"簗田晴助":68,"一色直朝":44,"野田弘朝":52,"里見義堯":84,"里見義舜":80,"正木時茂":90,"正木時忠":76,"秋元義久":56,"佐竹義昭":72,"佐竹義堅":58,"佐竹義廉":56,"佐竹義里":56,"和田昭為":56,"千葉親胤":30,"千葉胤富":58,"原胤貞":64,"小田氏治":46,"菅谷勝貞":56,"菅谷政貞":64,"結城政勝":62,"水谷正村":76,"多賀谷政経":68,"小山高朝":62,"小山氏朝":60,"小山晴朝":64,"真壁家幹":56,"真壁久幹":80,"壬生綱房":62,"壬生綱雄":60,"芳賀高照":54,"皆川成勝":50,"皆川俊宗":60,"那須高資":72,"那須資胤":64,"大関高増":70,"千本資俊":58,"本間有泰":50,"本間貞兼":56,"久知正泰":54,"潟上秀敏":50,"長尾景信":62,"山本寺定長":58,"直江実綱":62,"柿崎景家":88,"斎藤朝信":82,"宇佐美定満":68,"大熊朝秀":66,"庄田定賢":52,"安田長秀":66,"安田景元":60,"竹俣慶綱":66,"吉江景資":62,"加地春綱":60,"甘粕長重":78,"金津義旧":60,"荒川長実":64,"長野業正":86,"上泉秀綱":88,"和田業繁":60,"横瀬成繁":68,"沼田顕泰":60,"斎藤憲広":56,"成田長泰":60,"成田泰季":62,"太田資正":84,"三田綱秀":56,"佐野豊綱":58,"佐野昌綱":82,"宇都宮広綱":30,"芳賀高定":60,"益子勝宗":58,"大田原資清":66,"江戸忠通":64,"大掾慶幹":58,"大掾貞国":56,"土岐治頼":56,"高城胤吉":56,"酒井敏房":56,"酒井胤治":62,"土岐為頼":62,"真里谷信応":50,"真里谷信隆":50,"真里谷信政":50,"羽茂高信":56,
- "北条氏政":70,"北条氏照":78,"北条氏邦":74,"北条氏規":66,"北条氏忠":56,"上杉景虎":68,"北条氏直":62,"北条氏勝":70,"太田氏房":58,"千葉直重":48,"里見義頼":70,"里見義康":56,"里見忠義":36,"里見義重":30,"正木憲時":76,"正木頼忠":62,"佐竹義重":86,"佐竹義尚":46,"佐竹義斯":62,"佐竹義久":72,"佐竹義宣":64,"蘆名義広":52,"岩城貞隆":46,"岩城宣隆":50,"宇都宮国綱":60,"結城朝勝":54,"芳賀高武":60,"水谷勝俊":66,"多賀谷重経":78,"多賀谷三経":56,"小田友治":50,"小田守治":52,"菅谷範政":60,"千葉良胤":46,"千葉邦胤":50,"千葉重胤":36,"那須資晴":70,"那須資景":44,"大田原綱清":62,"大田原晴清":58,"大関晴増":56,"大関資増":50,"佐野宗綱":74,"佐野房綱":40,"由良国繁":66,"長尾顕長":62,"由良貞繁":44,"長野業盛":72,"小幡信真":70,"沼田景義":60,"那波顕宗":56,"成田氏長":54,"成田長親":66,"太田氏資":60,"梶原政景":68,"太田資武":50,"足利義氏":30,"簗田持助":62,"壬生義雄":58,"皆川広照":68,"江戸通政":48,"江戸重通":58,"真壁氏幹":80,"真壁房幹":54,"大掾清幹":44,"柿崎晴家":66,"柿崎憲家":56,"中条景泰":66,"本間高統":56,
+ /* 関東・越後・佐渡（R2・R3。遊ぶための値）*/ "北条氏康":88,"北条綱成":90,"北条宗哲":50,"北条氏尭":58,"北条康成":76,"北条綱高":74,"北条綱房":64,"大道寺周勝":58,"松田盛秀":60,"松田憲秀":56,"遠山綱景":64,"富永直勝":68,"多目元忠":66,"間宮康俊":64,"石巻家貞":40,"大藤信基":74,"太田康資":78,"吉良頼康":40,"上田朝直":56,"藤田泰邦":62,"大石綱周":56,"那波宗俊":60,"長尾景総":56,"小幡憲重":70,"上杉憲政":36,"長尾当長":58,"長尾憲景":58,"長尾景孝":50,"桐生助綱":62,"安中重繁":60,"倉賀野尚行":60,"上杉憲盛":54,"足利晴氏":42,"足利藤氏":46,"簗田晴助":68,"一色直朝":44,"野田弘朝":52,"里見義堯":84,"里見義舜":80,"正木時茂":90,"正木時忠":76,"秋元義久":56,"佐竹義昭":72,"佐竹義堅":58,"佐竹義廉":56,"佐竹義里":56,"和田昭為":56,"千葉親胤":30,"千葉胤富":58,"原胤貞":64,"小田氏治":46,"菅谷勝貞":56,"菅谷政貞":64,"結城政勝":62,"水谷正村":76,"多賀谷政経":68,"小山高朝":62,"小山氏朝":60,"小山晴朝":64,"真壁家幹":56,"真壁久幹":80,"壬生綱房":62,"壬生綱雄":60,"芳賀高照":54,"皆川成勝":50,"皆川俊宗":60,"那須高資":72,"那須資胤":64,"大関高増":70,"千本資俊":58,"本間有泰":50,"本間貞兼":56,"久知正泰":54,"潟上秀敏":50,"長尾景信":62,"山本寺定長":58,"直江実綱":62,"柿崎景家":88,"斎藤朝信":82,"宇佐美定満":60,"大熊朝秀":66,"庄田定賢":60,"安田長秀":66,"安田景元":60,"竹俣慶綱":66,"吉江景資":62,"加地春綱":60,"甘粕長重":78,"金津義旧":60,"荒川長実":64,"長野業正":86,"上泉秀綱":88,"和田業繁":60,"横瀬成繁":68,"沼田顕泰":60,"斎藤憲広":56,"成田長泰":60,"成田泰季":62,"太田資正":84,"三田綱秀":56,"佐野豊綱":58,"佐野昌綱":82,"宇都宮広綱":30,"芳賀高定":60,"益子勝宗":70,"大田原資清":66,"江戸忠通":64,"大掾慶幹":58,"大掾貞国":56,"土岐治頼":56,"高城胤吉":56,"酒井敏房":56,"酒井胤治":62,"土岐為頼":62,"真里谷信応":50,"真里谷信隆":50,"真里谷信政":50,"羽茂高信":56,
+ "北条氏政":70,"北条氏照":78,"北条氏邦":74,"北条氏規":66,"北条氏忠":56,"上杉景虎":54,"北条氏直":62,"北条氏勝":62,"太田氏房":58,"千葉直重":48,"里見義頼":70,"里見義康":56,"里見忠義":36,"里見義重":30,"正木憲時":76,"正木頼忠":62,"佐竹義重":86,"佐竹義尚":46,"佐竹義斯":62,"佐竹義久":72,"佐竹義宣":64,"蘆名義広":44,"岩城貞隆":54,"岩城宣隆":50,"宇都宮国綱":52,"結城朝勝":54,"芳賀高武":60,"水谷勝俊":66,"多賀谷重経":78,"多賀谷三経":56,"小田友治":50,"小田守治":52,"菅谷範政":60,"千葉良胤":46,"千葉邦胤":50,"千葉重胤":36,"那須資晴":70,"那須資景":44,"大田原綱清":62,"大田原晴清":66,"大関晴増":56,"大関資増":50,"佐野宗綱":74,"佐野房綱":40,"由良国繁":54,"長尾顕長":62,"由良貞繁":54,"長野業盛":72,"小幡信真":70,"沼田景義":60,"那波顕宗":56,"成田氏長":54,"成田長親":66,"太田氏資":60,"梶原政景":68,"太田資武":50,"足利義氏":30,"簗田持助":62,"壬生義雄":58,"皆川広照":68,"江戸通政":48,"江戸重通":58,"真壁氏幹":80,"真壁房幹":54,"大掾清幹":44,"柿崎晴家":66,"柿崎憲家":56,"中条景泰":66,"本間高統":56,
  "大道寺政繁":64,"千坂景親":50,
  /* R6 */ "北条氏親":40,"北条康種":58,"北条氏隆":42,"北条繁広":44,"北条氏長":40,"北条氏盛":44,"北条氏信":36,"北条氏宗":36,"太田源五郎":46,"上田憲定":60,"松田康長":64,"松田康郷":78,"松田直長":48,"富永政家":60,"大道寺直英":62,"大道寺直次":58,"中山家範":70,"中山照守":66,"中山信吉":52,"中山信政":40,"間宮信高":64,"間宮直元":50,"用土重連":62,"藤田信吉":70,"太田重正":50,"太田資宗":42,"小幡信高":64,"小幡信定":56,"笠原重政":48,"上杉憲重":36,"長尾景広":50,"上杉憲俊":40,"足利輝氏":30,"相馬整胤":40,"相馬治胤":58,"喜連川国朝":30,"喜連川頼氏":32,"喜連川義親":28,"喜連川尊信":28,"正木信茂":68,"正木時堯":52,"三浦為春":50,"三浦為時":38,"佐竹義種":54,"佐竹義章":42,"佐竹義憲":54,"佐竹義直":30,"小場義成":58,"小場義易":44,"佐竹義寘":34,"戸村義和":56,"戸村義国":60,"小貫頼久":52,"人見藤道":54,"佐竹義隆":40,"蘆名盛俊":30,"原胤親":56,"原胤栄":60,"原胤信":40,"千葉定胤":30,"高城胤辰":62,"高城胤則":56,"小田友重":40,"水谷勝隆":48,"水谷勝宗":42,"山川晴重":52,"真壁義幹":64,"渋江政光":62,"皆川広勝":56,"皆川隆庸":50,"皆川成郷":30,"皆川秀隆":32,"大関清増":54,"大関政増":42,"大関増親":32,"千本資政":50,"千本義隆":58,"千本義定":50,"千本義昌":42,"福原資保":54,"福原資盛":40,"那須資重":38,"大田原増清":56,"大田原政清":42,"大田原政継":40,"宇都宮義綱":34,"宇都宮隆綱":30,"塩谷義通":52,"塩谷義綱":58,"梅津憲忠":60,"梅津政景":44,"由良忠繁":34,"由良貞房":32,"佐野久綱":36,"上杉定勝":46,"直江景明":36,"志駄義時":58,"志駄義秀":66,"甘粕重政":60,"千坂高信":44,"千坂高治":40,"上杉長員":36,"畠山義真":44,"上杉長貞":30,"竹俣義秀":36,
  /* R9 */ "清水康英":62,"間宮綱信":50,"石巻康敬":44,"山角定勝":46,"小笠原康広":50,"上田長則":54,"笠原綱信":52,"笠原康勝":54,"遠山康光":46,"大藤秀信":66,"舎人経忠":54,"桑原盛正":40,"山中頼次":54,"上杉憲賢":50,"高田繁頼":58,"安中長繁":50,"本庄実忠":54,"足利頼純":30,"戸村義廣":56,"原胤清":52,"臼井景胤":50,"岡見治資":56,"壬生周長":56,"福原資孝":52,"伊王野資宗":62,"鮎ヶ瀬実光":58,"上泉秀胤":64,"長野業氏":56,"岩松守純":30,"羽尾道雲":56,"海野幸光":60,"海野輝幸":72,"塩谷義孝":54,"多功長朝":62,"吉江宗信":58,"長尾房長":56,"神余親綱":40,"黒川清実":52,"中条景資":58,"小川長資":50,
- /* 信濃・甲斐・駿河・遠江・伊豆（S2・S3。遊ぶための値）*/ "武田晴信":94,"武田信繁":80,"武田信廉":62,"松尾信是":52,"穴山信友":62,"小山田信有":66,"飯富虎昌":88,"飯富昌景":86,"馬場信房":88,"工藤祐長":80,"春日虎綱":78,"原虎胤":84,"原昌胤":62,"上原虎満":72,"山本勘助":70,"真田幸綱":82,"矢沢頼綱":76,"常田隆永":58,"駒井高白斎":44,"長坂虎房":56,"板垣信憲":56,"甘利信忠":66,"室住虎光":70,"小畠虎盛":78,"小幡昌盛":60,"多田三八郎":74,"秋山虎繁":78,"三枝虎吉":58,"跡部勝資":46,"今井信甫":56,"相木昌朝":62,"芦田信守":62,"望月信雅":54,"伴野貞祥":44,"大井貞清":58,"禰津元直":52,"諏訪満隣":54,"諏訪頼忠":56,"仁科盛能":56,"仁科盛政":54,"三村長親":54,"西牧信道":54,"山家昌治":52,"高遠頼継":62,"保科正俊":80,"藤沢頼親":58,"村上義清":90,"屋代政国":62,"室賀経俊":56,"清野清秀":56,"楽巌寺雅方":66,"山田国政":56,"吾妻清綱":54,"小笠原長時":70,"小笠原貞種":56,"小笠原長隆":52,"小笠原信定":64,"平瀬義兼":58,"二木重高":60,"犬甘政徳":56,"下条時氏":56,"下条信氏":58,"木曾義康":62,"山村良利":56,"高梨政頼":72,"高梨秀政":62,"須田満国":56,"須田満親":62,"井上清政":60,"島津忠直":54,"栗田永寿":52,"知久頼元":62,"今川義元":78,"太原雪斎":80,"朝比奈泰能":72,"朝比奈親徳":66,"朝比奈信置":72,"岡部親綱":66,"岡部元信":82,"庵原忠胤":60,"庵原忠縁":56,"三浦正俊":44,"瀬名氏俊":56,"関口氏純":50,"葛山氏元":60,"蒲原氏徳":66,"由比正信":56,"富士信忠":66,"安部元真":62,"長谷川元長":56,"長谷川正長":58,"一宮宗是":58,"飯尾乗連":60,"飯尾連龍":62,"松井貞宗":56,"松井宗信":76,"久野元宗":62,"久野宗能":62,"小笠原氏興":62,"井伊直盛":64,"小野政直":40,"天野景泰":64,"奥山吉兼":54,"大沢基胤":58,"江川英元":50,
- "武田義信":70,"一条信龍":66,"穴山梅雪":62,"穴山勝千代":30,"小山田桃隠":50,"小山田信茂":72,"小山田茂誠":58,"武田勝頼":86,"仁科盛信":76,"葛山信貞":44,"武田信清":40,"武田信勝":40,"武田信豊":64,"望月信頼":48,"望月信永":58,"河窪信俊":46,"土屋昌続":72,"土屋昌恒":80,"土屋忠直":44,"土屋利直":36,"土屋数直":34,"秋山昌詮":52,"三枝昌貞":72,"三枝昌吉":62,"小幡景憲":50,"駒井政直":52,"横田尹松":70,"初鹿野信昌":72,"馬場昌房":60,"真田信綱":80,"真田昌輝":76,"真田昌幸":84,"真田信尹":66,"真田信之":78,"真田信繁":92,"真田信吉":56,"真田信政":54,"真田信重":44,"矢沢頼康":70,"依田信蕃":82,"依田康国":60,"依田康勝":54,"諏訪頼水":60,"諏訪忠恒":44,"小笠原信嶺":62,"小笠原長巨":54,"内藤昌月":66,"保科正直":70,"保科正光":62,"保科正貞":48,"山浦景国":62,"屋代秀正":62,"小笠原貞慶":70,"小笠原秀政":66,"小笠原忠脩":52,"小笠原忠真":58,"小笠原忠知":44,"知久頼氏":58,"知久則直":44,"下条信正":52,"下条頼安":64,"木曾義昌":58,"木曾義利":44,"山村良候":58,"山村良勝":66,"千村良重":58,"須田長義":74,"今川氏真":40,"今川範以":34,"品川高久":30,"今川直房":36,"朝比奈泰朝":74,"朝比奈泰勝":52,"岡部正綱":70,"岡部長盛":66,"岡部宣勝":52,"大沢基宿":52,"久野宗朝":54,"安部信勝":56,"安部信盛":50,"井伊直親":50,"井伊直政":90,"井伊直勝":40,"井伊直孝":82,"井伊直滋":46,"井伊直澄":44,"江川英吉":46,"江川英長":50,
+ /* 信濃・甲斐・駿河・遠江・伊豆（S2・S3。遊ぶための値）*/ "武田晴信":94,"武田信繁":80,"武田信廉":52,"松尾信是":52,"穴山信友":54,"小山田信有":66,"飯富虎昌":88,"飯富昌景":86,"馬場信房":88,"工藤祐長":80,"春日虎綱":78,"原虎胤":84,"原昌胤":62,"上原虎満":72,"山本勘助":70,"真田幸綱":82,"矢沢頼綱":76,"常田隆永":58,"駒井高白斎":44,"長坂虎房":56,"板垣信憲":56,"甘利信忠":66,"室住虎光":70,"小畠虎盛":78,"小幡昌盛":60,"多田三八郎":74,"秋山虎繁":78,"三枝虎吉":58,"跡部勝資":46,"今井信甫":56,"相木昌朝":62,"芦田信守":62,"望月信雅":54,"伴野貞祥":44,"大井貞清":58,"禰津元直":52,"諏訪満隣":54,"諏訪頼忠":56,"仁科盛能":56,"仁科盛政":54,"三村長親":54,"西牧信道":54,"山家昌治":52,"高遠頼継":62,"保科正俊":80,"藤沢頼親":58,"村上義清":90,"屋代政国":62,"室賀経俊":56,"清野清秀":56,"楽巌寺雅方":66,"山田国政":56,"吾妻清綱":54,"小笠原長時":60,"小笠原貞種":56,"小笠原長隆":52,"小笠原信定":64,"平瀬義兼":58,"二木重高":60,"犬甘政徳":56,"下条時氏":56,"下条信氏":58,"木曾義康":62,"山村良利":56,"高梨政頼":72,"高梨秀政":62,"須田満国":56,"須田満親":62,"井上清政":60,"島津忠直":54,"栗田永寿":52,"知久頼元":62,"今川義元":78,"太原雪斎":80,"朝比奈泰能":72,"朝比奈親徳":66,"朝比奈信置":72,"岡部親綱":66,"岡部元信":82,"庵原忠胤":60,"庵原忠縁":56,"三浦正俊":44,"瀬名氏俊":56,"関口氏純":50,"葛山氏元":60,"蒲原氏徳":66,"由比正信":56,"富士信忠":66,"安部元真":62,"長谷川元長":56,"長谷川正長":58,"一宮宗是":58,"飯尾乗連":60,"飯尾連龍":62,"松井貞宗":56,"松井宗信":76,"久野元宗":62,"久野宗能":62,"小笠原氏興":62,"井伊直盛":64,"小野政直":40,"天野景泰":64,"奥山吉兼":54,"大沢基胤":58,"江川英元":50,
+ "武田義信":70,"一条信龍":66,"穴山梅雪":62,"穴山勝千代":30,"小山田桃隠":50,"小山田信茂":72,"小山田茂誠":58,"武田勝頼":86,"仁科盛信":76,"葛山信貞":44,"武田信清":40,"武田信勝":40,"武田信豊":64,"望月信頼":48,"望月信永":58,"河窪信俊":46,"土屋昌続":72,"土屋昌恒":80,"土屋忠直":44,"土屋利直":36,"土屋数直":34,"秋山昌詮":52,"三枝昌貞":72,"三枝昌吉":62,"小幡景憲":50,"駒井政直":52,"横田尹松":70,"初鹿野信昌":72,"馬場昌房":60,"真田信綱":80,"真田昌輝":76,"真田昌幸":84,"真田信尹":66,"真田信之":78,"真田信繁":92,"真田信吉":48,"真田信政":48,"真田信重":44,"矢沢頼康":70,"依田信蕃":82,"依田康国":60,"依田康勝":54,"諏訪頼水":52,"諏訪忠恒":44,"小笠原信嶺":62,"小笠原長巨":54,"内藤昌月":58,"保科正直":70,"保科正光":68,"保科正貞":48,"山浦景国":62,"屋代秀正":62,"小笠原貞慶":70,"小笠原秀政":66,"小笠原忠脩":52,"小笠原忠真":58,"小笠原忠知":44,"知久頼氏":58,"知久則直":44,"下条信正":52,"下条頼安":64,"木曾義昌":66,"木曾義利":44,"山村良候":58,"山村良勝":66,"千村良重":58,"須田長義":74,"今川氏真":40,"今川範以":34,"品川高久":30,"今川直房":36,"朝比奈泰朝":74,"朝比奈泰勝":52,"岡部正綱":70,"岡部長盛":66,"岡部宣勝":52,"大沢基宿":52,"久野宗朝":54,"安部信勝":56,"安部信盛":50,"井伊直親":50,"井伊直政":90,"井伊直勝":40,"井伊直孝":82,"井伊直滋":46,"井伊直澄":44,"江川英吉":46,"江川英長":50,
+ /* 記事の記録に合わせて改めた者（8.5.0） */
+ "南部利直":60,"南部重信":40,"南部重直":45,"津軽信枚":46,"津軽信義":38,"後藤寿庵":52,
+ "戸沢政盛":52,"池田盛周":58,"津軽信英":40,"石川宗弘":30,"秋田俊季":48,"黒沢道家":72,
+ "伊達政道":40,"伊達秀宗":46,"国分盛重":56,"伊達宗勝":38,"伊達宗敏":36,"伊達宗重":48,
+ "伊達宗高":42,"奥山兼清":66,"屋代景頼":64,"山岡重長":58,"浜田景隆":66,"瀬上景康":64,
+ "石母田景頼":60,"茂庭良元":56,"黒沢重久":52,"伊東重孝":42,"原田宗輔":46,"最上義康":70,
+ "柴橋頼綱":52,"鴇田周如":36,"船尾昭直":55,"安田能元":70,"白河義親":52,"大国実頼":52,
+ "水原親憲":74,"甘糟景継":64,"色部長真":68,
 };
 
 /* 武将の智謀。**忍びの働きと、その防ぎを決める**（§28.2）。0〜100 */
 const BUSHOU_CHIBOU={
  /* 後の世代（§19.8）*/ "伊達政宗":86,"伊達輝宗":70,"伊達成実":64,"片倉景綱":90,"最上義光":90,"南部信直":74,"津軽為信":82,"上杉景勝":70,"直江兼続":88,"戸沢盛安":62,"蘆名盛隆":58,"安東愛季":80,"秋田実季":66,"相馬義胤":68,"大内定綱":72,"鬼庭綱元":72,"新発田重家":60,"松前慶広":76,"九戸実親":56,"延沢満延":48,"楯岡満茂":60,"志村光安":66,"白石宗実":60,"後藤信康":52,"原田宗時":52,"支倉常長":56,"岩城常隆":62,"東禅寺義長":60,"仁賀保挙誠":62,"畠山義継":58,"留守政景":62,"石川昭光":60,"亘理重宗":56,"伊達忠宗":64,"片倉重長":66,"八戸政栄":66,"大崎義隆":54,"小野寺義道":48,"大宝寺義氏":50,"最上家親":58,
  "寒河江兼広":50,"鮎川清長":48,
- "小梁川宗朝":58,"石母田光頼":62,"白石宗利":50,"原田宗政":48,"富塚宗綱":54,"泉田重光":50,"針生盛幸":52,"富田滋実":60,"猪苗代盛国":54,"南長義":50,"七戸家国":48,"桜庭光康":54,"二本松盛国":50,"堀越能登":46,"大崎義宣":50,"氏家直継":56,"葛西晴胤":54,"柏山明吉":46,"岩城親隆":58,"須田盛秀":58,"田村顕基":60,"成沢道忠":48,"長尾政景":66,"本庄実乃":70,"色部勝長":58,"黒川晴氏":56,"中条藤資":54,"白鳥長久":58,
+ "小梁川宗朝":58,"石母田光頼":62,"白石宗利":50,"原田宗政":48,"富塚宗綱":54,"泉田重光":50,"針生盛幸":52,"富田滋実":60,"猪苗代盛国":54,"南長義":50,"七戸家国":48,"桜庭光康":54,"二本松盛国":50,"堀越能登":46,"大崎義宣":50,"氏家直継":56,"葛西晴胤":54,"柏山明吉":46,"岩城親隆":58,"須田盛秀":58,"田村顕基":60,"成沢道忠":48,"長尾政景":66,"本庄実乃":70,"色部勝長":58,"黒川晴氏":56,"中条藤資":64,"白鳥長久":58,
  "蠣崎季広":74,"長門広益":50,"南条広継":56,
  "南部晴政":58,"石川高信":66,"北信愛":78,"一戸政連":48,"東政勝":50,
  "毛馬内秀範":50,"大浦為則":56,"八戸勝義":54,
@@ -10230,13 +10297,21 @@ const BUSHOU_CHIBOU={
  "安東舜季":56,"安東堯季":60,"豊島重村":52,"千徳政吉":50,
  "本庄繁長":62,"長尾景虎":84,"山吉政久":56,"北条高広":58,"新発田綱貞":54,
  "ハシタイン":56,"チコモタイン":56,
- /* 関東・越後・佐渡（R2・R3。遊ぶための値）*/ "北条氏康":90,"北条綱成":62,"北条宗哲":82,"北条氏尭":56,"北条康成":64,"北条綱高":52,"北条綱房":46,"大道寺周勝":56,"松田盛秀":68,"松田憲秀":64,"遠山綱景":66,"富永直勝":48,"多目元忠":60,"間宮康俊":50,"石巻家貞":62,"大藤信基":74,"太田康資":50,"吉良頼康":50,"上田朝直":64,"藤田泰邦":58,"大石綱周":54,"那波宗俊":52,"長尾景総":54,"小幡憲重":56,"上杉憲政":40,"長尾当長":58,"長尾憲景":64,"長尾景孝":50,"桐生助綱":60,"安中重繁":54,"倉賀野尚行":50,"上杉憲盛":56,"足利晴氏":44,"足利藤氏":48,"簗田晴助":66,"一色直朝":60,"野田弘朝":50,"里見義堯":82,"里見義舜":62,"正木時茂":58,"正木時忠":60,"秋元義久":50,"佐竹義昭":72,"佐竹義堅":62,"佐竹義廉":64,"佐竹義里":54,"和田昭為":78,"千葉親胤":36,"千葉胤富":66,"原胤貞":60,"小田氏治":40,"菅谷勝貞":62,"菅谷政貞":62,"結城政勝":70,"水谷正村":64,"多賀谷政経":56,"小山高朝":66,"小山氏朝":64,"小山晴朝":70,"真壁家幹":58,"真壁久幹":64,"壬生綱房":78,"壬生綱雄":60,"芳賀高照":48,"皆川成勝":50,"皆川俊宗":60,"那須高資":50,"那須資胤":60,"大関高増":72,"千本資俊":56,"本間有泰":50,"本間貞兼":50,"久知正泰":46,"潟上秀敏":46,"長尾景信":54,"山本寺定長":52,"直江実綱":78,"柿崎景家":44,"斎藤朝信":66,"宇佐美定満":80,"大熊朝秀":56,"庄田定賢":60,"安田長秀":52,"安田景元":54,"竹俣慶綱":50,"吉江景資":52,"加地春綱":50,"甘粕長重":56,"金津義旧":44,"荒川長実":44,"長野業正":80,"上泉秀綱":62,"和田業繁":50,"横瀬成繁":80,"沼田顕泰":50,"斎藤憲広":54,"成田長泰":62,"成田泰季":52,"太田資正":84,"三田綱秀":52,"佐野豊綱":56,"佐野昌綱":70,"宇都宮広綱":40,"芳賀高定":84,"益子勝宗":54,"大田原資清":76,"江戸忠通":62,"大掾慶幹":52,"大掾貞国":50,"土岐治頼":52,"高城胤吉":58,"酒井敏房":54,"酒井胤治":56,"土岐為頼":62,"真里谷信応":48,"真里谷信隆":46,"真里谷信政":44,"羽茂高信":50,
- "北条氏政":72,"北条氏照":70,"北条氏邦":60,"北条氏規":72,"北条氏忠":50,"上杉景虎":62,"北条氏直":60,"北条氏勝":58,"太田氏房":54,"千葉直重":46,"里見義頼":68,"里見義康":54,"里見忠義":40,"里見義重":40,"正木憲時":50,"正木頼忠":58,"佐竹義重":76,"佐竹義尚":44,"佐竹義斯":64,"佐竹義久":72,"佐竹義宣":76,"蘆名義広":50,"岩城貞隆":50,"岩城宣隆":52,"宇都宮国綱":52,"結城朝勝":52,"芳賀高武":40,"水谷勝俊":60,"多賀谷重経":62,"多賀谷三経":48,"小田友治":46,"小田守治":48,"菅谷範政":58,"千葉良胤":48,"千葉邦胤":48,"千葉重胤":40,"那須資晴":60,"那須資景":50,"大田原綱清":56,"大田原晴清":62,"大関晴増":50,"大関資増":52,"佐野宗綱":44,"佐野房綱":66,"由良国繁":58,"長尾顕長":56,"由良貞繁":46,"長野業盛":50,"小幡信真":54,"沼田景義":44,"那波顕宗":48,"成田氏長":60,"成田長親":54,"太田氏資":50,"梶原政景":66,"太田資武":54,"足利義氏":46,"簗田持助":56,"壬生義雄":54,"皆川広照":72,"江戸通政":48,"江戸重通":56,"真壁氏幹":52,"真壁房幹":50,"大掾清幹":40,"柿崎晴家":44,"柿崎憲家":46,"中条景泰":48,"本間高統":46,
+ /* 関東・越後・佐渡（R2・R3。遊ぶための値）*/ "北条氏康":90,"北条綱成":62,"北条宗哲":82,"北条氏尭":56,"北条康成":64,"北条綱高":52,"北条綱房":46,"大道寺周勝":56,"松田盛秀":68,"松田憲秀":64,"遠山綱景":66,"富永直勝":48,"多目元忠":60,"間宮康俊":50,"石巻家貞":62,"大藤信基":74,"太田康資":50,"吉良頼康":50,"上田朝直":64,"藤田泰邦":58,"大石綱周":54,"那波宗俊":52,"長尾景総":54,"小幡憲重":56,"上杉憲政":40,"長尾当長":58,"長尾憲景":64,"長尾景孝":50,"桐生助綱":60,"安中重繁":54,"倉賀野尚行":50,"上杉憲盛":56,"足利晴氏":44,"足利藤氏":48,"簗田晴助":66,"一色直朝":60,"野田弘朝":50,"里見義堯":82,"里見義舜":62,"正木時茂":58,"正木時忠":60,"秋元義久":50,"佐竹義昭":72,"佐竹義堅":62,"佐竹義廉":64,"佐竹義里":54,"和田昭為":78,"千葉親胤":36,"千葉胤富":66,"原胤貞":60,"小田氏治":40,"菅谷勝貞":62,"菅谷政貞":62,"結城政勝":70,"水谷正村":64,"多賀谷政経":56,"小山高朝":66,"小山氏朝":64,"小山晴朝":70,"真壁家幹":58,"真壁久幹":64,"壬生綱房":78,"壬生綱雄":60,"芳賀高照":48,"皆川成勝":50,"皆川俊宗":60,"那須高資":50,"那須資胤":60,"大関高増":72,"千本資俊":56,"本間有泰":50,"本間貞兼":50,"久知正泰":46,"潟上秀敏":46,"長尾景信":54,"山本寺定長":52,"直江実綱":78,"柿崎景家":44,"斎藤朝信":66,"宇佐美定満":70,"大熊朝秀":56,"庄田定賢":60,"安田長秀":52,"安田景元":54,"竹俣慶綱":50,"吉江景資":52,"加地春綱":50,"甘粕長重":56,"金津義旧":44,"荒川長実":44,"長野業正":80,"上泉秀綱":62,"和田業繁":50,"横瀬成繁":80,"沼田顕泰":50,"斎藤憲広":54,"成田長泰":62,"成田泰季":52,"太田資正":84,"三田綱秀":52,"佐野豊綱":56,"佐野昌綱":70,"宇都宮広綱":40,"芳賀高定":84,"益子勝宗":60,"大田原資清":76,"江戸忠通":62,"大掾慶幹":52,"大掾貞国":50,"土岐治頼":52,"高城胤吉":58,"酒井敏房":54,"酒井胤治":56,"土岐為頼":62,"真里谷信応":48,"真里谷信隆":46,"真里谷信政":44,"羽茂高信":50,
+ "北条氏政":72,"北条氏照":70,"北条氏邦":60,"北条氏規":72,"北条氏忠":50,"上杉景虎":54,"北条氏直":60,"北条氏勝":58,"太田氏房":54,"千葉直重":46,"里見義頼":68,"里見義康":54,"里見忠義":40,"里見義重":40,"正木憲時":50,"正木頼忠":58,"佐竹義重":76,"佐竹義尚":44,"佐竹義斯":64,"佐竹義久":72,"佐竹義宣":76,"蘆名義広":50,"岩城貞隆":50,"岩城宣隆":52,"宇都宮国綱":52,"結城朝勝":52,"芳賀高武":40,"水谷勝俊":60,"多賀谷重経":62,"多賀谷三経":48,"小田友治":46,"小田守治":48,"菅谷範政":58,"千葉良胤":48,"千葉邦胤":48,"千葉重胤":40,"那須資晴":60,"那須資景":50,"大田原綱清":56,"大田原晴清":62,"大関晴増":50,"大関資増":52,"佐野宗綱":44,"佐野房綱":66,"由良国繁":58,"長尾顕長":56,"由良貞繁":46,"長野業盛":50,"小幡信真":54,"沼田景義":44,"那波顕宗":48,"成田氏長":60,"成田長親":54,"太田氏資":50,"梶原政景":66,"太田資武":54,"足利義氏":46,"簗田持助":56,"壬生義雄":54,"皆川広照":72,"江戸通政":48,"江戸重通":64,"真壁氏幹":52,"真壁房幹":50,"大掾清幹":40,"柿崎晴家":44,"柿崎憲家":46,"中条景泰":48,"本間高統":46,
  "大道寺政繁":62,"千坂景親":62,
  /* R6 */ "北条氏親":44,"北条康種":50,"北条氏隆":44,"北条繁広":46,"北条氏長":78,"北条氏盛":50,"北条氏信":42,"北条氏宗":44,"太田源五郎":40,"上田憲定":56,"松田康長":60,"松田康郷":44,"松田直長":52,"富永政家":50,"大道寺直英":58,"大道寺直次":54,"中山家範":50,"中山照守":48,"中山信吉":66,"中山信政":52,"間宮信高":48,"間宮直元":62,"用土重連":50,"藤田信吉":62,"太田重正":48,"太田資宗":64,"小幡信高":44,"小幡信定":46,"笠原重政":46,"上杉憲重":40,"長尾景広":48,"上杉憲俊":42,"足利輝氏":40,"相馬整胤":36,"相馬治胤":52,"喜連川国朝":40,"喜連川頼氏":48,"喜連川義親":36,"喜連川尊信":38,"正木信茂":44,"正木時堯":48,"三浦為春":62,"三浦為時":52,"佐竹義種":50,"佐竹義章":46,"佐竹義憲":52,"佐竹義直":36,"小場義成":56,"小場義易":48,"佐竹義寘":40,"戸村義和":46,"戸村義国":58,"小貫頼久":66,"人見藤道":50,"佐竹義隆":54,"蘆名盛俊":38,"原胤親":48,"原胤栄":52,"原胤信":42,"千葉定胤":38,"高城胤辰":54,"高城胤則":48,"小田友重":42,"水谷勝隆":60,"水谷勝宗":58,"山川晴重":44,"真壁義幹":52,"渋江政光":78,"皆川広勝":46,"皆川隆庸":52,"皆川成郷":34,"皆川秀隆":40,"大関清増":44,"大関政増":46,"大関増親":42,"千本資政":42,"千本義隆":56,"千本義定":48,"千本義昌":46,"福原資保":52,"福原資盛":48,"那須資重":42,"大田原増清":52,"大田原政清":50,"大田原政継":48,"宇都宮義綱":42,"宇都宮隆綱":44,"塩谷義通":44,"塩谷義綱":52,"梅津憲忠":74,"梅津政景":82,"由良忠繁":46,"由良貞房":48,"佐野久綱":44,"上杉定勝":62,"直江景明":40,"志駄義時":36,"志駄義秀":54,"甘粕重政":50,"千坂高信":58,"千坂高治":60,"上杉長員":44,"畠山義真":52,"上杉長貞":42,"竹俣義秀":66,
  /* R9 */ "清水康英":56,"間宮綱信":56,"石巻康敬":62,"山角定勝":58,"小笠原康広":56,"上田長則":52,"笠原綱信":62,"笠原康勝":48,"遠山康光":62,"大藤秀信":50,"舎人経忠":44,"桑原盛正":56,"山中頼次":48,"上杉憲賢":52,"高田繁頼":48,"安中長繁":48,"本庄実忠":50,"足利頼純":44,"戸村義廣":44,"原胤清":66,"臼井景胤":50,"岡見治資":44,"壬生周長":70,"福原資孝":54,"伊王野資宗":46,"鮎ヶ瀬実光":40,"上泉秀胤":42,"長野業氏":50,"岩松守純":40,"羽尾道雲":48,"海野幸光":50,"海野輝幸":50,"塩谷義孝":48,"多功長朝":50,"吉江宗信":52,"長尾房長":58,"神余親綱":58,"黒川清実":48,"中条景資":48,"小川長資":54,
- /* 信濃・甲斐・駿河・遠江・伊豆（S2・S3。遊ぶための値）*/ "武田晴信":94,"武田信繁":80,"武田信廉":60,"松尾信是":50,"穴山信友":66,"小山田信有":58,"飯富虎昌":60,"飯富昌景":66,"馬場信房":76,"工藤祐長":72,"春日虎綱":80,"原虎胤":52,"原昌胤":70,"上原虎満":64,"山本勘助":86,"真田幸綱":90,"矢沢頼綱":70,"常田隆永":48,"駒井高白斎":72,"長坂虎房":66,"板垣信憲":40,"甘利信忠":52,"室住虎光":54,"小畠虎盛":56,"小幡昌盛":46,"多田三八郎":50,"秋山虎繁":70,"三枝虎吉":54,"跡部勝資":62,"今井信甫":56,"相木昌朝":62,"芦田信守":56,"望月信雅":56,"伴野貞祥":50,"大井貞清":54,"禰津元直":56,"諏訪満隣":60,"諏訪頼忠":64,"仁科盛能":58,"仁科盛政":46,"三村長親":46,"西牧信道":52,"山家昌治":50,"高遠頼継":60,"保科正俊":58,"藤沢頼親":54,"村上義清":62,"屋代政国":58,"室賀経俊":50,"清野清秀":54,"楽巌寺雅方":50,"山田国政":46,"吾妻清綱":44,"小笠原長時":46,"小笠原貞種":50,"小笠原長隆":44,"小笠原信定":54,"平瀬義兼":44,"二木重高":52,"犬甘政徳":50,"下条時氏":56,"下条信氏":54,"木曾義康":60,"山村良利":62,"高梨政頼":64,"高梨秀政":50,"須田満国":52,"須田満親":62,"井上清政":50,"島津忠直":52,"栗田永寿":56,"知久頼元":56,"今川義元":86,"太原雪斎":96,"朝比奈泰能":72,"朝比奈親徳":60,"朝比奈信置":58,"岡部親綱":52,"岡部元信":60,"庵原忠胤":56,"庵原忠縁":48,"三浦正俊":62,"瀬名氏俊":54,"関口氏純":58,"葛山氏元":60,"蒲原氏徳":52,"由比正信":50,"富士信忠":56,"安部元真":52,"長谷川元長":50,"長谷川正長":48,"一宮宗是":48,"飯尾乗連":52,"飯尾連龍":56,"松井貞宗":52,"松井宗信":54,"久野元宗":50,"久野宗能":60,"小笠原氏興":54,"井伊直盛":54,"小野政直":62,"天野景泰":52,"奥山吉兼":46,"大沢基胤":56,"江川英元":48,
- "武田義信":56,"一条信龍":58,"穴山梅雪":78,"穴山勝千代":36,"小山田桃隠":48,"小山田信茂":62,"小山田茂誠":52,"武田勝頼":62,"仁科盛信":52,"葛山信貞":44,"武田信清":50,"武田信勝":40,"武田信豊":58,"望月信頼":44,"望月信永":44,"河窪信俊":48,"土屋昌続":66,"土屋昌恒":52,"土屋忠直":50,"土屋利直":56,"土屋数直":64,"秋山昌詮":58,"三枝昌貞":54,"三枝昌吉":58,"小幡景憲":84,"駒井政直":62,"横田尹松":70,"初鹿野信昌":52,"馬場昌房":50,"真田信綱":56,"真田昌輝":54,"真田昌幸":96,"真田信尹":78,"真田信之":80,"真田信繁":80,"真田信吉":52,"真田信政":58,"真田信重":50,"矢沢頼康":56,"依田信蕃":74,"依田康国":50,"依田康勝":48,"諏訪頼水":66,"諏訪忠恒":54,"小笠原信嶺":64,"小笠原長巨":52,"内藤昌月":64,"保科正直":62,"保科正光":66,"保科正貞":58,"山浦景国":62,"屋代秀正":58,"小笠原貞慶":66,"小笠原秀政":62,"小笠原忠脩":44,"小笠原忠真":66,"小笠原忠知":56,"知久頼氏":50,"知久則直":48,"下条信正":46,"下条頼安":56,"木曾義昌":56,"木曾義利":38,"山村良候":60,"山村良勝":62,"千村良重":56,"須田長義":54,"今川氏真":56,"今川範以":46,"品川高久":48,"今川直房":56,"朝比奈泰朝":60,"朝比奈泰勝":58,"岡部正綱":62,"岡部長盛":58,"岡部宣勝":58,"大沢基宿":56,"久野宗朝":48,"安部信勝":52,"安部信盛":56,"井伊直親":44,"井伊直政":74,"井伊直勝":40,"井伊直孝":76,"井伊直滋":52,"井伊直澄":58,"江川英吉":52,"江川英長":58,
+ /* 信濃・甲斐・駿河・遠江・伊豆（S2・S3。遊ぶための値）*/ "武田晴信":94,"武田信繁":80,"武田信廉":60,"松尾信是":50,"穴山信友":66,"小山田信有":58,"飯富虎昌":60,"飯富昌景":66,"馬場信房":76,"工藤祐長":72,"春日虎綱":80,"原虎胤":52,"原昌胤":70,"上原虎満":64,"山本勘助":86,"真田幸綱":90,"矢沢頼綱":70,"常田隆永":48,"駒井高白斎":72,"長坂虎房":66,"板垣信憲":40,"甘利信忠":52,"室住虎光":54,"小畠虎盛":56,"小幡昌盛":46,"多田三八郎":50,"秋山虎繁":70,"三枝虎吉":54,"跡部勝資":62,"今井信甫":56,"相木昌朝":62,"芦田信守":56,"望月信雅":56,"伴野貞祥":50,"大井貞清":54,"禰津元直":56,"諏訪満隣":60,"諏訪頼忠":64,"仁科盛能":58,"仁科盛政":46,"三村長親":46,"西牧信道":52,"山家昌治":50,"高遠頼継":60,"保科正俊":58,"藤沢頼親":54,"村上義清":62,"屋代政国":58,"室賀経俊":50,"清野清秀":54,"楽巌寺雅方":50,"山田国政":46,"吾妻清綱":44,"小笠原長時":46,"小笠原貞種":50,"小笠原長隆":44,"小笠原信定":54,"平瀬義兼":44,"二木重高":52,"犬甘政徳":50,"下条時氏":62,"下条信氏":54,"木曾義康":60,"山村良利":62,"高梨政頼":64,"高梨秀政":50,"須田満国":52,"須田満親":62,"井上清政":50,"島津忠直":52,"栗田永寿":56,"知久頼元":56,"今川義元":86,"太原雪斎":96,"朝比奈泰能":72,"朝比奈親徳":60,"朝比奈信置":58,"岡部親綱":52,"岡部元信":60,"庵原忠胤":56,"庵原忠縁":48,"三浦正俊":62,"瀬名氏俊":54,"関口氏純":58,"葛山氏元":60,"蒲原氏徳":52,"由比正信":50,"富士信忠":56,"安部元真":52,"長谷川元長":50,"長谷川正長":48,"一宮宗是":48,"飯尾乗連":52,"飯尾連龍":56,"松井貞宗":52,"松井宗信":54,"久野元宗":50,"久野宗能":60,"小笠原氏興":54,"井伊直盛":54,"小野政直":62,"天野景泰":52,"奥山吉兼":46,"大沢基胤":56,"江川英元":48,
+ "武田義信":56,"一条信龍":58,"穴山梅雪":78,"穴山勝千代":36,"小山田桃隠":48,"小山田信茂":62,"小山田茂誠":52,"武田勝頼":62,"仁科盛信":52,"葛山信貞":44,"武田信清":50,"武田信勝":40,"武田信豊":58,"望月信頼":44,"望月信永":44,"河窪信俊":48,"土屋昌続":66,"土屋昌恒":52,"土屋忠直":50,"土屋利直":56,"土屋数直":64,"秋山昌詮":58,"三枝昌貞":54,"三枝昌吉":58,"小幡景憲":84,"駒井政直":62,"横田尹松":70,"初鹿野信昌":52,"馬場昌房":50,"真田信綱":56,"真田昌輝":54,"真田昌幸":96,"真田信尹":78,"真田信之":80,"真田信繁":80,"真田信吉":52,"真田信政":58,"真田信重":50,"矢沢頼康":56,"依田信蕃":74,"依田康国":50,"依田康勝":48,"諏訪頼水":66,"諏訪忠恒":54,"小笠原信嶺":64,"小笠原長巨":52,"内藤昌月":64,"保科正直":62,"保科正光":66,"保科正貞":58,"山浦景国":62,"屋代秀正":58,"小笠原貞慶":66,"小笠原秀政":62,"小笠原忠脩":44,"小笠原忠真":66,"小笠原忠知":56,"知久頼氏":50,"知久則直":48,"下条信正":46,"下条頼安":56,"木曾義昌":56,"木曾義利":38,"山村良候":60,"山村良勝":62,"千村良重":56,"須田長義":54,"今川氏真":48,"今川範以":46,"品川高久":48,"今川直房":56,"朝比奈泰朝":60,"朝比奈泰勝":58,"岡部正綱":62,"岡部長盛":58,"岡部宣勝":58,"大沢基宿":56,"久野宗朝":48,"安部信勝":52,"安部信盛":56,"井伊直親":44,"井伊直政":74,"井伊直勝":40,"井伊直孝":76,"井伊直滋":52,"井伊直澄":58,"江川英吉":52,"江川英長":58,
+ /* 記事の記録に合わせて改めた者（8.5.0） */
+ "南部利直":58,"南部重信":60,"南部重直":52,"津軽信枚":74,"津軽信義":48,"後藤寿庵":58,
+ "戸沢政盛":50,"池田盛周":44,"津軽信英":68,"石川宗弘":62,"秋田俊季":44,"黒沢道家":64,
+ "伊達政道":38,"伊達秀宗":50,"国分盛重":44,"伊達宗勝":58,"伊達宗敏":42,"伊達宗重":62,
+ "伊達宗高":40,"奥山兼清":56,"屋代景頼":68,"山岡重長":60,"浜田景隆":50,"瀬上景康":46,
+ "石母田景頼":62,"茂庭良元":64,"黒沢重久":54,"伊東重孝":48,"原田宗輔":38,"最上義康":56,
+ "柴橋頼綱":40,"鴇田周如":72,"船尾昭直":58,"安田能元":62,"白河義親":62,"大国実頼":48,
+ "水原親憲":58,"甘糟景継":56,"色部長真":60,
 };
 
 /* 武将の兵科適性。1〜5（§31.2）。**1拍に打ち込む回数になり、弓と鉄砲は射程も伸びる。**
@@ -10262,50 +10337,129 @@ const BUSHOU_CHIBOU={
 const BUSHOU_SKILL={
  /* 内政で名の残る者 */
  "遠藤基信":{shou:5,tou:5}, "氏家守棟":{nou:4,shou:4},
- "桑折景長":{nou:4,ken:4},  "鬼庭良直":{ken:4},
+ "桑折景長":{nou:4,ken:4},  "鬼庭良直":{nou:3,shou:2,ken:4,tou:3},
  "金上盛備":{shou:4,tou:4}, "佐瀬種常":{nou:4},
  "松本氏輔":{ken:4},        "平田舜範":{nou:4},
  "長沼実国":{ken:4},        "土佐林禅棟":{shou:4,tou:4},
- "北信愛":{tou:5},          "石川高信":{ken:4},
- "蠣崎季広":{shou:5,tou:4}, "長門広益":{shou:4},
+ "北信愛":{tou:5},          "石川高信":{nou:3,shou:2,ken:4,tou:3},
+ "蠣崎季広":{nou:2,shou:5,ken:3,tou:4}, "長門広益":{shou:4},
  "安東舜季":{shou:5},       "安東堯季":{shou:4},
- "大宝寺義増":{shou:4},     "最上義守":{nou:4,tou:4},
- "伊達晴宗":{nou:4,tou:5},  "蘆名盛氏":{nou:4,shou:4,tou:4},
- "南部晴政":{ken:4},        "葛西晴信":{nou:4},
+ "大宝寺義増":{shou:4},     "最上義守":{nou:4,shou:2,ken:4,tou:4},
+ "伊達晴宗":{nou:4,shou:3,ken:3,tou:5},  "蘆名盛氏":{nou:4,shou:4,ken:3,tou:4},
+ "南部晴政":{nou:2,shou:2,ken:4,tou:4},        "葛西晴信":{nou:4,shou:3,ken:2,tou:1},
  "千葉胤茂":{nou:4},        "浜田広綱":{ken:4},
  "岩城重隆":{shou:4},       "相馬盛胤":{ken:4},
- "田村隆顕":{nou:4},        "本庄繁長":{ken:4},
- "長尾景虎":{nou:4,shou:4,tou:5},
+ "田村隆顕":{nou:4},        "本庄繁長":{nou:3,shou:2,ken:4,tou:4},
+ "長尾景虎":{nou:4,shou:4,ken:3,tou:5},
  /* 不得手 */
- "九戸政実":{nou:2,shou:2}, "毛馬内秀範":{shou:2},
+ "九戸政実":{nou:2,shou:2,ken:3,tou:4}, "毛馬内秀範":{shou:2},
  "チコモタイン":{shou:2},   "ハシタイン":{shou:2},
  /* 関東・越後（R2）*/
  "北条氏康":{nou:5,shou:4,ken:4,tou:4},
 
  "上田朝直":{nou:4},
- "横瀬成繁":{ken:4,shou:4},
- "結城政勝":{nou:4,shou:4},
- "水谷正村":{ken:4,shou:4},
- "直江実綱":{nou:4,shou:4},
+ "横瀬成繁":{nou:3,shou:4,ken:4,tou:3},
+ "結城政勝":{nou:4,shou:4,ken:3,tou:4},
+ "水谷正村":{nou:2,shou:4,ken:4,tou:3},
+ "直江実綱":{nou:4,shou:4,ken:3,tou:3},
  "大熊朝秀":{shou:4},
  /* 関東・越後・佐渡（R10・V1b。資料で確かめた事跡による）*/
  /* 築城・普請 */
- "間宮康俊":{ken:4},   "吉良頼康":{ken:4},
- "里見義堯":{ken:4},   "里見義舜":{ken:4},   "沼田顕泰":{ken:4},
- "安中重繁":{ken:4},   "益子勝宗":{ken:4},   "大田原資清":{ken:4},
- "高城胤吉":{ken:4},   "壬生綱房":{ken:4},   "大関高増":{ken:4},
- "長尾憲景":{ken:4},   "三田綱秀":{ken:4},   "藤田泰邦":{ken:4},
+ "間宮康俊":{ken:4},   "吉良頼康":{nou:2,shou:2,ken:4,tou:2},
+ "里見義堯":{nou:3,shou:2,ken:4,tou:3},   "里見義舜":{ken:4},   "沼田顕泰":{ken:4},
+ "安中重繁":{nou:2,shou:2,ken:4,tou:3},   "益子勝宗":{nou:2,shou:2,ken:4,tou:2},   "大田原資清":{ken:4},
+ "高城胤吉":{ken:4},   "壬生綱房":{nou:2,shou:3,ken:4,tou:3},   "大関高増":{nou:2,shou:2,ken:4,tou:3},
+ "長尾憲景":{nou:2,shou:2,ken:4,tou:3},   "三田綱秀":{ken:4},   "藤田泰邦":{ken:4},
  /* 治水・城下・財政・流通 */
- "大道寺政繁":{nou:4,shou:4,ken:4},
- "簗田晴助":{shou:4},  "菅谷勝貞":{shou:4},  "和田昭為":{shou:4},
+ "大道寺政繁":{nou:4,shou:4,ken:4,tou:4},
+ "簗田晴助":{nou:2,shou:4,ken:3,tou:2},  "菅谷勝貞":{shou:4},  "和田昭為":{shou:4},
  /* 人の召し抱え・家臣団 */
- "正木時茂":{tou:4},   "桐生助綱":{tou:4},   "長野業正":{tou:4},
- "小山高朝":{tou:4},
+ "正木時茂":{tou:4},   "桐生助綱":{tou:4},   "長野業正":{nou:3,shou:2,ken:3,tou:4},
+ "小山高朝":{nou:2,shou:2,ken:2,tou:4},
  "千葉胤富":{ken:4,tou:4},
  /* 信濃・甲斐・駿河・伊豆（S2 §11）*/
- "武田晴信":{nou:5,ken:4}, "馬場信房":{ken:4}, "上原虎満":{ken:4}, "山本勘助":{ken:4}, "今川義元":{nou:4,shou:5,tou:4}, "太原雪斎":{shou:4}, "江川英元":{shou:4},
+ "武田晴信":{nou:5,shou:5,ken:4,tou:5}, "馬場信房":{nou:2,shou:2,ken:4,tou:3}, "上原虎満":{ken:4}, "山本勘助":{nou:2,shou:2,ken:4,tou:3}, "今川義元":{nou:4,shou:5,ken:3,tou:4}, "太原雪斎":{nou:3,shou:4,ken:4,tou:3}, "江川英元":{shou:4},
+ /* 記事の記録から決めた者（8.5.0）。農業・商業・建築・登用の 4 つを持つ */
+ "南部信直":{nou:4,shou:3,ken:4,tou:3}, "南部利直":{nou:3,shou:4,ken:4,tou:2}, "南部重信":{nou:4,shou:4,ken:3,tou:3},
+ "南部重直":{nou:2,shou:2,ken:4,tou:2}, "大崎義宣":{nou:2,shou:2,ken:2,tou:1}, "松前慶広":{nou:2,shou:5,ken:3,tou:3},
+ "津軽信枚":{nou:4,shou:4,ken:5,tou:4}, "津軽信義":{nou:4,shou:4,ken:2,tou:1}, "津軽為信":{nou:2,shou:3,ken:3,tou:2},
+ "仁賀保挙誠":{nou:2,shou:3,ken:2,tou:3}, "大内定綱":{nou:2,shou:2,ken:3,tou:3}, "大崎義隆":{nou:3,shou:2,ken:2,tou:2},
+ "安東愛季":{nou:2,shou:5,ken:3,tou:4}, "小野寺義道":{nou:2,shou:2,ken:2,tou:1}, "後藤寿庵":{nou:5,shou:2,ken:3,tou:3},
+ "戸沢政盛":{nou:3,shou:2,ken:2,tou:3}, "戸沢盛安":{nou:2,shou:2,ken:2,tou:3}, "池田盛周":{nou:4,shou:2,ken:2,tou:3},
+ "津軽信英":{nou:3,shou:4,ken:4,tou:4}, "石川宗弘":{nou:4,shou:2,ken:4,tou:2}, "秋田俊季":{nou:2,shou:2,ken:3,tou:2},
+ "秋田実季":{nou:3,shou:4,ken:4,tou:3}, "黒沢道家":{nou:4,shou:4,ken:2,tou:4}, "伊達実元":{nou:3,shou:2,ken:2,tou:3},
+ "伊達忠宗":{nou:4,shou:4,ken:4,tou:4}, "伊達成実":{nou:4,shou:4,ken:3,tou:3}, "伊達政宗":{nou:5,shou:4,ken:5,tou:4},
+ "伊達政道":{nou:2,shou:2,ken:2,tou:3}, "伊達秀宗":{nou:4,shou:3,ken:2,tou:2}, "伊達輝宗":{nou:3,shou:3,ken:4,tou:4},
+ "国分盛重":{nou:2,shou:2,ken:3,tou:1}, "大宝寺義氏":{nou:2,shou:3,ken:2,tou:2}, "寒河江兼広":{nou:2,shou:2,ken:2,tou:2},
+ "白鳥長久":{nou:3,shou:3,ken:2,tou:3}, "石川昭光":{nou:3,shou:2,ken:2,tou:2}, "伊達宗勝":{nou:2,shou:2,ken:2,tou:1},
+ "伊達宗敏":{nou:3,shou:2,ken:4,tou:2}, "伊達宗重":{nou:3,shou:2,ken:2,tou:3}, "伊達宗高":{nou:3,shou:2,ken:2,tou:3},
+ "奥山兼清":{nou:4,shou:2,ken:3,tou:3}, "屋代景頼":{nou:4,shou:3,ken:3,tou:2}, "山岡重長":{nou:3,shou:3,ken:4,tou:3},
+ "支倉常長":{nou:2,shou:3,ken:2,tou:2}, "浜田景隆":{nou:2,shou:2,ken:2,tou:3}, "瀬上景康":{nou:2,shou:2,ken:2,tou:2},
+ "片倉景綱":{nou:3,shou:3,ken:3,tou:4}, "石母田景頼":{nou:3,shou:2,ken:3,tou:4}, "茂庭良元":{nou:3,shou:3,ken:4,tou:3},
+ "鬼庭綱元":{nou:3,shou:3,ken:4,tou:4}, "黒沢重久":{nou:2,shou:2,ken:2,tou:2}, "伊東重孝":{nou:2,shou:2,ken:2,tou:2},
+ "原田宗輔":{nou:2,shou:2,ken:2,tou:2}, "小山晴朝":{nou:2,shou:2,ken:2,tou:3}, "最上義光":{nou:4,shou:5,ken:4,tou:4},
+ "最上義康":{nou:2,shou:2,ken:2,tou:3}, "柴橋頼綱":{nou:2,shou:2,ken:3,tou:3}, "楯岡満茂":{nou:2,shou:2,ken:4,tou:3},
+ "片倉重長":{nou:2,shou:2,ken:3,tou:4}, "鴇田周如":{nou:4,shou:4,ken:4,tou:3}, "佐竹義直":{nou:2,shou:2,ken:2,tou:1},
+ "大田原晴清":{nou:2,shou:2,ken:4,tou:3}, "宇都宮国綱":{nou:2,shou:2,ken:3,tou:2}, "小貫頼久":{nou:3,shou:3,ken:3,tou:4},
+ "岩城宣隆":{nou:4,shou:3,ken:3,tou:3}, "岩城貞隆":{nou:2,shou:2,ken:2,tou:4}, "江戸重通":{nou:2,shou:2,ken:2,tou:1},
+ "皆川広照":{nou:2,shou:4,ken:4,tou:3}, "真壁氏幹":{nou:2,shou:2,ken:2,tou:3}, "結城朝勝":{nou:2,shou:2,ken:2,tou:3},
+ "船尾昭直":{nou:2,shou:2,ken:3,tou:3}, "蘆名盛隆":{nou:2,shou:3,ken:2,tou:1}, "蘆名義広":{nou:3,shou:3,ken:4,tou:2},
+ "佐竹義隆":{nou:3,shou:2,ken:3,tou:2}, "北条宗哲":{nou:3,shou:3,ken:4,tou:3}, "北条康成":{nou:3,shou:2,ken:2,tou:3},
+ "北条氏尭":{nou:3,shou:2,ken:2,tou:2}, "北条綱成":{nou:2,shou:2,ken:3,tou:3}, "北条高広":{nou:3,shou:2,ken:2,tou:2},
+ "塩谷義綱":{nou:3,shou:2,ken:3,tou:2}, "塩谷義通":{nou:3,shou:2,ken:2,tou:2}, "太田康資":{nou:2,shou:2,ken:2,tou:1},
+ "松田憲秀":{nou:3,shou:3,ken:2,tou:2}, "松田盛秀":{nou:3,shou:3,ken:2,tou:4}, "梅津憲忠":{nou:4,shou:3,ken:2,tou:3},
+ "渋江政光":{nou:5,shou:3,ken:4,tou:3}, "遠山綱景":{nou:3,shou:3,ken:2,tou:4}, "北条氏政":{nou:3,shou:4,ken:2,tou:4},
+ "千葉親胤":{nou:2,shou:2,ken:3,tou:1}, "安田能元":{nou:3,shou:3,ken:4,tou:4}, "小田氏治":{nou:2,shou:2,ken:2,tou:4},
+ "成田泰季":{nou:2,shou:2,ken:3,tou:3}, "正木時忠":{nou:2,shou:3,ken:3,tou:4}, "清水康英":{nou:3,shou:3,ken:3,tou:3},
+ "白河義親":{nou:2,shou:2,ken:2,tou:3}, "足利晴氏":{nou:2,shou:2,ken:2,tou:3}, "足利藤氏":{nou:2,shou:2,ken:2,tou:3},
+ "足利頼純":{nou:2,shou:2,ken:2,tou:3}, "上杉景虎":{nou:2,shou:2,ken:2,tou:3}, "佐野房綱":{nou:2,shou:3,ken:2,tou:4},
+ "北条氏勝":{nou:4,shou:2,ken:2,tou:2}, "北条氏忠":{nou:2,shou:2,ken:3,tou:2}, "北条氏照":{nou:3,shou:3,ken:4,tou:3},
+ "北条氏直":{nou:3,shou:3,ken:4,tou:3}, "北条氏規":{nou:2,shou:2,ken:3,tou:3}, "北条氏邦":{nou:4,shou:4,ken:4,tou:3},
+ "千葉直重":{nou:2,shou:2,ken:2,tou:2}, "太田氏房":{nou:4,shou:2,ken:3,tou:2}, "小幡信真":{nou:2,shou:2,ken:2,tou:3},
+ "正木頼忠":{nou:2,shou:2,ken:2,tou:2}, "里見忠義":{nou:2,shou:4,ken:3,tou:3}, "里見義康":{nou:3,shou:2,ken:3,tou:2},
+ "里見義頼":{nou:2,shou:4,ken:2,tou:2}, "三浦為春":{nou:3,shou:3,ken:4,tou:3}, "北条氏長":{nou:3,shou:3,ken:4,tou:4},
+ "原胤信":{nou:2,shou:2,ken:2,tou:2}, "喜連川国朝":{nou:2,shou:2,ken:3,tou:2}, "喜連川頼氏":{nou:2,shou:2,ken:3,tou:2},
+ "大掾清幹":{nou:2,shou:2,ken:2,tou:2}, "大道寺直英":{nou:3,shou:2,ken:4,tou:4}, "太田源五郎":{nou:2,shou:2,ken:3,tou:2},
+ "太田資宗":{nou:3,shou:3,ken:2,tou:3}, "成田長親":{nou:3,shou:2,ken:3,tou:3}, "梶原政景":{nou:2,shou:2,ken:4,tou:3},
+ "藤田信吉":{nou:2,shou:2,ken:2,tou:3}, "高城胤辰":{nou:3,shou:4,ken:3,tou:3}, "上杉憲政":{nou:2,shou:2,ken:2,tou:1},
+ "上泉秀綱":{nou:2,shou:2,ken:2,tou:3}, "中条藤資":{nou:2,shou:3,ken:2,tou:3}, "宇佐美定満":{nou:2,shou:2,ken:2,tou:2},
+ "庄田定賢":{nou:3,shou:4,ken:4,tou:3}, "斎藤朝信":{nou:3,shou:2,ken:2,tou:3}, "柿崎景家":{nou:3,shou:3,ken:2,tou:3},
+ "甘粕長重":{nou:4,shou:2,ken:4,tou:3}, "長尾当長":{nou:2,shou:3,ken:3,tou:4}, "長尾政景":{nou:3,shou:2,ken:3,tou:4},
+ "井伊直盛":{nou:3,shou:2,ken:2,tou:2}, "千坂景親":{nou:2,shou:3,ken:4,tou:3}, "富士信忠":{nou:3,shou:2,ken:3,tou:2},
+ "岡部元信":{nou:2,shou:2,ken:2,tou:1}, "斎藤憲広":{nou:2,shou:2,ken:3,tou:2}, "新発田重家":{nou:2,shou:4,ken:4,tou:3},
+ "朝比奈信置":{nou:2,shou:2,ken:2,tou:4}, "本庄実忠":{nou:3,shou:3,ken:4,tou:2}, "海野幸光":{nou:3,shou:2,ken:2,tou:3},
+ "海野輝幸":{nou:3,shou:2,ken:2,tou:2}, "葛山氏元":{nou:3,shou:2,ken:2,tou:2}, "関口氏純":{nou:3,shou:2,ken:2,tou:3},
+ "飯尾連龍":{nou:3,shou:3,ken:2,tou:2}, "上杉定勝":{nou:4,shou:3,ken:2,tou:3}, "上杉景勝":{nou:3,shou:5,ken:4,tou:4},
+ "中条景泰":{nou:2,shou:2,ken:2,tou:2}, "今川氏真":{nou:4,shou:4,ken:2,tou:1}, "今川直房":{nou:2,shou:2,ken:3,tou:2},
+ "今川範以":{nou:2,shou:2,ken:2,tou:1}, "大国実頼":{nou:2,shou:3,ken:4,tou:1}, "水原親憲":{nou:2,shou:2,ken:2,tou:2},
+ "甘粕重政":{nou:2,shou:2,ken:2,tou:2}, "甘糟景継":{nou:2,shou:2,ken:4,tou:3}, "由良国繁":{nou:2,shou:2,ken:2,tou:1},
+ "由良貞繁":{nou:2,shou:2,ken:2,tou:3}, "直江兼続":{nou:5,shou:4,ken:4,tou:4}, "色部長真":{nou:3,shou:2,ken:3,tou:4},
+ "長野業盛":{nou:2,shou:2,ken:2,tou:3}, "井伊直勝":{nou:2,shou:2,ken:4,tou:1}, "井伊直孝":{nou:2,shou:2,ken:3,tou:4},
+ "井伊直政":{nou:2,shou:2,ken:4,tou:4}, "井伊直澄":{nou:2,shou:2,ken:4,tou:4}, "井伊直親":{nou:3,shou:2,ken:2,tou:3},
+ "岡部正綱":{nou:2,shou:3,ken:4,tou:4}, "春日虎綱":{nou:3,shou:2,ken:3,tou:4}, "武田信廉":{nou:2,shou:2,ken:2,tou:3},
+ "武田信繁":{nou:3,shou:2,ken:2,tou:4}, "真田幸綱":{nou:2,shou:2,ken:3,tou:4}, "矢沢頼綱":{nou:3,shou:2,ken:3,tou:3},
+ "穴山信友":{nou:3,shou:4,ken:4,tou:3}, "飯富昌景":{nou:2,shou:4,ken:3,tou:4}, "飯富虎昌":{nou:2,shou:2,ken:3,tou:3},
+ "一条信龍":{nou:2,shou:2,ken:2,tou:4}, "下条信氏":{nou:3,shou:2,ken:3,tou:2}, "下条時氏":{nou:3,shou:3,ken:3,tou:4},
+ "保科正俊":{nou:2,shou:2,ken:3,tou:3}, "多田三八郎":{nou:2,shou:2,ken:2,tou:2}, "小笠原長時":{nou:2,shou:2,ken:2,tou:1},
+ "山村良利":{nou:3,shou:3,ken:2,tou:3}, "村上義清":{nou:3,shou:2,ken:2,tou:2}, "板垣信憲":{nou:2,shou:2,ken:2,tou:1},
+ "武田義信":{nou:2,shou:2,ken:2,tou:2}, "甘利信忠":{nou:3,shou:3,ken:4,tou:3}, "秋山虎繁":{nou:3,shou:3,ken:4,tou:4},
+ "穴山梅雪":{nou:3,shou:3,ken:3,tou:3}, "諏訪頼忠":{nou:3,shou:2,ken:4,tou:3}, "跡部勝資":{nou:3,shou:3,ken:3,tou:3},
+ "長坂虎房":{nou:3,shou:2,ken:3,tou:3}, "須田満親":{nou:3,shou:2,ken:3,tou:4}, "三枝昌貞":{nou:4,shou:3,ken:2,tou:3},
+ "仁科盛信":{nou:3,shou:3,ken:2,tou:4}, "土屋昌恒":{nou:2,shou:2,ken:2,tou:3}, "土屋昌続":{nou:3,shou:3,ken:2,tou:4},
+ "小山田信茂":{nou:3,shou:3,ken:2,tou:2}, "小幡景憲":{nou:2,shou:2,ken:2,tou:4}, "横田尹松":{nou:3,shou:2,ken:2,tou:3},
+ "武田信勝":{nou:2,shou:2,ken:2,tou:2}, "武田信清":{nou:3,shou:2,ken:2,tou:3}, "武田勝頼":{nou:3,shou:2,ken:4,tou:2},
+ "真田信之":{nou:4,shou:3,ken:4,tou:4}, "真田信尹":{nou:2,shou:3,ken:2,tou:4}, "真田信綱":{nou:3,shou:2,ken:3,tou:3},
+ "真田信繁":{nou:2,shou:2,ken:4,tou:3}, "真田昌幸":{nou:3,shou:3,ken:4,tou:4}, "穴山勝千代":{nou:3,shou:2,ken:2,tou:3},
+ "葛山信貞":{nou:2,shou:2,ken:2,tou:2}, "下条頼安":{nou:2,shou:2,ken:2,tou:4}, "依田信蕃":{nou:2,shou:2,ken:3,tou:4},
+ "依田康勝":{nou:2,shou:2,ken:3,tou:2}, "保科正光":{nou:4,shou:2,ken:4,tou:3}, "保科正直":{nou:2,shou:2,ken:3,tou:3},
+ "内藤昌月":{nou:3,shou:2,ken:2,tou:4}, "千村良重":{nou:3,shou:4,ken:3,tou:3}, "小笠原信嶺":{nou:2,shou:3,ken:4,tou:3},
+ "小笠原秀政":{nou:2,shou:2,ken:2,tou:3}, "小笠原貞慶":{nou:2,shou:2,ken:3,tou:3}, "山村良候":{nou:4,shou:3,ken:2,tou:3},
+ "山村良勝":{nou:3,shou:4,ken:3,tou:4}, "山浦景国":{nou:3,shou:2,ken:2,tou:2}, "木曾義利":{nou:2,shou:2,ken:2,tou:1},
+ "木曾義昌":{nou:2,shou:3,ken:4,tou:3}, "真田信吉":{nou:2,shou:3,ken:3,tou:2}, "真田信政":{nou:3,shou:2,ken:2,tou:2},
+ "知久頼氏":{nou:2,shou:2,ken:3,tou:1}, "諏訪頼水":{nou:4,shou:3,ken:3,tou:3}, "太田資正":{nou:2,shou:2,ken:2,tou:3},
+ "宇都宮広綱":{nou:2,shou:2,ken:2,tou:3},
 };
-const SKILL_MID=3;             // 名指ししない者の適性
+const SKILL_MID=3;             // 適性の基準（並）。欄の無い古い行はこれと読む。登録された武将の既定は式で出す（`skillOf`）
 
 /* ------------------------------------------------------------
    忍びの適性（§28.2）
@@ -10333,83 +10487,157 @@ const BUSHOU_NINJA=new Set([
 ]);
 
 const BUSHOU_TEKI={
- "長尾景虎":{ashi:5,kiba:5,tepp:3,kiki:5},
- "本庄繁長":{ashi:5,kiba:4,tepp:3,kiki:4},
- "九戸政実":{ashi:4,kiba:5,tepp:3,kiki:5},
- "蘆名盛氏":{ashi:4,kiba:4,tepp:4,kiki:4},
- "伊達晴宗":{ashi:4,kiba:4,tepp:3,kiki:4},
- "伊達実元":{ashi:4,kiba:4,tepp:3},
- "鬼庭良直":{ashi:5,kiba:3,tepp:3},
+ "長尾景虎":{ashi:5,kiba:5,tepp:3,kiki:5,sui:3},
+ "本庄繁長":{ashi:5,kiba:4,tepp:3,kiki:4,sui:2},
+ "九戸政実":{ashi:4,kiba:5,tepp:3,kiki:5,sui:1},
+ "蘆名盛氏":{ashi:4,kiba:4,tepp:4,kiki:4,sui:2},
+ "伊達晴宗":{ashi:4,kiba:4,tepp:3,kiki:4,sui:1},
+ "伊達実元":{ashi:4,kiba:4,tepp:3,kiki:3,sui:1},
+ "鬼庭良直":{ashi:5,kiba:3,tepp:3,kiki:3,sui:1},
  "相馬盛胤":{ashi:4,kiba:5,tepp:2,kiki:4},
  "亘理元宗":{ashi:4,kiba:4,tepp:2},
- "南部晴政":{ashi:4,kiba:5,tepp:2,kiki:5},
- "石川高信":{ashi:4,kiba:4,tepp:2,kiki:4},
+ "南部晴政":{ashi:4,kiba:5,tepp:2,kiki:5,sui:1},
+ "石川高信":{ashi:4,kiba:4,tepp:2,kiki:4,sui:1},
  "北信愛"  :{ashi:4,kiba:4,tepp:3},
  "八戸勝義":{ashi:3,kiba:4,tepp:2},
  "大浦為則":{ashi:3,kiba:4,tepp:2},
  "延沢満重":{ashi:4,kiba:4,tepp:2},
- "北条高広":{ashi:4,kiba:4,tepp:3},
+ "北条高広":{ashi:4,kiba:4,tepp:3,kiki:3,sui:1},
  "新発田綱貞":{ashi:4,kiba:3,tepp:3},
  "金上盛備":{ashi:3,kiba:3,tepp:4},
  "氏家守棟":{ashi:3,kiba:3,tepp:4},
  "小野寺輝道":{ashi:3,kiba:3,tepp:3,sui:2},
  "戸沢道盛":{ashi:3,kiba:4,tepp:2},
- "蠣崎季広":{ashi:3,kiba:2,tepp:3,sui:5},
+ "蠣崎季広":{ashi:3,kiba:2,tepp:3,kiki:1,sui:5},
  "ハシタイン":{ashi:3,kiba:2,tepp:1,sui:5},
  "チコモタイン":{ashi:3,kiba:2,tepp:1,sui:5},
  "斯波経詮":{ashi:2,kiba:2,tepp:2},
  "大崎義直":{ashi:2,kiba:3,tepp:2},
  /* 関東・越後・佐渡（R2・R3）*/
- "北条氏康":{ashi:5,kiba:4,tepp:3,kiki:4},
- "北条綱成":{ashi:4,kiba:5,kiki:5,sui:4},
- "北条康成":{kiba:4},
+ "北条氏康":{ashi:5,kiba:4,tepp:3,kiki:4,sui:3},
+ "北条綱成":{ashi:4,kiba:5,tepp:4,kiki:5,sui:4},
+ "北条康成":{ashi:4,kiba:4,tepp:2,kiki:3,sui:2},
  "間宮康俊":{ashi:4,sui:4},
  "大藤信基":{ashi:5},
- "太田康資":{ashi:4},
- "太田資正":{ashi:4,kiba:4},
+ "太田康資":{ashi:4,kiba:4,tepp:3,kiki:3,sui:2},
+ "太田資正":{ashi:4,kiba:4,tepp:2,kiki:3,sui:2},
  "小幡憲重":{kiba:4},
- "長野業正":{ashi:5,kiba:4,kiki:4},
- "上泉秀綱":{ashi:5,kiba:4},
- "簗田晴助":{sui:3},
- "里見義堯":{ashi:4,kiba:4,sui:4},
+ "長野業正":{ashi:5,kiba:4,tepp:2,kiki:4,sui:1},
+ "上泉秀綱":{ashi:5,kiba:4,tepp:2,kiki:3,sui:1},
+ "簗田晴助":{ashi:4,kiba:3,tepp:3,kiki:2,sui:3},
+ "里見義堯":{ashi:4,kiba:4,tepp:2,kiki:3,sui:4},
  "里見義舜":{kiba:4,sui:5},
  "正木時茂":{ashi:5,kiba:5,kiki:4},
- "正木時忠":{sui:5},
+ "正木時忠":{ashi:3,kiba:3,tepp:2,kiki:2,sui:5},
  "真壁久幹":{ashi:5,kiba:3},
- "水谷正村":{kiba:4},
+ "水谷正村":{ashi:4,kiba:4,tepp:3,kiki:3,sui:3},
  "佐野昌綱":{ashi:4},
  "那須高資":{kiba:4},
- "柿崎景家":{ashi:4,kiba:5,kiki:5},
- "斎藤朝信":{ashi:4,kiba:4},
- "宇佐美定満":{sui:3},
+ "柿崎景家":{ashi:4,kiba:5,tepp:2,kiki:5,sui:2},
+ "斎藤朝信":{ashi:4,kiba:4,tepp:2,kiki:3,sui:2},
+ "宇佐美定満":{ashi:3,kiba:3,tepp:2,kiki:2,sui:3},
  "安田長秀":{kiba:4},
- "甘粕長重":{ashi:4,kiba:4},
+ "甘粕長重":{ashi:4,kiba:4,tepp:3,kiki:3,sui:2},
  "荒川長実":{kiba:4},
  "本間有泰":{sui:3},
  "本間貞兼":{sui:3},
  "羽茂高信":{sui:3},
  "久知正泰":{sui:3},
- "北条氏照":{kiba:4},
+ "北条氏照":{ashi:4,kiba:4,tepp:3,kiki:3,sui:3},
  "正木憲時":{ashi:4},
  "佐竹義重":{kiba:5},
  "佐野宗綱":{kiba:4},
- "小幡信真":{kiba:4},
- "真壁氏幹":{ashi:5},
+ "小幡信真":{ashi:4,kiba:4,tepp:2,kiki:4,sui:1},
+ "真壁氏幹":{ashi:5,kiba:3,tepp:2,kiki:2,sui:1},
  "柿崎晴家":{kiba:4},
  /* R6 */
  "松田康郷":{kiba:4},
  "小幡信高":{kiba:4},
  "正木信茂":{ashi:4},
- /* R9 */ "清水康英":{sui:4},"大藤秀信":{ashi:4},
+ /* R9 */ "清水康英":{ashi:4,kiba:3,tepp:2,kiki:2,sui:4},"大藤秀信":{ashi:4},
  /* R10・V1b */ "富永直勝":{sui:3},"菅谷勝貞":{sui:4},
  /* 信濃・甲斐・駿河・遠江（S2 §11・S3）*/
- "武田晴信":{ashi:4,kiba:5,tepp:3,kiki:5}, "武田信繁":{kiba:4}, "飯富虎昌":{ashi:4,kiba:5,kiki:5}, "飯富昌景":{ashi:4,kiba:5,kiki:5}, "馬場信房":{ashi:4,kiba:4}, "原虎胤":{ashi:5}, "小畠虎盛":{ashi:5}, "多田三八郎":{ashi:5}, "保科正俊":{ashi:5}, "村上義清":{ashi:5,kiba:4,kiki:4}, "小笠原長時":{kiba:4}, "岡部元信":{sui:4}, "武田勝頼":{kiba:5}, "土屋昌恒":{ashi:4}, "真田昌幸":{ashi:4}, "真田信繁":{ashi:5}, "依田信蕃":{ashi:4}, "須田長義":{ashi:4}, "井伊直政":{kiba:5},
+ "武田晴信":{ashi:4,kiba:5,tepp:3,kiki:5,sui:3}, "武田信繁":{ashi:4,kiba:4,tepp:2,kiki:4,sui:1}, "飯富虎昌":{ashi:4,kiba:5,tepp:2,kiki:5,sui:1}, "飯富昌景":{ashi:4,kiba:5,tepp:2,kiki:5,sui:1}, "馬場信房":{ashi:4,kiba:4,tepp:2,kiki:4,sui:1}, "原虎胤":{ashi:5}, "小畠虎盛":{ashi:5}, "多田三八郎":{ashi:5,kiba:3,tepp:2,kiki:2,sui:1}, "保科正俊":{ashi:5,kiba:4,tepp:2,kiki:3,sui:1}, "村上義清":{ashi:5,kiba:4,tepp:2,kiki:4,sui:1}, "小笠原長時":{ashi:3,kiba:4,tepp:2,kiki:3,sui:1}, "岡部元信":{ashi:5,kiba:4,tepp:3,kiki:3,sui:4}, "武田勝頼":{ashi:4,kiba:5,tepp:1,kiki:4,sui:3}, "土屋昌恒":{ashi:4,kiba:3,tepp:2,kiki:2,sui:3}, "真田昌幸":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "真田信繁":{ashi:5,kiba:4,tepp:3,kiki:4,sui:1}, "依田信蕃":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "須田長義":{ashi:4}, "井伊直政":{ashi:4,kiba:5,tepp:2,kiki:5,sui:1},
+ /* 記事の記録から決めた者（8.5.0）。足軽・騎馬・鉄砲・鉄騎・水軍の 5 つを持つ */
+ "南部信直":{ashi:3,kiba:3,tepp:3,kiki:3,sui:1}, "南部利直":{ashi:3,kiba:3,tepp:3,kiki:3,sui:1}, "南部重信":{ashi:2,kiba:2,tepp:2,kiki:2,sui:1},
+ "南部重直":{ashi:2,kiba:2,tepp:2,kiki:2,sui:1}, "大崎義宣":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "松前慶広":{ashi:3,kiba:2,tepp:2,kiki:1,sui:4},
+ "津軽信枚":{ashi:3,kiba:2,tepp:2,kiki:2,sui:3}, "津軽信義":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "津軽為信":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "葛西晴信":{ashi:3,kiba:2,tepp:2,kiki:2,sui:2}, "仁賀保挙誠":{ashi:4,kiba:3,tepp:2,kiki:2,sui:2}, "大内定綱":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "大崎義隆":{ashi:4,kiba:3,tepp:3,kiki:2,sui:1}, "安東愛季":{ashi:4,kiba:3,tepp:3,kiki:2,sui:4}, "小野寺義道":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "後藤寿庵":{ashi:2,kiba:2,tepp:4,kiki:2,sui:1}, "戸沢政盛":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "戸沢盛安":{ashi:4,kiba:5,tepp:2,kiki:4,sui:1},
+ "池田盛周":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "津軽信英":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "石川宗弘":{ashi:2,kiba:2,tepp:2,kiki:2,sui:1},
+ "秋田俊季":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "秋田実季":{ashi:3,kiba:2,tepp:4,kiki:2,sui:3}, "黒沢道家":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "伊達忠宗":{ashi:2,kiba:2,tepp:4,kiki:2,sui:1}, "伊達成実":{ashi:5,kiba:4,tepp:3,kiki:4,sui:2}, "伊達政宗":{ashi:4,kiba:3,tepp:4,kiki:3,sui:4},
+ "伊達政道":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "伊達秀宗":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "伊達輝宗":{ashi:4,kiba:3,tepp:3,kiki:3,sui:1},
+ "国分盛重":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "大宝寺義氏":{ashi:4,kiba:3,tepp:2,kiki:2,sui:3}, "寒河江兼広":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1},
+ "最上義守":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "白鳥長久":{ashi:4,kiba:3,tepp:2,kiki:2,sui:2}, "石川昭光":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "伊達宗勝":{ashi:3,kiba:2,tepp:2,kiki:1,sui:1}, "伊達宗敏":{ashi:2,kiba:2,tepp:2,kiki:1,sui:1}, "伊達宗重":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1},
+ "伊達宗高":{ashi:2,kiba:2,tepp:2,kiki:1,sui:1}, "奥山兼清":{ashi:4,kiba:3,tepp:3,kiki:2,sui:1}, "屋代景頼":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "山岡重長":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "支倉常長":{ashi:3,kiba:2,tepp:4,kiki:2,sui:4}, "浜田景隆":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "瀬上景康":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "片倉景綱":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "石母田景頼":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "茂庭良元":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "鬼庭綱元":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "黒沢重久":{ashi:3,kiba:2,tepp:2,kiki:1,sui:1},
+ "伊東重孝":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "原田宗輔":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "壬生綱房":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "大関高増":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "小山晴朝":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "小山高朝":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "最上義光":{ashi:4,kiba:3,tepp:5,kiki:3,sui:3}, "最上義康":{ashi:4,kiba:3,tepp:2,kiki:3,sui:2}, "柴橋頼綱":{ashi:3,kiba:3,tepp:1,kiki:2,sui:2},
+ "楯岡満茂":{ashi:4,kiba:3,tepp:3,kiki:3,sui:2}, "片倉重長":{ashi:4,kiba:3,tepp:3,kiki:3,sui:1}, "益子勝宗":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "鴇田周如":{ashi:2,kiba:2,tepp:2,kiki:1,sui:1}, "佐竹義直":{ashi:2,kiba:2,tepp:1,kiki:1,sui:1}, "大田原晴清":{ashi:4,kiba:3,tepp:3,kiki:3,sui:1},
+ "宇都宮国綱":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "小貫頼久":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "岩城宣隆":{ashi:2,kiba:2,tepp:2,kiki:2,sui:1},
+ "岩城貞隆":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "江戸重通":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "皆川広照":{ashi:4,kiba:3,tepp:4,kiki:3,sui:1},
+ "結城朝勝":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "船尾昭直":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "蘆名盛隆":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "蘆名義広":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "佐竹義隆":{ashi:2,kiba:2,tepp:2,kiki:2,sui:1}, "北条宗哲":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2},
+ "北条氏尭":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "塩谷義綱":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "塩谷義通":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1},
+ "松田憲秀":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "松田盛秀":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "梅津憲忠":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "渋江政光":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "遠山綱景":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "北条氏政":{ashi:4,kiba:3,tepp:3,kiki:3,sui:2},
+ "千葉親胤":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "吉良頼康":{ashi:2,kiba:2,tepp:2,kiki:2,sui:3}, "大道寺政繁":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "安田能元":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "小田氏治":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "成田泰季":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "白河義親":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "足利晴氏":{ashi:2,kiba:3,tepp:1,kiki:2,sui:1}, "足利藤氏":{ashi:3,kiba:3,tepp:1,kiki:2,sui:1},
+ "足利頼純":{ashi:2,kiba:2,tepp:1,kiki:1,sui:1}, "上杉景虎":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "佐野房綱":{ashi:2,kiba:2,tepp:2,kiki:1,sui:1},
+ "北条氏勝":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "北条氏忠":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "北条氏直":{ashi:3,kiba:3,tepp:3,kiki:2,sui:2},
+ "北条氏規":{ashi:4,kiba:3,tepp:3,kiki:2,sui:4}, "北条氏邦":{ashi:4,kiba:3,tepp:2,kiki:3,sui:2}, "千葉直重":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "太田氏房":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "正木頼忠":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "里見忠義":{ashi:2,kiba:2,tepp:2,kiki:1,sui:2},
+ "里見義康":{ashi:3,kiba:2,tepp:2,kiki:2,sui:3}, "里見義頼":{ashi:3,kiba:3,tepp:2,kiki:2,sui:4}, "三浦為春":{ashi:3,kiba:2,tepp:2,kiki:2,sui:2},
+ "北条氏長":{ashi:3,kiba:2,tepp:4,kiki:2,sui:2}, "原胤信":{ashi:2,kiba:1,tepp:3,kiki:1,sui:1}, "喜連川国朝":{ashi:2,kiba:1,tepp:1,kiki:1,sui:1},
+ "喜連川頼氏":{ashi:2,kiba:1,tepp:2,kiki:1,sui:1}, "大掾清幹":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "大道寺直英":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "太田源五郎":{ashi:2,kiba:2,tepp:1,kiki:1,sui:1}, "太田資宗":{ashi:2,kiba:2,tepp:1,kiki:1,sui:1}, "成田長親":{ashi:4,kiba:2,tepp:2,kiki:2,sui:3},
+ "梶原政景":{ashi:4,kiba:3,tepp:2,kiki:2,sui:2}, "藤田信吉":{ashi:4,kiba:3,tepp:3,kiki:3,sui:2}, "高城胤辰":{ashi:3,kiba:4,tepp:2,kiki:3,sui:2},
+ "上杉憲政":{ashi:2,kiba:3,tepp:1,kiki:2,sui:1}, "中条藤資":{ashi:4,kiba:3,tepp:2,kiki:3,sui:2}, "安中重繁":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "庄田定賢":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "横瀬成繁":{ashi:3,kiba:3,tepp:3,kiki:2,sui:2}, "直江実綱":{ashi:4,kiba:3,tepp:2,kiki:2,sui:2},
+ "長尾当長":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "長尾憲景":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "長尾政景":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "井伊直盛":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "今川義元":{ashi:4,kiba:3,tepp:2,kiki:2,sui:2}, "千坂景親":{ashi:2,kiba:2,tepp:2,kiki:1,sui:1},
+ "太原雪斎":{ashi:4,kiba:3,tepp:2,kiki:2,sui:3}, "富士信忠":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "斎藤憲広":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "新発田重家":{ashi:5,kiba:4,tepp:3,kiki:3,sui:4}, "朝比奈信置":{ashi:4,kiba:4,tepp:3,kiki:3,sui:2}, "本庄実忠":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "海野幸光":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "海野輝幸":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "葛山氏元":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "関口氏純":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "飯尾連龍":{ashi:4,kiba:2,tepp:2,kiki:2,sui:2}, "上杉定勝":{ashi:2,kiba:2,tepp:2,kiki:2,sui:1},
+ "上杉景勝":{ashi:4,kiba:3,tepp:3,kiki:3,sui:3}, "中条景泰":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "今川氏真":{ashi:2,kiba:2,tepp:2,kiki:2,sui:1},
+ "今川直房":{ashi:1,kiba:2,tepp:1,kiki:1,sui:1}, "今川範以":{ashi:1,kiba:2,tepp:1,kiki:1,sui:1}, "大国実頼":{ashi:3,kiba:2,tepp:2,kiki:2,sui:2},
+ "水原親憲":{ashi:4,kiba:3,tepp:5,kiki:3,sui:2}, "甘粕重政":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "甘糟景継":{ashi:4,kiba:3,tepp:2,kiki:3,sui:2},
+ "由良国繁":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "由良貞繁":{ashi:3,kiba:3,tepp:2,kiki:2,sui:3}, "直江兼続":{ashi:4,kiba:3,tepp:2,kiki:2,sui:2},
+ "色部長真":{ashi:4,kiba:4,tepp:2,kiki:3,sui:2}, "長野業盛":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "井伊直勝":{ashi:2,kiba:2,tepp:2,kiki:2,sui:1},
+ "井伊直孝":{ashi:4,kiba:4,tepp:3,kiki:4,sui:1}, "井伊直澄":{ashi:2,kiba:2,tepp:2,kiki:2,sui:1}, "井伊直親":{ashi:3,kiba:2,tepp:1,kiki:2,sui:1},
+ "山本勘助":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "岡部正綱":{ashi:4,kiba:3,tepp:2,kiki:3,sui:4}, "春日虎綱":{ashi:4,kiba:3,tepp:2,kiki:3,sui:1},
+ "武田信廉":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "真田幸綱":{ashi:4,kiba:3,tepp:2,kiki:3,sui:1}, "矢沢頼綱":{ashi:4,kiba:3,tepp:2,kiki:3,sui:1},
+ "穴山信友":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "一条信龍":{ashi:3,kiba:4,tepp:2,kiki:3,sui:1}, "下条信氏":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "下条時氏":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "山村良利":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "板垣信憲":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "武田義信":{ashi:4,kiba:3,tepp:2,kiki:3,sui:1}, "甘利信忠":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "秋山虎繁":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "穴山梅雪":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "諏訪頼忠":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "跡部勝資":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "長坂虎房":{ashi:4,kiba:2,tepp:2,kiki:2,sui:1}, "須田満親":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2}, "三枝昌貞":{ashi:4,kiba:2,tepp:2,kiki:2,sui:1},
+ "仁科盛信":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "土屋昌続":{ashi:4,kiba:4,tepp:2,kiki:3,sui:1}, "小山田信茂":{ashi:4,kiba:3,tepp:3,kiki:2,sui:1},
+ "小幡景憲":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1}, "横田尹松":{ashi:4,kiba:4,tepp:2,kiki:3,sui:1}, "武田信勝":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "武田信清":{ashi:2,kiba:2,tepp:1,kiki:1,sui:1}, "真田信之":{ashi:4,kiba:4,tepp:2,kiki:3,sui:1}, "真田信尹":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "真田信綱":{ashi:4,kiba:4,tepp:2,kiki:3,sui:1}, "穴山勝千代":{ashi:2,kiba:2,tepp:1,kiki:1,sui:1}, "葛山信貞":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "下条頼安":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "依田康勝":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "保科正光":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1},
+ "保科正直":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "内藤昌月":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "千村良重":{ashi:3,kiba:3,tepp:2,kiki:2,sui:2},
+ "小笠原信嶺":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "小笠原秀政":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "小笠原貞慶":{ashi:3,kiba:4,tepp:2,kiki:3,sui:1},
+ "山村良候":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "山村良勝":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "山浦景国":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1},
+ "木曾義利":{ashi:2,kiba:2,tepp:1,kiki:1,sui:1}, "木曾義昌":{ashi:4,kiba:3,tepp:2,kiki:2,sui:1}, "真田信吉":{ashi:2,kiba:2,tepp:2,kiki:1,sui:1},
+ "真田信政":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1}, "知久頼氏":{ashi:3,kiba:3,tepp:2,kiki:2,sui:1}, "諏訪頼水":{ashi:2,kiba:3,tepp:2,kiki:2,sui:1},
+ "宇都宮広綱":{ashi:3,kiba:2,tepp:1,kiki:2,sui:1}, "結城政勝":{ashi:3,kiba:2,tepp:2,kiki:2,sui:1},
 };
 
 const BUSHOU_GAIKOU={
- /* 後の世代（§19.8）*/ "伊達政宗":80,"伊達輝宗":72,"伊達成実":50,"片倉景綱":78,"最上義光":82,"南部信直":68,"津軽為信":70,"上杉景勝":64,"直江兼続":86,"戸沢盛安":48,"蘆名盛隆":56,"安東愛季":74,"秋田実季":70,"相馬義胤":60,"大内定綱":62,"鬼庭綱元":78,"新発田重家":50,"松前慶広":82,"九戸実親":50,"延沢満延":40,"楯岡満茂":56,"志村光安":60,"白石宗実":56,"後藤信康":46,"原田宗時":44,"支倉常長":72,"岩城常隆":58,"東禅寺義長":50,"仁賀保挙誠":60,"畠山義継":50,"留守政景":60,"石川昭光":62,"亘理重宗":56,"伊達忠宗":70,"片倉重長":62,"八戸政栄":64,"大崎義隆":56,"小野寺義道":46,"大宝寺義氏":44,"最上家親":60,
+ /* 後の世代（§19.8）*/ "伊達政宗":80,"伊達輝宗":72,"伊達成実":60,"片倉景綱":78,"最上義光":82,"南部信直":68,"津軽為信":70,"上杉景勝":64,"直江兼続":86,"戸沢盛安":56,"蘆名盛隆":66,"安東愛季":74,"秋田実季":70,"相馬義胤":60,"大内定綱":62,"鬼庭綱元":78,"新発田重家":50,"松前慶広":82,"九戸実親":50,"延沢満延":40,"楯岡満茂":56,"志村光安":60,"白石宗実":56,"後藤信康":46,"原田宗時":44,"支倉常長":72,"岩城常隆":58,"東禅寺義長":50,"仁賀保挙誠":60,"畠山義継":50,"留守政景":60,"石川昭光":62,"亘理重宗":56,"伊達忠宗":70,"片倉重長":62,"八戸政栄":64,"大崎義隆":56,"小野寺義道":46,"大宝寺義氏":60,"最上家親":60,
  "寒河江兼広":54,"鮎川清長":44,
- "小梁川宗朝":54,"石母田光頼":58,"白石宗利":48,"原田宗政":44,"富塚宗綱":50,"泉田重光":46,"針生盛幸":50,"富田滋実":56,"猪苗代盛国":40,"南長義":48,"七戸家国":46,"桜庭光康":50,"二本松盛国":48,"堀越能登":44,"大崎義宣":52,"氏家直継":52,"葛西晴胤":56,"柏山明吉":42,"岩城親隆":60,"須田盛秀":50,"田村顕基":52,"成沢道忠":46,"長尾政景":56,"本庄実乃":62,"色部勝長":54,"黒川晴氏":60,"中条藤資":52,"白鳥長久":56,
+ "小梁川宗朝":54,"石母田光頼":58,"白石宗利":48,"原田宗政":44,"富塚宗綱":50,"泉田重光":46,"針生盛幸":50,"富田滋実":56,"猪苗代盛国":40,"南長義":48,"七戸家国":46,"桜庭光康":50,"二本松盛国":48,"堀越能登":44,"大崎義宣":52,"氏家直継":52,"葛西晴胤":56,"柏山明吉":42,"岩城親隆":60,"須田盛秀":50,"田村顕基":52,"成沢道忠":46,"長尾政景":56,"本庄実乃":62,"色部勝長":54,"黒川晴氏":60,"中条藤資":60,"白鳥長久":66,
  "蠣崎季広":78,"長門広益":55,"南条広継":48,
  "南部晴政":62,"石川高信":70,"北信愛":80,"一戸政連":50,"東政勝":52,
  "毛馬内秀範":48,"大浦為則":58,"八戸勝義":55,
@@ -10427,18 +10655,26 @@ const BUSHOU_GAIKOU={
  "安東舜季":58,
  "小野寺輝道":56,
  "大宝寺義増":48,"土佐林禅棟":74,
- "最上義守":54,"氏家定直":70,"氏家守棟":76,"清水義高":50,
+ "最上義守":64,"氏家定直":70,"氏家守棟":76,"清水義高":50,
  "伊達晴宗":68,"伊達実元":62,"鬼庭良直":66,"遠藤基信":86,
  "中野宗時":72,"牧野久仲":58,"亘理元宗":56,"桑折景長":64,"留守顕宗":58,
- "本庄繁長":40,
+ "本庄繁長":62,
  "長尾景虎":74,"山吉政久":58,
- /* 関東・越後・佐渡（R2・R3。遊ぶための値）*/ "北条氏康":84,"北条綱成":50,"北条宗哲":76,"北条氏尭":50,"北条康成":56,"北条綱高":44,"北条綱房":40,"大道寺周勝":50,"松田盛秀":66,"松田憲秀":60,"遠山綱景":70,"富永直勝":42,"多目元忠":44,"間宮康俊":40,"石巻家貞":64,"大藤信基":42,"太田康資":40,"吉良頼康":62,"上田朝直":58,"藤田泰邦":52,"大石綱周":56,"那波宗俊":48,"長尾景総":50,"小幡憲重":50,"上杉憲政":56,"長尾当長":56,"長尾憲景":56,"長尾景孝":46,"桐生助綱":50,"安中重繁":50,"倉賀野尚行":44,"上杉憲盛":52,"足利晴氏":62,"足利藤氏":56,"簗田晴助":62,"一色直朝":62,"野田弘朝":48,"里見義堯":72,"里見義舜":58,"正木時茂":46,"正木時忠":54,"秋元義久":44,"佐竹義昭":70,"佐竹義堅":62,"佐竹義廉":72,"佐竹義里":52,"和田昭為":70,"千葉親胤":40,"千葉胤富":74,"原胤貞":56,"小田氏治":52,"菅谷勝貞":54,"菅谷政貞":56,"結城政勝":60,"水谷正村":50,"多賀谷政経":50,"小山高朝":62,"小山氏朝":60,"小山晴朝":64,"真壁家幹":54,"真壁久幹":60,"壬生綱房":60,"壬生綱雄":52,"芳賀高照":44,"皆川成勝":48,"皆川俊宗":58,"那須高資":48,"那須資胤":60,"大関高増":62,"千本資俊":48,"本間有泰":50,"本間貞兼":46,"久知正泰":44,"潟上秀敏":44,"長尾景信":52,"山本寺定長":48,"直江実綱":74,"柿崎景家":40,"斎藤朝信":68,"宇佐美定満":60,"大熊朝秀":52,"庄田定賢":60,"安田長秀":44,"安田景元":46,"竹俣慶綱":44,"吉江景資":46,"加地春綱":44,"甘粕長重":46,"金津義旧":40,"荒川長実":40,"長野業正":64,"上泉秀綱":40,"和田業繁":44,"横瀬成繁":74,"沼田顕泰":44,"斎藤憲広":46,"成田長泰":56,"成田泰季":44,"太田資正":74,"三田綱秀":50,"佐野豊綱":54,"佐野昌綱":66,"宇都宮広綱":40,"芳賀高定":70,"益子勝宗":50,"大田原資清":60,"江戸忠通":58,"大掾慶幹":50,"大掾貞国":48,"土岐治頼":50,"高城胤吉":54,"酒井敏房":50,"酒井胤治":52,"土岐為頼":56,"真里谷信応":50,"真里谷信隆":46,"真里谷信政":42,"羽茂高信":50,
- "北条氏政":74,"北条氏照":66,"北条氏邦":50,"北条氏規":84,"北条氏忠":48,"上杉景虎":60,"北条氏直":62,"北条氏勝":52,"太田氏房":50,"千葉直重":44,"里見義頼":64,"里見義康":56,"里見忠義":42,"里見義重":38,"正木憲時":42,"正木頼忠":56,"佐竹義重":70,"佐竹義尚":44,"佐竹義斯":66,"佐竹義久":80,"佐竹義宣":68,"蘆名義広":48,"岩城貞隆":52,"岩城宣隆":50,"宇都宮国綱":58,"結城朝勝":50,"芳賀高武":36,"水谷勝俊":58,"多賀谷重経":54,"多賀谷三経":46,"小田友治":48,"小田守治":46,"菅谷範政":50,"千葉良胤":46,"千葉邦胤":52,"千葉重胤":40,"那須資晴":56,"那須資景":52,"大田原綱清":50,"大田原晴清":60,"大関晴増":48,"大関資増":52,"佐野宗綱":40,"佐野房綱":74,"由良国繁":56,"長尾顕長":50,"由良貞繁":46,"長野業盛":44,"小幡信真":48,"沼田景義":40,"那波顕宗":46,"成田氏長":58,"成田長親":56,"太田氏資":46,"梶原政景":70,"太田資武":50,"足利義氏":70,"簗田持助":52,"壬生義雄":52,"皆川広照":74,"江戸通政":48,"江戸重通":58,"真壁氏幹":46,"真壁房幹":48,"大掾清幹":40,"柿崎晴家":40,"柿崎憲家":44,"中条景泰":44,"本間高統":44,
+ /* 関東・越後・佐渡（R2・R3。遊ぶための値）*/ "北条氏康":84,"北条綱成":64,"北条宗哲":76,"北条氏尭":50,"北条康成":56,"北条綱高":44,"北条綱房":40,"大道寺周勝":50,"松田盛秀":66,"松田憲秀":60,"遠山綱景":70,"富永直勝":42,"多目元忠":44,"間宮康俊":40,"石巻家貞":64,"大藤信基":42,"太田康資":52,"吉良頼康":62,"上田朝直":58,"藤田泰邦":52,"大石綱周":56,"那波宗俊":48,"長尾景総":50,"小幡憲重":50,"上杉憲政":56,"長尾当長":64,"長尾憲景":64,"長尾景孝":46,"桐生助綱":50,"安中重繁":58,"倉賀野尚行":44,"上杉憲盛":52,"足利晴氏":62,"足利藤氏":56,"簗田晴助":62,"一色直朝":62,"野田弘朝":48,"里見義堯":72,"里見義舜":58,"正木時茂":46,"正木時忠":54,"秋元義久":44,"佐竹義昭":70,"佐竹義堅":62,"佐竹義廉":72,"佐竹義里":52,"和田昭為":70,"千葉親胤":40,"千葉胤富":74,"原胤貞":56,"小田氏治":52,"菅谷勝貞":54,"菅谷政貞":56,"結城政勝":66,"水谷正村":62,"多賀谷政経":50,"小山高朝":62,"小山氏朝":60,"小山晴朝":74,"真壁家幹":54,"真壁久幹":60,"壬生綱房":60,"壬生綱雄":52,"芳賀高照":44,"皆川成勝":48,"皆川俊宗":58,"那須高資":48,"那須資胤":60,"大関高増":62,"千本資俊":48,"本間有泰":50,"本間貞兼":46,"久知正泰":44,"潟上秀敏":44,"長尾景信":52,"山本寺定長":48,"直江実綱":74,"柿崎景家":56,"斎藤朝信":68,"宇佐美定満":60,"大熊朝秀":52,"庄田定賢":60,"安田長秀":44,"安田景元":46,"竹俣慶綱":44,"吉江景資":46,"加地春綱":44,"甘粕長重":46,"金津義旧":40,"荒川長実":40,"長野業正":64,"上泉秀綱":50,"和田業繁":44,"横瀬成繁":74,"沼田顕泰":44,"斎藤憲広":46,"成田長泰":56,"成田泰季":44,"太田資正":74,"三田綱秀":50,"佐野豊綱":54,"佐野昌綱":66,"宇都宮広綱":40,"芳賀高定":70,"益子勝宗":62,"大田原資清":60,"江戸忠通":58,"大掾慶幹":50,"大掾貞国":48,"土岐治頼":50,"高城胤吉":54,"酒井敏房":50,"酒井胤治":52,"土岐為頼":56,"真里谷信応":50,"真里谷信隆":46,"真里谷信政":42,"羽茂高信":50,
+ "北条氏政":74,"北条氏照":72,"北条氏邦":60,"北条氏規":84,"北条氏忠":48,"上杉景虎":60,"北条氏直":62,"北条氏勝":58,"太田氏房":50,"千葉直重":44,"里見義頼":72,"里見義康":56,"里見忠義":42,"里見義重":38,"正木憲時":42,"正木頼忠":62,"佐竹義重":70,"佐竹義尚":44,"佐竹義斯":66,"佐竹義久":80,"佐竹義宣":68,"蘆名義広":48,"岩城貞隆":60,"岩城宣隆":50,"宇都宮国綱":58,"結城朝勝":58,"芳賀高武":36,"水谷勝俊":58,"多賀谷重経":54,"多賀谷三経":46,"小田友治":48,"小田守治":46,"菅谷範政":50,"千葉良胤":46,"千葉邦胤":52,"千葉重胤":40,"那須資晴":56,"那須資景":52,"大田原綱清":50,"大田原晴清":60,"大関晴増":48,"大関資増":52,"佐野宗綱":40,"佐野房綱":74,"由良国繁":56,"長尾顕長":50,"由良貞繁":46,"長野業盛":44,"小幡信真":48,"沼田景義":40,"那波顕宗":46,"成田氏長":58,"成田長親":56,"太田氏資":46,"梶原政景":70,"太田資武":50,"足利義氏":70,"簗田持助":52,"壬生義雄":52,"皆川広照":74,"江戸通政":48,"江戸重通":64,"真壁氏幹":56,"真壁房幹":48,"大掾清幹":40,"柿崎晴家":40,"柿崎憲家":44,"中条景泰":44,"本間高統":44,
  "大道寺政繁":60,"千坂景親":72,
- /* R6 */ "北条氏親":42,"北条康種":46,"北条氏隆":46,"北条繁広":44,"北条氏長":50,"北条氏盛":52,"北条氏信":42,"北条氏宗":46,"太田源五郎":40,"上田憲定":52,"松田康長":56,"松田康郷":40,"松田直長":50,"富永政家":46,"大道寺直英":54,"大道寺直次":52,"中山家範":44,"中山照守":44,"中山信吉":62,"中山信政":50,"間宮信高":44,"間宮直元":56,"用土重連":44,"藤田信吉":60,"太田重正":50,"太田資宗":66,"小幡信高":40,"小幡信定":44,"笠原重政":44,"上杉憲重":40,"長尾景広":46,"上杉憲俊":40,"足利輝氏":44,"相馬整胤":34,"相馬治胤":48,"喜連川国朝":46,"喜連川頼氏":56,"喜連川義親":40,"喜連川尊信":40,"正木信茂":40,"正木時堯":46,"三浦為春":60,"三浦為時":54,"佐竹義種":48,"佐竹義章":44,"佐竹義憲":50,"佐竹義直":36,"小場義成":52,"小場義易":46,"佐竹義寘":40,"戸村義和":44,"戸村義国":54,"小貫頼久":64,"人見藤道":46,"佐竹義隆":56,"蘆名盛俊":38,"原胤親":44,"原胤栄":50,"原胤信":38,"千葉定胤":40,"高城胤辰":50,"高城胤則":46,"小田友重":42,"水谷勝隆":58,"水谷勝宗":54,"山川晴重":42,"真壁義幹":48,"渋江政光":60,"皆川広勝":44,"皆川隆庸":54,"皆川成郷":34,"皆川秀隆":40,"大関清増":42,"大関政増":46,"大関増親":40,"千本資政":40,"千本義隆":52,"千本義定":46,"千本義昌":44,"福原資保":50,"福原資盛":46,"那須資重":42,"大田原増清":50,"大田原政清":50,"大田原政継":46,"宇都宮義綱":44,"宇都宮隆綱":44,"塩谷義通":42,"塩谷義綱":50,"梅津憲忠":62,"梅津政景":66,"由良忠繁":52,"由良貞房":56,"佐野久綱":42,"上杉定勝":60,"直江景明":40,"志駄義時":34,"志駄義秀":50,"甘粕重政":46,"千坂高信":64,"千坂高治":62,"上杉長員":52,"畠山義真":58,"上杉長貞":48,"竹俣義秀":60,
+ /* R6 */ "北条氏親":42,"北条康種":46,"北条氏隆":46,"北条繁広":44,"北条氏長":50,"北条氏盛":52,"北条氏信":42,"北条氏宗":46,"太田源五郎":40,"上田憲定":52,"松田康長":56,"松田康郷":40,"松田直長":50,"富永政家":46,"大道寺直英":54,"大道寺直次":52,"中山家範":44,"中山照守":44,"中山信吉":62,"中山信政":50,"間宮信高":44,"間宮直元":56,"用土重連":44,"藤田信吉":60,"太田重正":50,"太田資宗":66,"小幡信高":40,"小幡信定":44,"笠原重政":44,"上杉憲重":40,"長尾景広":46,"上杉憲俊":40,"足利輝氏":44,"相馬整胤":34,"相馬治胤":48,"喜連川国朝":46,"喜連川頼氏":56,"喜連川義親":40,"喜連川尊信":40,"正木信茂":40,"正木時堯":46,"三浦為春":60,"三浦為時":54,"佐竹義種":48,"佐竹義章":44,"佐竹義憲":50,"佐竹義直":36,"小場義成":52,"小場義易":46,"佐竹義寘":40,"戸村義和":44,"戸村義国":54,"小貫頼久":74,"人見藤道":46,"佐竹義隆":56,"蘆名盛俊":38,"原胤親":44,"原胤栄":50,"原胤信":38,"千葉定胤":40,"高城胤辰":50,"高城胤則":46,"小田友重":42,"水谷勝隆":58,"水谷勝宗":54,"山川晴重":42,"真壁義幹":48,"渋江政光":60,"皆川広勝":44,"皆川隆庸":54,"皆川成郷":34,"皆川秀隆":40,"大関清増":42,"大関政増":46,"大関増親":40,"千本資政":40,"千本義隆":52,"千本義定":46,"千本義昌":44,"福原資保":50,"福原資盛":46,"那須資重":42,"大田原増清":50,"大田原政清":50,"大田原政継":46,"宇都宮義綱":44,"宇都宮隆綱":44,"塩谷義通":42,"塩谷義綱":50,"梅津憲忠":62,"梅津政景":66,"由良忠繁":52,"由良貞房":56,"佐野久綱":42,"上杉定勝":60,"直江景明":40,"志駄義時":34,"志駄義秀":50,"甘粕重政":46,"千坂高信":64,"千坂高治":62,"上杉長員":52,"畠山義真":58,"上杉長貞":48,"竹俣義秀":60,
  /* R9 */ "清水康英":48,"間宮綱信":58,"石巻康敬":70,"山角定勝":50,"小笠原康広":58,"上田長則":48,"笠原綱信":58,"笠原康勝":44,"遠山康光":72,"大藤秀信":40,"舎人経忠":40,"桑原盛正":64,"山中頼次":42,"上杉憲賢":54,"高田繁頼":44,"安中長繁":46,"本庄実忠":46,"足利頼純":56,"戸村義廣":42,"原胤清":62,"臼井景胤":50,"岡見治資":40,"壬生周長":62,"福原資孝":50,"伊王野資宗":42,"鮎ヶ瀬実光":36,"上泉秀胤":36,"長野業氏":46,"岩松守純":52,"羽尾道雲":44,"海野幸光":44,"海野輝幸":42,"塩谷義孝":46,"多功長朝":44,"吉江宗信":46,"長尾房長":52,"神余親綱":70,"黒川清実":46,"中条景資":44,"小川長資":50,
- /* 信濃・甲斐・駿河・遠江・伊豆（S2・S3。遊ぶための値）*/ "武田晴信":86,"武田信繁":66,"武田信廉":54,"松尾信是":48,"穴山信友":72,"小山田信有":60,"飯富虎昌":46,"飯富昌景":52,"馬場信房":54,"工藤祐長":60,"春日虎綱":62,"原虎胤":40,"原昌胤":56,"上原虎満":50,"山本勘助":56,"真田幸綱":80,"矢沢頼綱":54,"常田隆永":40,"駒井高白斎":76,"長坂虎房":64,"板垣信憲":40,"甘利信忠":44,"室住虎光":44,"小畠虎盛":40,"小幡昌盛":40,"多田三八郎":36,"秋山虎繁":62,"三枝虎吉":46,"跡部勝資":66,"今井信甫":52,"相木昌朝":52,"芦田信守":48,"望月信雅":52,"伴野貞祥":50,"大井貞清":48,"禰津元直":60,"諏訪満隣":56,"諏訪頼忠":58,"仁科盛能":56,"仁科盛政":40,"三村長親":40,"西牧信道":46,"山家昌治":44,"高遠頼継":46,"保科正俊":44,"藤沢頼親":50,"村上義清":58,"屋代政国":54,"室賀経俊":46,"清野清秀":48,"楽巌寺雅方":40,"山田国政":40,"吾妻清綱":40,"小笠原長時":52,"小笠原貞種":54,"小笠原長隆":42,"小笠原信定":50,"平瀬義兼":40,"二木重高":44,"犬甘政徳":44,"下条時氏":54,"下条信氏":52,"木曾義康":58,"山村良利":62,"高梨政頼":66,"高梨秀政":44,"須田満国":50,"須田満親":66,"井上清政":44,"島津忠直":48,"栗田永寿":54,"知久頼元":50,"今川義元":88,"太原雪斎":94,"朝比奈泰能":70,"朝比奈親徳":52,"朝比奈信置":48,"岡部親綱":46,"岡部元信":46,"庵原忠胤":52,"庵原忠縁":44,"三浦正俊":60,"瀬名氏俊":50,"関口氏純":62,"葛山氏元":62,"蒲原氏徳":46,"由比正信":44,"富士信忠":52,"安部元真":44,"長谷川元長":48,"長谷川正長":44,"一宮宗是":46,"飯尾乗連":50,"飯尾連龍":54,"松井貞宗":48,"松井宗信":46,"久野元宗":44,"久野宗能":54,"小笠原氏興":52,"井伊直盛":50,"小野政直":56,"天野景泰":46,"奥山吉兼":42,"大沢基胤":54,"江川英元":56,
- "武田義信":54,"一条信龍":66,"穴山梅雪":84,"穴山勝千代":36,"小山田桃隠":46,"小山田信茂":58,"小山田茂誠":50,"武田勝頼":56,"仁科盛信":44,"葛山信貞":42,"武田信清":52,"武田信勝":40,"武田信豊":60,"望月信頼":42,"望月信永":40,"河窪信俊":46,"土屋昌続":60,"土屋昌恒":44,"土屋忠直":48,"土屋利直":54,"土屋数直":66,"秋山昌詮":52,"三枝昌貞":44,"三枝昌吉":54,"小幡景憲":50,"駒井政直":60,"横田尹松":56,"初鹿野信昌":46,"馬場昌房":46,"真田信綱":48,"真田昌輝":46,"真田昌幸":84,"真田信尹":82,"真田信之":82,"真田信繁":58,"真田信吉":52,"真田信政":56,"真田信重":50,"矢沢頼康":48,"依田信蕃":60,"依田康国":50,"依田康勝":46,"諏訪頼水":62,"諏訪忠恒":52,"小笠原信嶺":66,"小笠原長巨":52,"内藤昌月":64,"保科正直":60,"保科正光":62,"保科正貞":56,"山浦景国":66,"屋代秀正":56,"小笠原貞慶":70,"小笠原秀政":64,"小笠原忠脩":44,"小笠原忠真":68,"小笠原忠知":54,"知久頼氏":48,"知久則直":46,"下条信正":44,"下条頼安":56,"木曾義昌":62,"木曾義利":36,"山村良候":58,"山村良勝":58,"千村良重":52,"須田長義":48,"今川氏真":66,"今川範以":48,"品川高久":50,"今川直房":62,"朝比奈泰朝":56,"朝比奈泰勝":62,"岡部正綱":58,"岡部長盛":56,"岡部宣勝":56,"大沢基宿":62,"久野宗朝":44,"安部信勝":50,"安部信盛":54,"井伊直親":46,"井伊直政":80,"井伊直勝":40,"井伊直孝":72,"井伊直滋":50,"井伊直澄":56,"江川英吉":58,"江川英長":60,
+ /* 信濃・甲斐・駿河・遠江・伊豆（S2・S3。遊ぶための値）*/ "武田晴信":86,"武田信繁":66,"武田信廉":54,"松尾信是":48,"穴山信友":72,"小山田信有":60,"飯富虎昌":46,"飯富昌景":66,"馬場信房":54,"工藤祐長":60,"春日虎綱":62,"原虎胤":40,"原昌胤":56,"上原虎満":50,"山本勘助":56,"真田幸綱":80,"矢沢頼綱":54,"常田隆永":40,"駒井高白斎":76,"長坂虎房":64,"板垣信憲":40,"甘利信忠":60,"室住虎光":44,"小畠虎盛":40,"小幡昌盛":40,"多田三八郎":36,"秋山虎繁":62,"三枝虎吉":46,"跡部勝資":66,"今井信甫":52,"相木昌朝":52,"芦田信守":48,"望月信雅":52,"伴野貞祥":50,"大井貞清":48,"禰津元直":60,"諏訪満隣":56,"諏訪頼忠":58,"仁科盛能":56,"仁科盛政":40,"三村長親":40,"西牧信道":46,"山家昌治":44,"高遠頼継":46,"保科正俊":44,"藤沢頼親":50,"村上義清":58,"屋代政国":54,"室賀経俊":46,"清野清秀":48,"楽巌寺雅方":40,"山田国政":40,"吾妻清綱":40,"小笠原長時":62,"小笠原貞種":54,"小笠原長隆":42,"小笠原信定":50,"平瀬義兼":40,"二木重高":44,"犬甘政徳":44,"下条時氏":54,"下条信氏":52,"木曾義康":58,"山村良利":62,"高梨政頼":66,"高梨秀政":44,"須田満国":50,"須田満親":66,"井上清政":44,"島津忠直":48,"栗田永寿":54,"知久頼元":50,"今川義元":88,"太原雪斎":94,"朝比奈泰能":70,"朝比奈親徳":52,"朝比奈信置":48,"岡部親綱":46,"岡部元信":46,"庵原忠胤":52,"庵原忠縁":44,"三浦正俊":60,"瀬名氏俊":50,"関口氏純":62,"葛山氏元":62,"蒲原氏徳":46,"由比正信":44,"富士信忠":52,"安部元真":44,"長谷川元長":48,"長谷川正長":44,"一宮宗是":46,"飯尾乗連":50,"飯尾連龍":54,"松井貞宗":48,"松井宗信":46,"久野元宗":44,"久野宗能":54,"小笠原氏興":52,"井伊直盛":50,"小野政直":56,"天野景泰":46,"奥山吉兼":42,"大沢基胤":54,"江川英元":56,
+ "武田義信":54,"一条信龍":66,"穴山梅雪":84,"穴山勝千代":36,"小山田桃隠":46,"小山田信茂":64,"小山田茂誠":50,"武田勝頼":56,"仁科盛信":44,"葛山信貞":42,"武田信清":52,"武田信勝":40,"武田信豊":60,"望月信頼":42,"望月信永":40,"河窪信俊":46,"土屋昌続":68,"土屋昌恒":44,"土屋忠直":48,"土屋利直":54,"土屋数直":66,"秋山昌詮":52,"三枝昌貞":44,"三枝昌吉":54,"小幡景憲":50,"駒井政直":60,"横田尹松":56,"初鹿野信昌":46,"馬場昌房":46,"真田信綱":48,"真田昌輝":46,"真田昌幸":84,"真田信尹":82,"真田信之":82,"真田信繁":58,"真田信吉":52,"真田信政":56,"真田信重":50,"矢沢頼康":48,"依田信蕃":60,"依田康国":50,"依田康勝":46,"諏訪頼水":62,"諏訪忠恒":52,"小笠原信嶺":66,"小笠原長巨":52,"内藤昌月":64,"保科正直":60,"保科正光":62,"保科正貞":56,"山浦景国":66,"屋代秀正":56,"小笠原貞慶":70,"小笠原秀政":64,"小笠原忠脩":44,"小笠原忠真":68,"小笠原忠知":54,"知久頼氏":48,"知久則直":46,"下条信正":44,"下条頼安":62,"木曾義昌":62,"木曾義利":36,"山村良候":58,"山村良勝":58,"千村良重":58,"須田長義":48,"今川氏真":66,"今川範以":48,"品川高久":50,"今川直房":70,"朝比奈泰朝":56,"朝比奈泰勝":62,"岡部正綱":58,"岡部長盛":56,"岡部宣勝":56,"大沢基宿":62,"久野宗朝":44,"安部信勝":50,"安部信盛":54,"井伊直親":46,"井伊直政":80,"井伊直勝":40,"井伊直孝":72,"井伊直滋":50,"井伊直澄":56,"江川英吉":58,"江川英長":60,
+ /* 記事の記録に合わせて改めた者（8.5.0） */
+ "九戸政実":42,"南部利直":66,"南部重信":64,"南部重直":40,"津軽信枚":82,"津軽信義":46,
+ "後藤寿庵":56,"戸沢政盛":64,"池田盛周":40,"津軽信英":70,"石川宗弘":62,"秋田俊季":56,
+ "黒沢道家":58,"伊達政道":42,"伊達秀宗":52,"国分盛重":48,"伊達宗勝":60,"伊達宗敏":50,
+ "伊達宗重":66,"伊達宗高":52,"奥山兼清":58,"屋代景頼":46,"山岡重長":68,"浜田景隆":44,
+ "瀬上景康":42,"石母田景頼":64,"茂庭良元":72,"黒沢重久":40,"伊東重孝":40,"原田宗輔":42,
+ "最上義康":68,"柴橋頼綱":52,"鴇田周如":50,"船尾昭直":70,"北条高広":48,"安田能元":48,
+ "白河義親":60,"大国実頼":60,"水原親憲":50,"甘糟景継":46,"色部長真":62,
 };
 
 /* 役職が並ぶときに城主にする者（8.1.3）。白石城は白石氏の本拠（ja.wikipedia「白石宗実」）*/
@@ -10474,18 +10710,29 @@ const BUSHOU_SITE={
    **群は2種類。所属（勢力ごと）と、詰めている先（拠点ごと）。**
    どちらも同じ表に入れる。どちらも「武将のまとまり」で、分ける理由がない。
    ID は 勢力ぶんの続きから振る。 */
-/* 兵科適性。名指しが無ければ戦闘から導く（§31.2）*/
-/* 仕事の適性。名指しが無ければ並（3）*/
+/* ------------------------------------------------------------
+   **登録された武将の適性**（依頼・8.5.0・§19.4）
+   ------------------------------------------------------------
+   **事跡の知られた者は史実から名指しする**（`BUSHOU_SKILL`・`BUSHOU_TEKI`）。
+   記録の乏しい者は、一人ずつ決めてある戦闘・智謀・外交（無ければ 50）から式で出す。
+   **C や D があってよい。** それまでは名指しの無い者が全員 B（並）だった。
+
+     段 ＝ 40 未満 D／40〜54 C／55〜69 B／70 以上 A（式では S を付けない。S は名指しだけ）
+     農業 ← 智謀　商業 ← 外交　建築 ←（智謀＋戦闘）÷2　登用 ←（外交＋智謀）÷2
+     足軽・騎馬・鉄砲 ← 戦闘　鉄騎 ＝ 騎馬−1　水軍 ＝ 足軽−1（どちらも 1 より下げない）
+   ------------------------------------------------------------ */
+const gradeOfNum=v=>v<40?1:v<55?2:v<70?3:4;
 function skillOf(name){
   const t=BUSHOU_SKILL[name]||{};
-  return {nou:t.nou??SKILL_MID, shou:t.shou??SKILL_MID,
-          ken:t.ken??SKILL_MID, tou:t.tou??SKILL_MID};
+  const se=BUSHOU_SENTOU[name]??50, ch=BUSHOU_CHIBOU[name]??50, ga=BUSHOU_GAIKOU[name]??50;
+  return {nou:t.nou??gradeOfNum(ch), shou:t.shou??gradeOfNum(ga),
+          ken:t.ken??gradeOfNum((ch+se)/2), tou:t.tou??gradeOfNum((ga+ch)/2)};
 }
 
 /* 忍びの適性。**名簿に載っているかどうか。真偽である**（§28.2）*/
 const ninjaOf=name=>BUSHOU_NINJA.has(name);
 function tekiOf(name,sentou){
-  const d=Math.max(1,Math.min(5,1+Math.round(sentou/28)));
+  const d=gradeOfNum(sentou);
   const t=BUSHOU_TEKI[name]||{};
   /* **鉄騎は騎馬の上に立つ。** 騎馬を扱えない者が鉄騎を扱えることはない。
      水軍は名指しが無ければ足軽より低く見る。海の戦は誰にでも執れない */
@@ -10570,8 +10817,8 @@ function makeBushouPlay(baseSites){
 const BASE_RANKS=[
  /* 大名家の系統。上へ行くほど率いる兵が多い。
     `kunkou` はその役職に上がる勲功。大名だけ `-` で、勲功では上がらない */
- /* **足軽小頭はいちばん下**（依頼）。ランダム武将はここから始まる。IDは 0 */
- {id:0, kind:"daimyo",    label:"足軽小頭", hei:1500, kunkou:  0},   // 率いる兵 1500（依頼）
+ /* **組頭はいちばん下**（依頼）。ランダム武将はここから始まる。IDは 0 */
+ {id:0, kind:"daimyo",    label:"組頭", hei:1500, kunkou:  0},   // 率いる兵 1500（依頼）
  {id:1, kind:"daimyo",    label:"足軽大将", hei:2000, kunkou:100},
  {id:2, kind:"daimyo",    label:"侍大将",   hei:2500, kunkou:200},
  {id:3, kind:"daimyo",    label:"部将",     hei:3000, kunkou:300},
@@ -10685,7 +10932,7 @@ function runChuseiFactor(c){
   if(c>=CHUSEI_KNEE)return CHUSEI_KNEE_V*(CHUSEI_LOW-c)/(CHUSEI_LOW-CHUSEI_KNEE);
   return CHUSEI_KNEE_V+(1-CHUSEI_KNEE_V)*(CHUSEI_KNEE-c)/CHUSEI_KNEE;
 }
-const BETRAY_ODDS=0.10;              // 月ごとの分裂・独立の基の割
+const BETRAY_ODDS=0.05;              // 旬ごとの分裂・独立の基の割（依頼・8.5.0。それまでは月ごと 0.10）
 const SHUPPON_RATE=0.2;              // 出奔は分裂・独立の 1/5（依頼）
 const KANYU_NINJA=0.50, KANYU_GAIKOU=0.20;   // 勧誘の基の割。忍びは高く、使いは低く（依頼）
 const CHUSEI_RANK_ODDS={ichimon:0.1, 5:0.2, 4:0.4, 3:0.6, 2:0.8};   // 身分の倍。無ければ 1.0
@@ -10749,7 +10996,9 @@ function runSecede(siteId,bid){
      if(!playUnits.some(u=>isLink(u.bushou)&&u.bushou.id===mid))runPutIdou(mid,home.id,bs.cell);
    }}
   runSetMind(before,id,MIND_MIN); runSetMind(id,before,MIND_MIN);
-  runTell(b.name+"、"+st.name+"にて"+myoji+"家を興し離反","家名",bs.cell);
+  /* **独立の札のあとに、興った札**（依頼）。独立したことと、家が興ったことは別の出来事 */
+  runTell(tellHomeOf(b)+b.name+"が独立しました","家名",bs.cell);
+  runTell(st.name+"で"+myoji+"家が興りました","家名",bs.cell);
   playStamp++;
   return true;
 }
@@ -10765,6 +11014,7 @@ function runBetrayDokuritsu(u){
                    group:mkLink(19,id,"bushouNum"), colorUp:"#f2efe6", colorLow:"#f2efe6"});
   playBushouGroups.push({id, bushouNum:1, bushou:[bid]});
   runLeaveGroups(bid);
+  const home0=tellHomeOf(b);                      /* 札に添える、離れる前の所属拠点名 */
   b.shozoku=mkLink(15,id,"label"); b.site="-"; b.ichimon=true; b.since=runNowMonthNo();
   b.rank=mkLink(22,RANK_TOP.dokuritsu,"label");
   runDelUnit(u.id);
@@ -10780,7 +11030,8 @@ function runBetrayDokuritsu(u){
   };
   playUnits.push(row); g.units.push(row.id); g.unitNum=g.units.length;
   runSetMind(before,id,MIND_MIN);
-  runTell(b.name+"、支城にて離反し独立","家名",cell);
+  runTell(home0+b.name+"が独立しました","家名",cell);
+  runTell(myoji+"氏が興りました","家名",cell);   /* 独立の札のあとに、興った札（依頼）*/
   playStamp++;
   return true;
 }
@@ -10828,7 +11079,7 @@ function runBetrayTick(){
       const odds=runBetrayOdds(b,BETRAY_ODDS*SHUPPON_RATE); if(odds<=0)continue;
       if(runRand()>=odds)continue;
       const bs=byId(BASE_SITES,st.id);
-      runTell(b.name+"、出奔","家名",bs?bs.cell:null);
+      runTell(tellHomeOf(b)+b.name+"が出奔しました","家名",bs?bs.cell:null);
       runRonin(b.id,bs?bs.cell:undefined);
       betrayLog.shuppon=(betrayLog.shuppon||0)+1;
     }
@@ -10871,6 +11122,7 @@ function runKanyu(unitId,siteId){
   if(runRand()>=odds)return {ok:false, name:b.name};
   /* 寝返り。**勧誘した家の隊になる。** 城の前に移動の隊として出て、勧誘した家の城へ向かう */
   const cell=byId(BASE_SITES,siteId)?.cell??null;
+  const home0=tellHomeOf(b);                      /* 札に添える、寝返る前の所属拠点名 */
   runLeaveGroups(b.id);
   b.shozoku=mkLink(15,mine,"label"); b.site=mkLink(20,home,"name");
   b.since=runNowMonthNo(); b.ichimon=false;
@@ -10880,7 +11132,7 @@ function runKanyu(unitId,siteId){
   runDeed(mine,owner,SHO_KUBI);
   if(isLink(u.bushou)){runAddKunkou(u.bushou.id,KUNKOU_WIN); if(kind==="忍者")runGrowSkill(u.bushou.id,"ninja");}
   betrayLog.kanyu++;
-  runTell(b.name+"、"+(byId(playPowers,mine)||{}).label+"に寝返る","家名",cell);
+  runTell(home0+b.name+"が"+(byId(playPowers,mine)||{}).label+"に寝返りました","家名",cell);
   playStamp++;
   return {ok:true, name:b.name};
 }
@@ -10892,6 +11144,23 @@ const RANK_TOP={daimyo:6, dokuritsu:9};
 /* **その家に仕え始めた月**（依頼・§19.3）。跡目の順で、位が同じなら長く仕えた者が先。
    シナリオの始めから仕えている者は持たない（最も古い扱い）*/
 const runNowMonthNo=()=>{const g=playProgress[0]; return g?g.year*12+g.month:0;};
+/* ------------------------------------------------------------
+   **1 手番は 1/4 月**（依頼・8.5.0・§22.1）
+   ------------------------------------------------------------
+   月は 4 つの旬（上旬・中旬・下旬・晦）に分かれ、全勢力が 1 回ずつ動くと旬が 1 つ進む。
+   晦の次に月が進む。いまの旬は進行プレイデータの `jun`（1〜4）。古いセーブは 1 と読む。
+   **時計は二つある。** 手番の時計（移動・戦・判断・普請と占拠の進み・食い・逃散・一揆と裏切りの籤）と、
+   月の時計（銭・兵・兵糧の入り、俸禄、統治力、朽ち、雪、病没、正月の事）。月の時計は月の初めの手番にだけ回る
+   ------------------------------------------------------------ */
+const TURNS_PER_MONTH=4;
+const JUN_LABEL=["上旬","中旬","下旬","晦"];
+const runJunOf=g=>Math.max(1,Math.min(TURNS_PER_MONTH,(g&&g.jun)|0||1));
+/* 通しの手番の番号。**混乱の持ち越し・城を出た手番・城に入った手番**はこれで測る */
+const runNowTurnNo=()=>{const g=playProgress[0]; return g?(g.year*12+g.month-1)*TURNS_PER_MONTH+runJunOf(g)-1:0;};
+/* 暦の表記。「1551年1月 上旬」 */
+const dateText=(g,sep="")=>g?(g.year+"年"+sep+g.month+"月 "+JUN_LABEL[runJunOf(g)-1]):"";
+/* 手番の数を読む言葉に。4 で割り切れれば「Nか月」、ほかは「N手番」 */
+const turnsText=n=>{n=Math.max(0,Math.ceil(n)); return n>=TURNS_PER_MONTH&&n%TURNS_PER_MONTH===0?(n/TURNS_PER_MONTH)+"か月":n+"手番";};
 /* 小大名は廃した（依頼）。古いセーブの小大名を大名に直すためだけに番号を残す */
 const RANK_SHO=11;
 /* ------------------------------------------------------------
@@ -11230,7 +11499,7 @@ function runNameEvents(){
       const was=b.name;
       b.name=ev.to+b.name.slice(ev.from.length);
       if(b.myoji!==undefined)b.myoji=ev.to;
-      runTell(was+"、姓を"+ev.to+"と改め、"+b.name+"と名乗る","家名",runBushouCell(b));
+      runTell(was+"が姓を"+ev.to+"に改めました","家名",runBushouCell(b));
       const pr=pw?byId(playPowers,pw):null;
       if(pr&&isLink(pr.toushu)&&pr.toushu.id===b.id)lords.push([pw,b]);
       g.seiDone.includes(i)||g.seiDone.push(i);
@@ -11245,7 +11514,7 @@ function runNameEvents(){
     const was=b.name;
     b.name=runMyojiOf(b)+ev.to;
     g.meiDone.push(i);
-    runTell(was+"、名を"+ev.to+"と改め、"+b.name+"と名乗る","家名",runBushouCell(b));
+    runTell(was+"が名を"+ev.to+"に改めました","家名",runBushouCell(b));
     playStamp++;
   });
 }
@@ -11334,7 +11603,7 @@ function runLaterHeir(powerId,deadId){
   playBushou.push(row);
   runJoinGroups(L.id,powerId,site);
   g.laterEarly=early.concat([L.id]);
-  if(tellMine(powerId))runTell(row.name+"、元服し"+pwRow.label+"の跡目となる","元服",runBushouCell(row));
+  /* 元服は札で報せない（依頼・8.5.0）*/
   playStamp++;
   return row;
 }
@@ -11375,12 +11644,10 @@ function runAppearTick(){
       const hired=ks!==null&&runLaterAsk(L.id,ks);
       if(hired){
         const pw2=byId(playPowers,runSiteOwner(ks));
-        if(pw2&&tellMine(pw2.id))runTell(row.name+"、元服し"+pw2.label+"に仕う","元服",cell);
         playStamp++; continue;
       }
       if(cell!==null)runRoninOut(L.id,cell);
     }
-    if(pwRow&&tellMine(pwRow.id))runTell(row.name+"、元服（"+pwRow.label+"）","元服",cell);
     playStamp++;
   }
 }
@@ -11395,7 +11662,7 @@ function runLifeTick(){
     const past=age-(goal-LIFE_EARLY);
     if(past<0)continue;
     if(runRand()>=LIFE_ODDS*(past+1))continue;
-    runTell(b.name+"、病没（"+age+"歳）","病没",runBushouCell(b));
+    runTell(tellHomeOf(b)+b.name+"が死亡しました","病没",runBushouCell(b));
     runKillBushou(b.id);
   }
 }
@@ -13689,7 +13956,7 @@ const KANE_PER_MACHI=10, KANE_PER_MINATO=80;   // 町系の入り（§21.3）。
 /* **港に隣り合う町と、街道の上の町は、入りが1.5倍**（依頼）*/
 const MACHI_BONUS=1.5;
 /* **武将の禄**（§21.3）。率いる兵これだけにつき、月に銭1。
-   足軽小頭4／足軽大将8／侍大将10／部将12／家老15／宿老18／大名20。
+   組頭4／足軽大将8／侍大将10／部将12／家老15／宿老18／大名20。
    500 では軽すぎた。**人を多く抱える家ほど苦しくなる**形を強める（依頼）*/
 const ROKU_PER=250;
 /* ------------------------------------------------------------
@@ -13717,7 +13984,7 @@ const TOUCHI_OUT =100;         // 相手の実効支配域のマスを取る（�
 const TOUCHI_MAX =100;         // 溜められる上限
 
 /* 上限と、月ごとの動き。**数はどれも仮。** 遊びの手ざわりを見てから決める */
-const HYORO_MAX=5000, KANE_MAX=20000, JUNNO_MAX=100;
+const HYORO_MAX=20000, KANE_MAX=20000, JUNNO_MAX=100;   /* 兵糧の上限は 8.5.0 で 4 倍（依頼）*/
 /* **城に置ける兵の上限は、城の段階で決まる**（§21.3）。
    更地・屋敷・館・城Lv.1〜3 の順。段階は耐久度から導く（§21.1）。
    一律にすると、屋敷も城Lv.3も同じだけ兵を抱えられることになり、
@@ -14022,7 +14289,7 @@ function makeSitePlay(baseSites,eff,objs,made,bp){
                一律 800 にしていたため、**大きな城ほど早く蔵が尽き**、
                小さな城は使いきれない米を抱えて始まることになる。
                実りは年に一度（§21.3）なので、**一年ぶん**が始まりの量である */
-            hyoro :lv?eatOf(startHeiOf(st.id,lv))*12:0,
+            hyoro :lv?eatMonthOf(startHeiOf(st.id,lv))*12:0,
             /* **始めの兵は段に応じる**（§21.3）。どの城も一律 1000 にしていたため、
                **城Lv.3（上限15000）が上限の 1/15 で始まり、盤のほとんどの城が
                空に近かった。** 出陣で留守の兵を引くと、隣の家の軍勢1つで落ちる。
@@ -14982,6 +15249,7 @@ function loadPlay(play){
   playProgress=[{id:1,
                  year :q?q.year :play.clock.year,
                  month:q?q.month:play.clock.month,
+                 jun  :q?runJunOf(q):1,
                  at:0, turnNum:0, order:[], acted:[],
                  /* **乱数の種は表が持つ。** 持たないと、同じセーブデータから
                     始めても違う戦になる（§26.1）。
@@ -15006,7 +15274,7 @@ function loadPlay(play){
     /* **進行の残りの欄も読み戻す**（§22.2・§30）。休戦・次の武将の番号・後の世代の繰り上げ・
        改名の済み印など。バグ：順・手番・種・人の家しか戻さず、休戦がロードで消え、
        武将の番号が使い直され、続きが同じ手順で進まなかった */
-    const fixed=["id","year","month","at","turnNum","order","acted","seed","player"];
+    const fixed=["id","year","month","jun","at","turnNum","order","acted","seed","player"];
     for(const k of Object.keys(q))if(!fixed.includes(k))playProgress[0][k]=clone(q[k]);
   }
   playObjects   =clone(play.objects||[]);
@@ -15107,7 +15375,7 @@ function runDelPower(id){
      返すと滅んだ家の番号が新しい家に付き、残っていた縁がその家のものになる */
   /* **滅びた大名家は報せる**（§31.5）。独立勢力は取り込まれても滅亡とは言わない。
      落城で滅ぶときは、城の報せを先に積んであるので、この報せは後に出る */
-  if(pw&&pw.kind==="daimyo")runTell(pw.label+"、滅亡","滅亡");
+  if(pw&&pw.kind==="daimyo")runTell(pw.label+"が滅亡しました","滅亡");
   return true;
 }
 
@@ -15181,6 +15449,8 @@ const TELL_KEEP=32;            // 溜めておける報せの数
 let tellCell=null;
 /* **陣払いと元服の報せは、人が指す家のものだけ出す**（依頼。v8.1.7）。誰も指していないときは出さない */
 const tellMine=pw=>!!playerPower()&&pw===playerPower();
+/* 札の文に添える所属拠点名。「米沢城の伊達晴宗が…」。所属が無ければ名だけ（依頼・8.5.0）*/
+const tellHomeOf=b=>b&&isLink(b.site)?linkValue(b.site)+"の":"";
 function runTell(text,kind,cell){
   if(!text)return null;
   if(cell!==undefined&&cell!==null)tellCell=cell;
@@ -15314,7 +15584,7 @@ function runRoninOut(bushouId,cell){
   const g=runGroupAt(put); if(!g)return null;
   /* `exit`：盤に出た升と月（依頼）。出たその月は歩かない（`runRoninTick`）。`aim`：行き先 {kind:"town"|"site", cell, site} */
   const row=runUnitRow({label:"浪人 "+b.name, type:tb.id, state:stt==="sui"?"sui":"idou",
-    power:null, bushou:bushouId, cell:put, exit:{cell:put, at:runMonthKey()}});
+    power:null, bushou:bushouId, cell:put, exit:{cell:put, at:runTurnKey()}});
   playUnits.push(row);
   g.units.push(row.id); g.unitNum=g.units.length;
   playStamp++;
@@ -15404,7 +15674,7 @@ function runRaiseDokuritsu(u,cell){
   const row=runUnitRow({label:"独立勢力 "+myoji+"氏", type:tb.id, state:"sagyo", power:id, bushou:bid,
     cell, hei:RONIN_FLAG_HEI, sonae:runSonaeFlat(RONIN_FLAG_HEI)});
   playUnits.push(row); g.units.push(row.id); g.unitNum=g.units.length;
-  runTell(b.name+"、支城にて旗を挙ぐ","家名",cell);
+  runTell(myoji+"氏が興りました","家督",cell);    /* 浪人が支城で旗を挙げた（依頼）*/
   playStamp++;
   return true;
 }
@@ -15428,7 +15698,7 @@ function runRaiseHouse(u,siteId){
   st.touchi=0;
   runJoinGroups(bid,id,siteId);
   if(!isLink(st.group))runMakeDomain(siteId);
-  runTell(b.name+"、"+st.name+"にて旗を挙ぐ（"+myoji+"家）","家名",bs.cell);
+  runTell(st.name+"で"+myoji+"家が興りました","家督",bs.cell);  /* 浪人が城で旗を挙げた（依頼）*/
   playStamp++;
   return true;
 }
@@ -15454,7 +15724,7 @@ function runRaiseHouse(u,siteId){
    家を興し（`runIkkiFound`）、もとの主の家とは友好 0、外交方針は強気。
    隊も城も失った一揆は消える（`runIkkiTick`）
    ============================================================ */
-const IKKI_ODDS=0.05;
+const IKKI_ODDS=0.02;            /* 旬ごと（依頼・8.5.0。それまでは月ごと 0.05）*/
 const IKKI_JUNNO=50;                            // これ未満で起きる
 const IKKI_HEI=[5000,4000,3000,2000,1000];      // 順応 0〜9・10〜19・20〜29・30〜39・40〜49 の上限。1000 刻みで上限以下を等しい割で引く
 const IKKI_HEI_STEP=1000;
@@ -15543,24 +15813,21 @@ function runIkkiRise(siteId){
   const id=runNewPowerId();
   playPowers.push({id, kind:"ikki", label:kind, toushu:mkLink(18,bid,"name"),
                    group:mkLink(19,id,"bushouNum"), colorUp:IKKI_COLOR, colorLow:IKKI_COLOR});
-  const se=Math.floor(runRand()*(HIRE_ABILITY_MAX+1));
-  const sk=()=>1+Math.floor(runRand()*HIRE_SKILL_MAX);
   playBushou.push({id:bid, name, myoji:"", shozoku:mkLink(15,id,"label"), since:runNowMonthNo(), chusei:CHUSEI_HIRE,
     birth:g.year-(HIRE_AGE_MIN+Math.floor(runRand()*(HIRE_AGE_MAX-HIRE_AGE_MIN+1))), life:runRollLife(),
     site:"-", rank:mkLink(22,7,"label"), ichimon:true,
-    gaikou:Math.floor(runRand()*(HIRE_ABILITY_MAX+1)), sentou:se, chibou:Math.floor(runRand()*(HIRE_ABILITY_MAX+1)),
-    ninja:false, rest:0, nou:sk(), shou:sk(), ken:sk(), tou:sk(), ...tekiOf(name,se), kunkou:0});
+    gaikou:runRandAbility(), sentou:runRandAbility(), chibou:runRandAbility(),
+    ninja:false, rest:0, ...runRandSkills(), kunkou:0});   /* 能力は無作為（依頼・8.5.0）*/
   playBushouGroups.push({id, bushouNum:1, bushou:[bid]});
   const gc=runGroupAt(cell); if(!gc)return null;
   const row=runUnitRow({label:kind+" "+name, type:tb.id, state:"sagyo", power:id, bushou:bid,
-    cell, hei, hyoro:eatOf(hei)*12, sonae:runSonaeFlat(hei)});
+    cell, hei, hyoro:eatMonthOf(hei)*12, sonae:runSonaeFlat(hei)});
   row.ikki=siteId;                               /* 一揆の隊だけが持つ欄（§21.4）*/
   playUnits.push(row); gc.units.push(row.id); gc.unitNum=gc.units.length;
-  runTell(st.name+"の領内で"+kind+"（"+name+"・兵"+hei+"）","一揆",cell);
+  runTell(st.name+"の領内で"+kind+"が発生しました","一揆",cell);
   playStamp++;
   return row;
 }
-/* 一揆の隊の手番。周りの建物を一つ荒らし、城の隣なら攻め、でなければ城へ寄る */
 /* **目指す城が更地なら、隣の国の拠点へ向かう**（依頼）。隣の国は、国（グレーゾーン）が
    接している国。その中で一揆にいちばん近い、更地でない拠点（私の判断）。無ければ null */
 function runIkkiNextSite(u){
@@ -15582,52 +15849,117 @@ function runIkkiNextSite(u){
   }
   return best;
 }
+/* ------------------------------------------------------------
+   **一揆の行き先**（依頼・8.6.6・§21.4）
+   ------------------------------------------------------------
+   **拠点か、その国の支城へ向かう。** 支城は、一揆が起きた拠点の国（グレーゾーン）の
+   内にあるもの。そのうち**いまの升からいちばん近い**ところ（歩数。私の判断）。
+   独立勢力や、ほかの一揆が占めている支城は外す。拠点は更地なら外す。
+   一度決めた行き先は、行けなくなるまで変えない（毎手番引き直すと、近さが並ぶ所で行き来する）
+   ------------------------------------------------------------ */
+function runIkkiAimOk(u,cell){
+  const bs=byId(BASE_SITES,u.ikki); if(!bs)return false;
+  if(cell===bs.cell){const st=byId(playSites,u.ikki); return !!st&&st.taikyu>0;}
+  if(!runIsFort(cell))return false;
+  const dom=BASE_CELLGROUPS[bs.domain-1]; if(!dom||!dom.cells.includes(cell))return false;
+  return !playUnits.some(o=>o.id!==u.id&&isLink(o.q)&&o.q.id===cell&&runIsRooted(o));
+}
+function runIkkiAim(u){
+  if(u.ikkiAim!==undefined&&u.ikkiAim!==null&&runIkkiAimOk(u,u.ikkiAim))return u.ikkiAim;
+  const bs=byId(BASE_SITES,u.ikki); if(!bs)return null;
+  const dom=BASE_CELLGROUPS[bs.domain-1];
+  const cand=[bs.cell,...(dom?runFortList().filter(id=>dom.cells.includes(id)):[])];
+  let best=null,bd=Infinity;
+  for(const id of cand){
+    if(!runIkkiAimOk(u,id))continue;
+    const d=runAIDist(u.q.id,id); if(d<bd){bd=d;best=id;}
+  }
+  u.ikkiAim=best;
+  return best;
+}
+/* **一揆は1升ずつ動く**（依頼・8.6.6）。隣の升のうち、行き先へいちばん近づく升。
+   道（踏み代）で通じていなければ、歩数で近づく升（`runAIStepTo` と同じ）*/
+function runIkkiStep(u,goal){
+  const c=BASE_CELLS[u.q.id-1]; if(!c)return null;
+  const reach=runReach(u.id);
+  const nb=DIR6[c.r&1].map(([dq,dr])=>cellOf(c.q+dq,c.r+dr)).filter(n=>n&&reach.has(n.id)).map(n=>n.id);
+  const f=runAIField(goal,moveOf(u),"sagyo");
+  const here=f.get(u.q.id);
+  let best=null,bd=here===undefined?Infinity:here;
+  for(const id of nb){const d=f.get(id); if(d!==undefined&&d<bd){bd=d;best=id;}}
+  if(best!==null||here!==undefined)return best;
+  let bh=runAIDist(u.q.id,goal);
+  for(const id of nb){const d=runAIDist(id,goal); if(d<bh){bh=d;best=id;}}
+  return best;
+}
+/* 支城を占める（依頼・8.6.6）。**家にはならない。** 勢力は一揆のまま、
+   そこから動かず、周りの域を奪い（`runIsRooted`）、隣に来た隊を討つ（`runDokuritsuAct`）*/
+function runIkkiHold(u){
+  const cell=u.q.id;
+  u.ikkiFort=cell; u.ikkiAim=null;
+  playStamp++;
+  runDomainTrimAll();                            /* 周りの升を、いまの域から外す */
+  const o=objectAtCell(cell);
+  return o&&o.name?o.name:"支城";
+}
+/* 一揆の隊の手番（依頼・8.6.6・§21.4）。
+   支城を占めていれば、独立勢力と同じに隣の隊を討つだけ。
+   でなければ、行き先（拠点か国の支城）へ1升寄り、入った升の建物を荒らす（狼藉）。
+   拠点の隣に着けば拠点を攻め、支城の升に入ればそこを占める */
 function runIkkiAct(u){
   const name=isLink(u.bushou)?linkValue(u.bushou):"";
-  {const st0=byId(playSites,u.ikki);
-   if(st0&&!(st0.taikyu>0)){const nx=runIkkiNextSite(u); if(nx!==null)u.ikki=nx;}}
-  const bs=byId(BASE_SITES,u.ikki); if(!bs)return null;
-  const owner=runSiteOwner(u.ikki);
-  /* 荒らす。立っている升と隣の升のうち、その拠点の主の実効支配域にある建物 */
-  const c=BASE_CELLS[u.q.id-1];
-  const around=[u.q.id,...DIR6[c.r&1].map(([dq,dr])=>{const n=cellOf(c.q+dq,c.r+dr);return n?n.id:null;}).filter(x=>x)];
-  let rav=null;
-  for(const id of around){
-    const o=objectAtCell(id); if(!o)continue;
-    const b=byId(BASE_OBJECTS,o.label.id); if(!b||!WEAR_CAT.includes(b.cat))continue;
-    const ds=runDomainOwnerSite(id); if(ds===null||(owner&&runSiteOwner(ds)!==owner))continue;
-    const r=runObjDown(id); if(r){rav=r;break;}
+  if(runIsRooted(u)){
+    if(runIsFort(u.q.id)){const t=runDokuritsuAct(u); return t===null?null:name+"の一揆"+t.slice(name.length);}
+    u.ikkiFort=null; playStamp++;                /* 支城が無くなった。また歩く */
   }
-  let msg=rav?name+"の一揆が"+rav.label+"を荒らした":null;
-  /* **城の隣に着いていなければ、隣に立つ敵の隊を討って道を開ける**（依頼）。
-     城の隣の升に立つ隊を先に、次に城に近い隊（私の判断）。
+  /* 立っている升が支城なら占める（戦で踏み込んだときなど）*/
+  if(runIsFort(u.q.id)&&!playUnits.some(o=>o.id!==u.id&&isLink(o.q)&&o.q.id===u.q.id&&runIsRooted(o)))
+    return name+"の一揆が"+runIkkiHold(u)+"を占拠した";
+  let aim=runIkkiAim(u);
+  if(aim===null){
+    /* **拠点が更地で、国に向かえる支城も無ければ、隣の国の拠点へ向かう**（依頼）*/
+    const nx=runIkkiNextSite(u);
+    if(nx!==null){u.ikki=nx; u.ikkiAim=null; aim=runIkkiAim(u);}
+  }
+  if(aim===null)return name+"の一揆は留まった";
+  const bs=byId(BASE_SITES,u.ikki);
+  const toSite=!!bs&&aim===bs.cell;
+  const reach=toSite?1:0;                        /* 拠点は隣から攻める。支城はその升に入る */
+  /* **行き先に着いていなければ、隣に立つ敵の隊を討って道を開ける**（依頼）。
+     行き先に近い隊から（私の判断）。支城に立つ隊も、ここで討つ。
      バグ：城の隣の升が普請の隊で埋まると、一揆は2升手前で普請が終わるまで留まっていた */
-  if(runAIDist(u.q.id,bs.cell)>1){
+  if(runAIDist(u.q.id,aim)>reach){
     const mine=isLink(u.power)?u.power.id:null;
+    const c=BASE_CELLS[u.q.id-1];
     let foe=null,fv=Infinity;
-    for(const id of around.slice(1)){
-      for(const o of runOpenUnits(id)){
+    for(const [dq,dr] of DIR6[c.r&1]){
+      const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
+      for(const o of runOpenUnits(n.id)){
         const op=isLink(o.power)?o.power.id:null;
         if(o.id===u.id||!runAIFoe(mine,op))continue;
-        const dd=runAIDist(o.q.id,bs.cell);
+        const dd=runAIDist(o.q.id,aim);
         if(dd<fv){fv=dd;foe=o;}
       }
     }
     if(foe){
       const r=runAttackUnit(u.id,foe.id);
       if(r&&r.battle)return name+"の一揆が"+foe.label+"に襲いかかった";
-      if(r)return (msg?msg+"。":"")+name+"の一揆が"+foe.label+"を討った";
+      if(r)return name+"の一揆が"+foe.label+"を討った";
     }
   }
-  if(runAIDist(u.q.id,bs.cell)===1){
+  if(toSite&&runAIDist(u.q.id,aim)===1){
     const r=runAttackSite(u.id,u.ikki);
     if(r&&r.battle)return name+"の一揆が"+((byId(playSites,u.ikki)||{}).name||"城")+"へ攻め寄せた";
     if(r)return name+"の一揆が"+(byId(playSites,u.ikki)||{}).name+"を攻めた";
-    return msg||name+"の一揆が城を囲んでいる";
+    return name+"の一揆が城を囲んでいる";
   }
-  const to=runAIStepTo(u.id,bs.cell);
-  if(to!==null&&runMoveUnit(u.id,to))return (msg?msg+"。":"")+name+"の一揆が城へ向かった";
-  return msg||name+"の一揆は留まった";
+  const to=runIkkiStep(u,aim);
+  if(to===null||!runMoveUnit(u.id,to))return name+"の一揆は留まった";
+  /* **動いた先に建物があれば狼藉する**（依頼・8.6.6）。荒らしは `runRavage` ただ1つ（§27.6）*/
+  const rav=runRavage(u.id,u.q.id);
+  const msg=rav?name+"の一揆が"+rav.label+"を荒らした":null;
+  if(runIsFort(u.q.id))return (msg?msg+"。":"")+name+"の一揆が"+runIkkiHold(u)+"を占拠した";
+  return msg||name+"の一揆が"+(toSite?"城":"支城")+"へ向かった";
 }
 /* 一揆が拠点を取った。**無主の拠点で家を興すときと同じ処理**（`runRaiseHouse`）で家を興す */
 function runIkkiFound(powerId,siteId,before){
@@ -15650,11 +15982,11 @@ function runIkkiFound(powerId,siteId,before){
     const uu=gg&&gg.units.length?byId(playUnits,gg.units[0]):null;
     if(uu)uu.label=pw.label+" "+x.name;
   }
-  for(const u of playUnits)if(isLink(u.power)&&u.power.id===powerId){u.ikki=null;
+  for(const u of playUnits)if(isLink(u.power)&&u.power.id===powerId){u.ikki=null; u.ikkiFort=null; u.ikkiAim=null;
     if(typeof u.label==="string"&&/一揆 /.test(u.label))u.label=pw.label+" "+u.label.replace(/^.*一揆 /,"");}
   /* **もとの主の家とは友好 0、外交方針は強気**（依頼）*/
   if(before){ runSetMind(powerId,before,0); pw.shiseiForce={[before]:"強気"}; }
-  runTell(b.name+"、一揆にて"+st.name+"を奪い、旗を挙ぐ（"+pw.label+"）","家名",bs?bs.cell:null);
+  runTell(st.name+"で"+pw.label+"が興りました","家名",bs?bs.cell:null);
   playStamp++;
   return true;
 }
@@ -15675,7 +16007,7 @@ function runRoninMeet(u,cell){
     if(!runHire(bid,home,lead.id))continue;
     runDelUnit(u.id);
     runPutIdou(bid,home,cell);                   /* 移動の隊になって城へ向かう */
-    runTell(b.name+"、"+pw.label+"に仕う","捕縛",cell);
+    runTell(b.name+"は"+pw.label+"に登用されました","捕縛",cell);
     return true;
   }
   return false;
@@ -15699,7 +16031,7 @@ function runRoninVisit(u,siteId){
   if(runRand()>=odds)return false;
   if(!runHire(bid,siteId,best?best.id:null))return false;
   runDelUnit(u.id);
-  runTell(b.name+"、"+pw.label+"に仕う","捕縛",byId(BASE_SITES,siteId).cell);
+  runTell(b.name+"は"+pw.label+"に登用されました","捕縛",byId(BASE_SITES,siteId).cell);
   return true;
 }
 /* ============================================================
@@ -15897,8 +16229,22 @@ const BASE_NANORI=[
 ];
 /* 武将数÷拠点数（切り捨て）ごとの、年の初めに仕官してくる割。1 から順に */
 const HIRE_ODDS=[0.75,0.50,0.40,0.30,0.20,0.15,0.10,0.08,0.05,0.02];   // 1〜9、10以上は最後の値（依頼）。切り捨てて0なら1と見る
-const HIRE_ABILITY_MAX=39;     // 戦闘・智謀・外交の上限（C の帯の上端。D 0〜19／C 20〜39）
-const HIRE_SKILL_MAX=2;        // 仕事の適性の上限（D 1／C 2）
+/* **無作為に作る武将の能力**（依頼・8.5.0）。仕官してくる者と一揆の頭。
+   段ごとの割で段を引き、数の能力（戦闘・智謀・外交）はその段の帯（D 0〜19／C 20〜39／B 40〜59／A 60〜79）から等しい割で引く。
+   適性（農業・商業・建築・登用・足軽・騎馬・鉄砲・鉄騎・水軍）は段そのもの（D 1〜A 4）。S は出ない。
+   **鉄騎は騎馬を越えない**（§31.2）*/
+const HIRE_GRADE_ODDS=[0.60,0.30,0.09,0.01];   // D・C・B・A の割（依頼：D 高・C 中・B かなり低・A 極低）
+function runRandGrade(){
+  let x=runRand();
+  for(let i=0;i<HIRE_GRADE_ODDS.length;i++){ if(x<HIRE_GRADE_ODDS[i])return i+1; x-=HIRE_GRADE_ODDS[i]; }
+  return 1;
+}
+const runRandAbility=()=>(runRandGrade()-1)*20+Math.floor(runRand()*20);
+function runRandSkills(){
+  const kiba=runRandGrade();
+  return {nou:runRandGrade(), shou:runRandGrade(), ken:runRandGrade(), tou:runRandGrade(),
+          ashi:runRandGrade(), kiba, tepp:runRandGrade(), kiki:Math.min(kiba,runRandGrade()), sui:runRandGrade()};
+}
 const MYOJI_RANK=3;            // この役職（部将）以上に上がれば苗字が付く
 /* 武将の苗字。**欄を持つ者はその欄、持たない者は名から切る**（§19.3）*/
 const runMyojiOf=b=>b?(b.myoji!==undefined?b.myoji:runMyoji(b.name)):"";
@@ -15938,18 +16284,15 @@ function runHireWeak(siteId){
   }
   if(!name)return null;
   const id=runNextBushouId();
-  const se=Math.floor(runRand()*(HIRE_ABILITY_MAX+1));
-  const sk=()=>1+Math.floor(runRand()*HIRE_SKILL_MAX);
   const row={id, name, myoji:"", shozoku:mkLink(15,owner,"label"), since:runNowMonthNo(), chusei:CHUSEI_HIRE,
              birth:g.year-(HIRE_AGE_MIN+Math.floor(runRand()*(HIRE_AGE_MAX-HIRE_AGE_MIN+1))), life:runRollLife(),
              site:mkLink(20,siteId,"name"), rank:mkLink(22,0,"label"),
              ichimon:false,
-             gaikou:Math.floor(runRand()*(HIRE_ABILITY_MAX+1)),
-             sentou:se,
-             chibou:Math.floor(runRand()*(HIRE_ABILITY_MAX+1)),
+             gaikou:runRandAbility(),
+             sentou:runRandAbility(),
+             chibou:runRandAbility(),
              ninja:false, rest:0,
-             nou:sk(), shou:sk(), ken:sk(), tou:sk(),
-             ...tekiOf(name,se),
+             ...runRandSkills(),           /* 能力は無作為（依頼・8.5.0）*/
              kunkou:0};
   playBushou.push(row);
   runJoinGroups(id,owner,siteId);
@@ -15986,7 +16329,7 @@ function runRoninTick(){
     /* **出奔などで盤に出たその月は、出た升に立ったまま**（依頼）。
        バグ：盤に出た同じ月の処理のうちに歩き出していたため、「出奔」の報せで城を見ても
        浪人の隊がおらず、浪人にならなかったように見えた */
-    if(u.exit&&u.exit.cell===u.q.id&&u.exit.at===runMonthKey())continue;
+    if(u.exit&&u.exit.cell===u.q.id&&u.exit.at===runTurnKey())continue;
     /* 行き先。町は盤じゅうから選ぶ。**海の向こうでも行く**（依頼）。
        道は引いたときに決めて持ち、月ごとに歩き代のぶんだけ進む */
     if(!u.aim){
@@ -16099,7 +16442,7 @@ function runHire(bushouId,siteId,doerId){
   /* **そのときの勲功に見合う身分から始める**（§19.2）。
      浪人でいるあいだ勲功は月ごとに減る（`RONIN_DECAY`）ので、
      長く浪人でいた者ほど低い身分で入る。**待たせること自体が値段である** */
-  /* **苗字のある者は、足軽小頭には落ちない**（依頼）。足軽大将から */
+  /* **苗字のある者は、組頭には落ちない**（依頼）。足軽大将から */
   b.rank   =mkLink(22,Math.max(runRankOf(b.kunkou),b.myoji===""?0:1),"label");
   runLeaveGroups(bushouId);
   runJoinGroups(bushouId,owner,siteId);
@@ -16199,6 +16542,7 @@ function runTopGaikou(siteId){
    | **よその拠点** | その升と、隣接1升 |
    | **独立勢力の隊** | その升と、隣接1升 |
    | **独立勢力が占拠している支城** | その升と、隣接1升 |
+   | **支城を占めた一揆の隊** | その升と、隣接1升（依頼・8.6.6。`runIsRooted`）|
 
    自分の拠点の周りは当然に自分の域なので、ここでは数えない。
    ------------------------------------------------------------ */
@@ -16220,10 +16564,22 @@ function runBanIndex(){
   };
   for(const bs of BASE_SITES)put(bs.cell,runSiteOwner(bs.id));
   for(const u of playUnits){
-    if(u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="独立勢力")continue;
+    if(!runIsRooted(u))continue;
     put(u.q.id,null);
   }
   return banIndex;
+}
+/* ------------------------------------------------------------
+   **根を張っている隊か**（依頼・8.6.6）
+   ------------------------------------------------------------
+   独立勢力の隊と、**支城を占めた一揆の隊**（`ikkiFort`）。どちらも
+   その升から動かず、その升と隣接1升を誰の域にもさせず（不可侵・域の切り取り）、
+   隣に来た隊を討つ。**一揆は家にはならない**（依頼）。勢力は一揆のまま
+   ------------------------------------------------------------ */
+function runIsRooted(u){
+  if(!u||u.state==="-"||!isLink(u.type))return false;
+  if(linkValue(u.type)==="独立勢力")return true;
+  return u.ikkiFort!==undefined&&u.ikkiFort!==null&&isLink(u.q)&&u.q.id===u.ikkiFort;
 }
 /* ------------------------------------------------------------
    **拠点固有の土地**（依頼・§11.2.2）
@@ -16520,9 +16876,42 @@ function runDomainTrim(siteId){
   playStamp++;
   return off;
 }
-/* 盤ぜんたいの域を測り直す。**盤を作ったときと、読み込んだときに一度** */
+/* ------------------------------------------------------------
+   **独立勢力の升と隣接1升は、どの実効支配域からも外す**（依頼・§11.2.2）
+   ------------------------------------------------------------
+   不可侵の升（`runBanIndex`）は、新しく取れないだけで、すでに域に入っている升は落とさない。
+   盤を作るときは独立勢力の周りを初めから域に入れない（`makeEffBlock`）が、
+   遊んでいる途中で軍勢ごと独立した者（`runBetrayDokuritsu`）や、空の支城で旗を挙げた浪人（`runRaiseDokuritsu`）の周りは
+   元の家の域に残っていた。**その家の内政の隊が、域の中だと思って独立勢力の隣へ何度も入っていった**（室住氏・塩尻峠）。
+   手番ごとに外すので、古いセーブもその手番で揃う。拠点の升そのものは外さない。
+   友好は動かさない（剥がしたのではなく、その家が押さえられない土地だった）
+   ------------------------------------------------------------ */
+function runCarveDokuritsu(){
+  const carve=new Set();
+  for(const u of playUnits){
+    if(!runIsRooted(u)||!isLink(u.q))continue;
+    const c=BASE_CELLS[u.q.id-1]; if(!c)continue;
+    carve.add(c.id);
+    for(const [dq,dr] of DIR6[c.r&1]){const n=cellOf(c.q+dq,c.r+dr); if(n)carve.add(n.id);}
+  }
+  if(!carve.size)return 0;
+  let off=0;
+  for(const st of playSites){
+    if(!isLink(st.group))continue;
+    const g=byId(playCellGroups,st.group.id); if(!g)continue;
+    const bs=byId(BASE_SITES,st.id);
+    const keep=g.cells.filter(id=>!carve.has(id)||(bs&&id===bs.cell));
+    if(keep.length===g.cells.length)continue;
+    off+=g.cells.length-keep.length;
+    g.cells=keep; g.cellNum=keep.length;
+    playStamp++;
+    off+=runDomainTrim(st.id);                    /* 切れた先は域から落ちる */
+  }
+  return off;
+}
+/* 盤ぜんたいの域を測り直す。**手番ごと**（独立勢力の周りを外し、飛び地を落とす）*/
 function runDomainTrimAll(){
-  let n=0;
+  let n=runCarveDokuritsu();
   for(const st of playSites)n+=runDomainTrim(st.id);
   return n;
 }
@@ -16648,9 +17037,9 @@ const HARVEST_MONTH=9;         // 水田の実りの月
 const WINTER=[12,1,2];         // 畑の穫れない月
 /* **兵糧は依頼で1/4に。切りのいい数にし、畑・開墾地・水田の比は保つ**（依頼。1/4では開墾地が2.25になるので、
    1/3 にした：開墾地9→3・畑36→12・水田480→160。私の判断）*/
-const HARVEST_HATA=12;         // 畑。段1つにつき、冬以外の毎月
-const HARVEST_KAIKON=3;        // 開墾地。1つにつき、冬以外の毎月
-const HARVEST_SUIDEN=160;      // 水田。段1つにつき、実りの月に一度
+const HARVEST_HATA=48;         // 畑。段1つにつき、冬以外の毎月（8.5.0 で 4 倍。依頼）
+const HARVEST_KAIKON=12;       // 開墾地。1つにつき、冬以外の毎月（8.5.0 で 4 倍。依頼）
+const HARVEST_SUIDEN=640;      // 水田。段1つにつき、実りの月に一度（8.5.0 で 4 倍。依頼）
 const HARVEST_HATA_M=12-WINTER.length;      // 畑の穫れる月数
 
 /* 領内の畑と水田の、段の合計 */
@@ -16687,6 +17076,9 @@ function runHarvestNow(siteId,month){
    100 にすると、**田畑を開かない家は必ず米を買うことになる**（依頼）*/
 const EAT_PER=100;
 const eatOf=hei=>Math.ceil(Math.max(0,hei)/EAT_PER);
+/* **食いは手番ごと**（依頼・8.5.0）。いまの 1 か月ぶんを 1 手番で食う。
+   ひと月に食う量は `eatOf` × `TURNS_PER_MONTH`。蓄え・持たせる量・見積りはこちらで測る */
+const eatMonthOf=hei=>eatOf(hei)*TURNS_PER_MONTH;
 /* 出陣のとき、何か月ぶんの兵糧を持たせるか（§21.3）。
    **これを越えて外に居るなら、輸送の隊で運ぶほかにない** */
 const MARCH_MONTHS=15;         // 出陣に持たせる兵糧の月数。**少し多め**（依頼）
@@ -16927,14 +17319,15 @@ function runFortFeeds(u){
   if(!u)return false;
   return runFortFeedsFor(u.q.id,isLink(u.power)?u.power.id:null);
 }
-function runFeedUnits(){
+function runFeedUnits(newMonth=true){
   /* **写しを回す。** 陣を払うと隊が消え、移動の隊が足されるので、
      いまの並びをそのまま回すと飛ばされる行が出る */
   for(const u of playUnits.slice()){
     if(!playUnits.some(x=>x.id===u.id))continue;   /* もう盤に無い */
     if(!isLink(u.type)||u.state==="-")continue;
     const lb=linkValue(u.type);
-    if(lb==="独立勢力"){ u.hyoro=eatOf(u.hei); continue; }
+    /* 支城を占めた一揆も独立勢力と同じく食わない（依頼・8.6.6。占めた支城が養う＝私の判断）*/
+    if(lb==="独立勢力"||runIsRooted(u)){ u.hyoro=eatOf(u.hei); continue; }
     if(!(u.hei>0))continue;                      /* 兵を連れない隊は食わない */
     /* ------------------------------------------------------------
        **実効支配域の中の支城は、兵糧を補給し、兵を補う**（依頼・§27.4）
@@ -16952,7 +17345,7 @@ function runFeedUnits(){
        ------------------------------------------------------------ */
     if(lb==="軍勢"&&runFortFeeds(u)){
       {
-        if(lb==="軍勢"){
+        if(lb==="軍勢"&&newMonth){             /* 支城の兵の戻りは月の初めに 1 回（8.5.0）*/
           const cap=unitHeiMax(u);
           const add=Math.min(FORT_HEAL,Math.max(0,cap-u.hei));
           if(add>0){ u.hei+=add; runSonaeScale(u); }
@@ -16997,7 +17390,7 @@ function runFeedUnits(){
        立て直している最中なのだから、追い返す謂れがない */
     if(lb==="軍勢"&&(u.hei||0)>0&&(u.hei||0)<IKUSA_MIN){
       const r=runWithdraw(u.id);
-      if(r&&tellMine(isLink(u.power)?u.power.id:null))runTell(r.name+"、陣を払いたり",
+      if(r&&tellMine(isLink(u.power)?u.power.id:null))runTell(r.name+"は撤退しました",
                    "撤退",u.q?u.q.id:null);
     }
   }
@@ -17038,7 +17431,7 @@ function runCarryUnit(u){
 }
 function runCarrySpare(st){
   return {
-    hyoro:Math.max(0,st.hyoro-Math.ceil(eatOf(st.hei)*12*feedWantOf(st.id))),
+    hyoro:Math.max(0,st.hyoro-Math.ceil(eatMonthOf(st.hei)*12*feedWantOf(st.id))),
     hei  :Math.max(0,st.hei-garrisonOf(st)-IKUSA_MIN),
     kane :Math.max(0,(st.kane||0)-(kaneKeepOf(st.id)+AI_KANE_DEV)),
     uma  :st.uma||0, teppo:st.teppo||0 };
@@ -17073,12 +17466,12 @@ function runCarryPlan(siteId){
     if(!isLink(o.power)||o.power.id!==pw)continue;
     if(runFortFeeds(o))continue;
     const capU=unitHeiMax(o);
-    const needH=runThinFood(o)?eatOf(o.hei)*MARCH_MONTHS-(o.hyoro||0):0;
+    const needH=runThinFood(o)?eatMonthOf(o.hei)*MARCH_MONTHS-(o.hyoro||0):0;
     const needS=(capU>0&&o.hei<capU*AI_FORT_REST)?capU-o.hei:0;
     if(needH<=0&&needS<=0)continue;
     const cargo={hyoro:cap("hyoro",needH), hei:cap("hei",needS)};
     cargo.uma=cap("uma",cargo.hei); cargo.teppo=cap("teppo",cargo.hei);
-    if(cargo.hei>0)cargo.hyoro=cap("hyoro",cargo.hyoro+eatOf(cargo.hei)*MARCH_MONTHS);
+    if(cargo.hei>0)cargo.hyoro=cap("hyoro",cargo.hyoro+eatMonthOf(cargo.hei)*MARCH_MONTHS);
     if(cargo.hyoro+cargo.hei<CARRY_MIN)continue;
     const v=(cargo.hyoro+cargo.hei)/(1+runAIDist(bs.cell,o.q.id));
     if(v>bv){bv=v;best={to:"unit",id:o.id,cargo};}
@@ -17094,13 +17487,13 @@ function runCarryPlan(siteId){
     const short=runAIFeedShort(o.id);
     if(!front&&!short)continue;
     const cargo={hyoro:0,hei:0,kane:0,uma:0,teppo:0};
-    if(short)cargo.hyoro=cap("hyoro",eatOf(o.hei)*12*feedWantOf(o.id)-o.hyoro);
+    if(short)cargo.hyoro=cap("hyoro",eatMonthOf(o.hei)*12*feedWantOf(o.id)-o.hyoro);
     if(front){
       cargo.hei  =cap("hei",garrisonOf(o)+IKUSA_MIN-o.hei);
       cargo.kane =cap("kane",kaneKeepOf(o.id)+AI_KANE_DEV-(o.kane||0));
       cargo.uma  =cap("uma",((st.uma||0)-(o.uma||0))/2);
       cargo.teppo=cap("teppo",((st.teppo||0)-(o.teppo||0))/2);
-      if(cargo.hei>0)cargo.hyoro=cap("hyoro",cargo.hyoro+eatOf(cargo.hei)*MARCH_MONTHS);
+      if(cargo.hei>0)cargo.hyoro=cap("hyoro",cargo.hyoro+eatMonthOf(cargo.hei)*MARCH_MONTHS);
     }
     const tot=CARRY_KEYS.reduce((n,k)=>n+cargo[k],0);
     if(tot<CARRY_MIN)continue;
@@ -17153,7 +17546,7 @@ function runRearm(d,a){
   return used;
 }
 /* その軍勢は兵糧が細っているか。**2か月ぶんを切ったら細い** */
-const runThinFood=u=>(u.hyoro||0)<eatOf(u.hei)*2;
+const runThinFood=u=>(u.hyoro||0)<eatMonthOf(u.hei)*2;
 
 /* 兵糧攻めか。**城の出入り口がすべて、よその家の軍勢で塞がれている**（§26.4）。
    包囲（隣にひとつでも立っている）より厳しい。**逃げ道が無い。**
@@ -17180,15 +17573,16 @@ function runStarved(siteId){
 
 /* 月ごとに、拠点の値を回す。**兵糧が尽きると兵が減り、順応も落ちる。**
    **包囲されている城は、入りが絶え、兵も戻らない**（§26.4）*/
-function runGrowSites(){
+function runGrowSites(newMonth=true){
   for(const st of playSites){
     if(!runSiteOwner(st.id))continue;
     /* **包囲されていれば入りは絶える。** 食うぶんだけが出ていく（§26.4）。
        **飢えの測り方は包囲でも平時でも同じ**（§21.3）。ここに別の式を置くと、
        同じ「食えなかった」が二通りの減り方をする */
     const kakomi=runBesieged(st.id);
-    /* **包囲されていても禄は払う**（依頼）。止まるのは入りだけ */
-    {
+    /* **包囲されていても禄は払う**（依頼）。止まるのは入りだけ。
+       **銭の入りと俸禄は月の初めに 1 回**（依頼・8.5.0）*/
+    if(newMonth){
       const kp=runKaneParts(st.id);
       const take=kakomi?0:kp.take;
       /* **禄が払えたか**（§19.6）。払えれば満足度（表に出さない）が +8、
@@ -17217,8 +17611,8 @@ function runGrowSites(){
       }
       st.kane=Math.max(0,kane);
     }
-    if(!kakomi){
-      /* **畑は冬のほかは毎月、水田は実りの月だけ**（§21.3）*/
+    if(!kakomi&&newMonth){
+      /* **畑は冬のほかは毎月、水田は実りの月だけ**（§21.3）。入るのは月の初めに 1 回（8.5.0）*/
       {const mo=(playProgress[0]||{}).month||1;
        const take=runHarvestNow(st.id,mo);
        if(take>0)st.hyoro=Math.min(HYORO_MAX,st.hyoro+take);}
@@ -17229,9 +17623,9 @@ function runGrowSites(){
       st.hei=Math.max(0,st.hei-gone);
       st.junno=Math.max(st.floor,st.junno-1);
     }
-    /* **城にいる兵の数に応じて食う。** 逃げたあとの兵で数える */
+    /* **城にいる兵の数に応じて食う。** 逃げたあとの兵で数える。**食いと逃散は手番ごと**（依頼・8.5.0）*/
     st.hyoro=Math.max(0,st.hyoro-eatOf(st.hei));
-    if(gone<=0){
+    if(gone<=0&&newMonth){                       /* 兵の戻りは月の初めに 1 回 */
       if(kakomi){
         /* 包囲されていれば、食えていても人は戻らないし土地も馴染まない（上がらない）*/
       }else{
@@ -17650,7 +18044,8 @@ function runAIMinatoWant(siteId){
 /* 型ごとの移動力。**地形の踏み代をここから引いていく**（依頼・§25.3）。
    見える隊（農業・建築・商業・輸送・軍勢）は 6、見えない隊（外交・忍者・移動・浪人）は倍の 12 */
 const UNIT_MOVE={農業:6, 建築:6, 商業:6, 輸送:6, 軍勢:6, 外交:12, 忍者:12, 移動:12, 浪人:12};
-const runMonthKey=()=>{const g=playProgress[0]; return g?g.year*100+g.month:0;};
+/* **城を出た手番の印**（§25.3）。出た手番のうちは城へ戻れず、出た升の踏み代を引く。8.5.0 で月から手番へ */
+const runTurnKey=()=>runNowTurnNo();
 const moveOf=u=>{
   const t=isLink(u.type)?byId(BASE_UNITS,u.type.id):null;
   return t?(UNIT_MOVE[t.label]||6):6;
@@ -17698,7 +18093,7 @@ function runReachAs(unitId,state,passOnly,avoid){
   const from=u.q.id;
   /* **城から出た月は、出た升の踏み代を持ち分から引く**（依頼・§25.3）。城を出る一歩も1升の移動である。
      その一歩が「止まっているところからの一歩」なので、そのあとの一歩に重さを問わない決まりは使わない */
-  const ex=u.exit, justOut=!!(ex&&ex.cell===from&&ex.at===runMonthKey());
+  const ex=u.exit, justOut=!!(ex&&ex.cell===from&&ex.at===runTurnKey());
   const budget=justOut?Math.max(0,Math.round((moveOf(u)-runStepCost(from,state))*1e6)/1e6):moveOf(u);
   const best=new Map([[from,budget]]);
   /* 通り道を辿れるように、どの升から入ったかを持つ（`runMoveUnit` が関所を見る）*/
@@ -18118,7 +18513,7 @@ function runWorkRate(cellId){
   const pc=playCells[cellId-1];
   return (pc&&(pc.effect&16))?SNOW_WORK:1;
 }
-function runBuildTick(){
+function runBuildTick(newMonth=true){
   /* **拠点の普請は、隣に立つ隊の数だけ進む**（§27.1）。
      ほかの普請は升に1隊しか立てないので、1月に1つずつ進む */
   const men=new Map();
@@ -18145,15 +18540,15 @@ function runBuildTick(){
        **最低でも「普請している人数＋`REPAIR_STEP`」は上がる**（依頼）。
        持ち主のいない更地は、積んだ月に屋敷が建ち、その家のものになる（`runRepair`）
        ------------------------------------------------------------ */
-    const to=st.fushin.to, goal=repairTaikyuOf(to);
+    const to=st.fushin.to, goal=repairTaikyuOf(to,sid);
     let add=0; for(const u of us)add+=runFushinRate(u.id,to);
     /* **拠点の普請（城の改築）は雪でも遅れない**（依頼）*/
-    add=Math.max(add,us.length+REPAIR_STEP)+(st.fushin.acc||0);
+    add=Math.max(add,(us.length+REPAIR_STEP)/TURNS_PER_MONTH)+(st.fushin.acc||0);   /* 最低の上がりは月で「人数＋1」（8.5.0）*/
     const n=Math.floor(add); st.fushin.acc=add-n;
     const pw=isLink(us[0].power)?us[0].power.id:null;
     runRepair(sid,Math.max(0,Math.min(goal,st.taikyu+n)-st.taikyu),pw);
     /* **普請をしている武将には、進んだ月ごとに勲功が 1 入る**（依頼・§19.1）*/
-    for(const u of us)if(isLink(u.bushou))runAddKunkou(u.bushou.id,KUNKOU_FUSHIN);
+    if(newMonth)for(const u of us)if(isLink(u.bushou))runAddKunkou(u.bushou.id,KUNKOU_FUSHIN);   /* 勲功は月に 1（8.5.0）*/
     if(st.taikyu<goal)continue;
     st.fushin=null;
     for(const u of us){
@@ -18798,10 +19193,10 @@ function runAddUnit({type,site,bushou,cell,dir="-",state,keep}){
     cell:target, dir, hei,
     /* **軍勢を出すときだけ蔵を食う**（§27.5）。連れ出した馬と鉄砲は城から出る */
     sonae: hei>0?runSonaeOf(site,hei,true,stt==="sui"):[],
-    exit : {cell:target, at:runMonthKey()},
+    exit : {cell:target, at:runTurnKey()},
   });
   if(hei>0&&st){
-    const want=eatOf(hei)*MARCH_MONTHS;
+    const want=eatMonthOf(hei)*MARCH_MONTHS;
     const give=Math.min(want,st.hyoro);
     st.hyoro-=give; row.hyoro=give;
   }
@@ -18846,6 +19241,7 @@ function runMoveUnit(unitId,cellId){
   const d=runDirTo(from,cellId);
   if(!runSetUnitCell(unitId,cellId))return false;
   u.dir=d!=="-"?d:runFaceTo(from,cellId);
+  runSekiBreak(u,cellId);                        /* よその軍勢を止めた関所は壊れる（依頼・8.6.6）*/
   playStamp++;
   return true;
 }
@@ -19198,6 +19594,22 @@ function runSekiStopOnPath(u,cellId){
   }
   return null;
 }
+/* ------------------------------------------------------------
+   **関所は、よその家の軍勢を一度止めたら壊れる**（依頼・8.6.6・§27.4）
+   ------------------------------------------------------------
+   止めたとは、その軍勢が関所の升で移動を終えたこと。見える隊は関所の升より
+   先へ進めない（`runReachAs`）ので、関所の升に入った軍勢はみな止められている。
+   **見えない隊（外交・忍者・移動・浪人）を止めても壊れない。** 敵軍ではない。
+   止められるかは `runSekiHalts` で判じる（自家・同盟の軍勢では壊れない）。
+   壊れた関所は消える。建て直すには、また普請する
+   ------------------------------------------------------------ */
+function runSekiBreak(u,cellId){
+  if(!u||!isLink(u.type)||linkValue(u.type)!=="軍勢")return false;
+  if(!runIsSeki(cellId))return false;
+  const mine=isLink(u.power)?u.power.id:null;
+  if(!runSekiHalts(cellId,mine))return false;
+  return runDelObject(cellId);
+}
 /* その隊は、いまこの升の関で止められるか（§27.4）。見えない隊は `SEKI_STOP` の割 */
 function runSekiStop(u,cellId){
   if(!u||!runIsSeki(cellId))return false;
@@ -19208,11 +19620,7 @@ function runSekiStop(u,cellId){
   if(runRand()>=SEKI_STOP)return false;
   /* **人の隊が止められたなら、そのことを報せる**（§31.5）。
      黙って動かないのでは、指した人には何が起きたのか分からない */
-  const me0=playProgress[0]?playProgress[0].player|0:0;
-  if(me0&&mine===me0){
-    const nm=isLink(u.bushou)?linkValue(u.bushou):"隊";
-    runTell(nm+"、関所に阻まれる","関所",cellId);
-  }
+  /* 関所に止められたことは札で報せない（依頼・8.5.0）*/
   return true;
 }
 /* **支城に守りの倍は持たせない**（依頼・§27.4）。
@@ -21244,7 +21652,7 @@ function runBattleClose(){
     /* **二手の攻城なら、自分の出どころの備えだけを受け取る**（§26.3）*/
     const mine=sd.line.filter(x=>of===undefined||x.of===of||x.of===null&&of===unitId);
     /* **混乱の残りは備えごとに持ち越す**（依頼・`konRem`）。次の戦はそこから始まる */
-    const now=runNowMonthNo();
+    const now=runNowTurnNo();
     const kon=x=>(x.hei>0&&(x.konran||0)>0)?{konAt:now,konTo:now+x.konran}:{};
     u.sonae=mine.map(x=>({k:x.k,hei:x.hei,...kon(x)}));
     u.hei=mine.reduce((n,x)=>n+x.hei,0);
@@ -21347,14 +21755,14 @@ function runBattleClose(){
     if(B.kind==="攻城"&&B.def.site!==null){
       const st0=byId(playSites,B.def.site);
       const bs0=byId(BASE_SITES,B.def.site);
-      if(st0)runTell(st0.name+"、持ちこたえたり","落城",bs0?bs0.cell:null);
+      if(st0)runTell(st0.name+"を攻め落とせませんでした","落城",bs0?bs0.cell:null);
     }
   }else if(B.back){
     /* **人が「退く」を選んだ**（§26.3）。居座らず撤退する */
     if(B.kind==="攻城"&&B.def.site!==null){
       const st0=byId(playSites,B.def.site);
       const bs0=byId(BASE_SITES,B.def.site);
-      if(st0)runTell(st0.name+"、持ちこたえたり","落城",bs0?bs0.cell:null);
+      if(st0)runTell(st0.name+"を攻め落とせませんでした","落城",bs0?bs0.cell:null);
       if(a&&a.hei>0)out.retreat=runRetreat(a.id,B.def.power);
       if(a2&&playUnits.some(x=>x.id===a2.id)&&a2.hei>0)out.retreat2=runRetreat(a2.id,B.def.power);
     }else if(a&&playUnits.some(x=>x.id===a.id)&&a.hei>0)out.withdraw=runWithdraw(a.id);
@@ -21365,7 +21773,7 @@ function runBattleClose(){
     if(B.kind==="攻城"&&B.def.site!==null){
       const st0=byId(playSites,B.def.site);
       const bs0=byId(BASE_SITES,B.def.site);
-      if(st0)runTell(st0.name+"、持ちこたえたり","落城",bs0?bs0.cell:null);
+      if(st0)runTell(st0.name+"を攻め落とせませんでした","落城",bs0?bs0.cell:null);
     }
     if(a&&a.hei<=0)runRout(a.id,null);
     else if(a&&B.kind==="攻城"){
@@ -21410,7 +21818,7 @@ function runBattleClose(){
     const r=runWithdraw(u.id);
     if(r){
       (out.worn=out.worn||[]).push(r);
-      if(tellMine(isLink(u.power)?u.power.id:null))runTell(r.name+"、陣を払いたり",
+      if(tellMine(isLink(u.power)?u.power.id:null))runTell(r.name+"は撤退しました",
               "撤退",u.q?u.q.id:null);
     }
   }
@@ -21434,18 +21842,18 @@ function runBattleClose(){
     const u=byId(playUnits,uid);
     if(!u||u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="軍勢")continue;
     /* この戦の終わりの残りで決め直す。戦の中で解けていれば（一喝）動ける */
-    u.konranTo=n>0?runNowMonthNo()+n:0;
+    u.konranTo=n>0?runNowTurnNo()+n:0;
   }
   playStamp++;
   return out;
 }
 /* 混乱で動けないか（依頼）*/
-const runKonranNow=u=>!!u&&(u.konranTo||0)>=runNowMonthNo();
+const runKonranNow=u=>!!u&&(u.konranTo||0)>=runNowTurnNo();   /* 1 拍＝1 手番（依頼・8.5.0）*/
 /* **備えの混乱の残りの拍**（依頼）。戦のあった月はその戦の残りのまま。
    あとの月は、その月の手番をまだ消化していないものとして数える（`runKonranNow` と同じ数え方）*/
 const konRem=x=>{
   if(!x||!x.konTo)return 0;
-  const now=runNowMonthNo();
+  const now=runNowTurnNo();
   if(now>x.konTo)return 0;
   return x.konTo-now+(now>(x.konAt||0)?1:0);
 };
@@ -21502,7 +21910,7 @@ function runRetreat(unitId,byPowerId,byName){
       /* **振り切ったことを報せるのは、捕縛の判じを受けたときだけ**（§31.5）。
          兵を連れて退いただけの隊にまで出すと、**攻城のたびに札が出て、
          人に読ませたい出来事が札の列に埋もれる** */
-      if(b&&hei<=0)runTell(b.name+"、落ち延びたり","落ち延び",u?u.q.id:null);
+      if(b&&hei<=0)runTell(b.name+"は追撃を振り切りました","逃避",u?u.q.id:null);
     }
   }
   playStamp++;
@@ -21565,7 +21973,7 @@ function runAttackUnit(atkId,defId){
        **隣に来た隊を討った独立勢力が、そのまま本拠を離れて歩き出していた。**
        根を張っている者は、勝っても動かない */
     const aTb=isLink(a.type)?linkValue(a.type):"";
-    const went=(dTb==="独立勢力"||aTb==="独立勢力")
+    const went=(dTb==="独立勢力"||aTb==="独立勢力"||runIsRooted(a))   /* 支城を占めた一揆も動かない（8.6.6）*/
       ?false:runMoveUnit(atkId,cell);
     return {kind:"蹂躙", win:"atk", note:"蹴散らした", atkLost:0, defLost:0,
             ravaged, went, fate:(fate&&fate.how)?fate:null};
@@ -21650,7 +22058,7 @@ const DOKU_CAPTURE_ODDS=0.70;  // 独立勢力の隊が崩れたとき、率い�
 const DOKU_HIRE_BASE=0.75;     // 独立勢力の者を登用する見込みの素（大名家の武将は 0.40）
 const DOKU_HIRE_MAX=0.95;      // 同じく、見込みの上限（大名家の武将は 0.90）
 /* **戦の末に登用された者の格**（依頼）。元の格から `CAPTIVE_RANK_DOWN` 下げ、`CAPTIVE_RANK_MIN`（足軽大将）より下にはしない。
-   元の格は大名家の梯子（足軽小頭0〜宿老5・大名6）で数える。小大名は部将（3）に当てる。
+   元の格は大名家の梯子（組頭0〜宿老5・大名6）で数える。小大名は部将（3）に当てる。
    独立勢力の肩書は、率いる兵の数が近い格に当てる：侍頭（2000）→足軽大将1・土豪（3000）→部将3・国衆（4500）→宿老5（私の判断）。
    浪人は勲功から出す格 */
 const CAPTIVE_RANK_DOWN=3, CAPTIVE_RANK_MIN=1;
@@ -21707,7 +22115,7 @@ function runCapture(bushouId,byPowerId,siteId,cell,byName,wasWar){
        家の名が変わり、その報せが積まれる。**後に回すと
        「清水が継いだ」が「最上が切られた」より先に出る。**
        継ぐ理由がまだ起きていないのに継いでいることになる */
-    runTell(name+"、"+taker+"に斬られる","捕縛",cell);
+    runTell(name+"は"+taker+"に斬られました","捕縛",cell);
     /* **プレイデータから消える。** 大名なら跡目を立てる（§19.3）*/
     runBehead(bushouId,byPowerId,wasWar);
     return {how, name};
@@ -21721,7 +22129,7 @@ function runCapture(bushouId,byPowerId,siteId,cell,byName,wasWar){
        バグ：先に浪人にしてから登用に失敗すると、隊も家も無い武将が表にだけ残った */
     if(st===undefined||st===null){
       runFreeBushou(bushouId,cell);
-      runTell(name+"、解き放たれる","捕縛",cell);
+      runTell(name+"は解放されました","捕縛",cell);
       return {how:"見逃", name};
     }
     const lv0=capRankLv(b);                       /* 捕らえる前の格（浪人にする前に控える）*/
@@ -21735,16 +22143,16 @@ function runCapture(bushouId,byPowerId,siteId,cell,byName,wasWar){
       if(rk&&typeof rk.kunkou==="number")b.kunkou=rk.kunkou;
       runPutIdou(bushouId,st,cell);
       const pw=byPowerId?byId(playPowers,byPowerId):null;
-      runTell(name+"、"+(pw?pw.label:"敵方")+"に仕う","捕縛",cell);
+      runTell(name+"は"+(pw?pw.label:"敵方")+"に登用されました","捕縛",cell);
       return {how, name};
     }
     runRonin(bushouId,cell);                      /* 召し抱えられなかった。浪人として盤に出す */
-    runTell(name+"、解き放たれる","捕縛",cell);
+    runTell(name+"は解放されました","捕縛",cell);
     return {how:"見逃", name};
   }
   /* 見逃（解放）。**その者の家がまだ拠点を持っているかで行き先が分かれる** */
   runFreeBushou(bushouId,cell);
-  runTell(name+"、解き放たれる","捕縛",cell);
+  runTell(name+"は解放されました","捕縛",cell);
   return {how:"見逃", name};
 }
 
@@ -21930,7 +22338,7 @@ function runRename(powerId,heir){
       u.label=pw.label+u.label.slice(was.length);
   }
   playStamp++;
-  runTell(myoji+"家、旗を挙ぐ","家名");
+  /* 家の名が変わったことは札にしない（依頼・8.5.0）。継いだことは家督の札（`runSuccession`）で出ている */
   return true;
 }
 
@@ -21961,7 +22369,7 @@ function runSuccession(powerId){
     playStamp++;
     return null;
   }
-  /* **役職はIDが大きいほど上である**（§20）。足軽小頭0 足軽大将1 … 宿老5 大名6。
+  /* **役職はIDが大きいほど上である**（§20）。組頭0 足軽大将1 … 宿老5 大名6。
      小さい順に並べると、家中でいちばん下の者が跡を継ぐことになる */
   const rankOfMan=m=>isLink(m.rank)?m.rank.id:0;
   const kin=men.filter(m=>m.ichimon);
@@ -21985,7 +22393,7 @@ function runSuccession(powerId){
      名が変わったときだけ報せていたため、**同じ苗字の者が継ぐと
      当主が代わったことが盤のどこにも出なかった。**
      家の名を変える前に報せるので、ここでは前の名で呼ぶ */
-  runTell(heir.name+"、"+pw.label+"の家督を継ぐ","家督",
+  runTell(heir.name+"が後を継ぎました","家督",
           runBushouCell(heir));
   /* **苗字の違う者が継げば、家の名も旗も変わる**（§19.3）。
      縁（友好・同盟）は家のIDに付いているので、そのまま引き継がれる。
@@ -22062,7 +22470,7 @@ function runRout(unitId,byUnitId,byPowerId=null){
       /* **討ち死には札で報せる**（依頼・§31.5）。報せずに消すと、盤の上では
          武将がただ消えたように見える。殺す前に積む。当主なら、このあと家督の札が続く */
       const bk=byId(playBushou,b);
-      if(bk)runTell(bk.name+"、討ち死に","討ち死に",cell);
+      if(bk)runTell(bk.name+"は討ち死にしました","討死",cell);
       runKillBushou(b);
     }
     else{
@@ -22075,8 +22483,7 @@ function runRout(unitId,byUnitId,byPowerId=null){
       if(home!==null)runPutIdou(b,home,cell,u.state);
       /* **軍勢を率いていた者と、鍬を持っていた者では言い方が違う**（依頼）。
          戦って敗れたのなら「落ち延びた」、鍬を捨てて逃げたのなら「逃げ果せた」 */
-      if(bb)runTell(bb.name+(wasWar?"、落ち延びたり":"、逃げ果せたり"),
-                    "落ち延び",cell);
+      if(bb)runTell(bb.name+"は追撃を振り切りました","逃避",cell);
     }
     /* **独立勢力の隊が崩れれば、その家は無くなる**（§28.3・§19.2）。
        独立勢力は拠点を持たず、隊そのものが家である。逃げ果せた者も、
@@ -22145,7 +22552,7 @@ function runFallSite(siteId,powerId,atkId){
   /* **城の報せは、この先で起こることより先に積む**（§31.5）。
      落城の始末の中で武将が捕らえられ、家が滅ぶ。ここで先に積まなければ
      「〇〇家が滅亡しました」が城の報せより前に出る */
-  runTell(st.name+"、陥落","落城",bs0?bs0.cell:null);
+  runTell(st.name+"が陥落しました","落城",bs0?bs0.cell:null);
   /* **拠点を落とされた家の忠誠が下がる**（§19.6）*/
   runHouseChusei(before,CHUSEI_FALL);
   /* **跡目も滅亡も、この始末がぜんぶ済んでから**（依頼・§19.3・§31.5）。
@@ -22194,7 +22601,7 @@ function runFallSite(siteId,powerId,atkId){
          尽きていれば浪人になる */
       const nm=m.name;
       runFreeBushou(m.id,bs0?bs0.cell:null);
-      runTell(nm+"、落ち延びたり","落ち延び",bs0?bs0.cell:null);
+      runTell(nm+"は追撃を振り切りました","逃避",bs0?bs0.cell:null);
       f={how:"逃げた", name:nm, id:m.id};
     }
     if(f)fates.push(f);
@@ -22291,9 +22698,10 @@ function runMakeDomain(siteId,fromRuin=false){
   /* **独立勢力の立つ升と、その隣接6升は引く**（§11.2.1）。そこは独立勢力が
      押さえている。メイク側（`makeEffective`）にはこの縛りが入っているのに
      ここには無かったため、**落城で域を作り直すたびに縛りが落ちていた。**
-     同じ縛りが、域を作る経路によって効いたり効かなかったりする形である */
+     同じ縛りが、域を作る経路によって効いたり効かなかったりする形である。
+     **支城を占めた一揆も同じ**（依頼・8.6.6・`runIsRooted`）*/
   for(const u of playUnits){
-    if(u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="独立勢力")continue;
+    if(!runIsRooted(u))continue;
     const c=BASE_CELLS[u.q.id-1]; if(!c)continue;
     taken.add(c.id);
     for(const [dq,dr] of DIR6[c.r&1]){
@@ -22587,10 +22995,10 @@ function runStartLevee(unitId,keep=0){
   const site=runAIHome(u); if(site===null)return null;
   const st=byId(playSites,site); if(!st||(st.kane||0)<LEVEE_COST+keep)return null;
   st.kane=Math.max(0,st.kane-LEVEE_COST);
-  u.work={cell, label:"土手", cat:"治水", cost:LEVEE_COST, left:LEVEE_MONTHS, site, up:false};
+  u.work={cell, label:"土手", cat:"治水", cost:LEVEE_COST, left:LEVEE_MONTHS*TURNS_PER_MONTH, site, up:false};   /* 期間は今のまま（8.5.0）*/
   u.state="sagyo";
   playStamp++;
-  return {cell, months:LEVEE_MONTHS};
+  return {cell, months:LEVEE_MONTHS*TURNS_PER_MONTH};
 }
 
 /* ------------------------------------------------------------
@@ -22873,8 +23281,9 @@ function runOccMonths(unitId,cellId){
   const pw=isLink(u.power)?u.power.id:null;
   const held=runDomainOwnerSite(cellId);
   const kuni=runKuniOwner(cellId)===pw;
-  if(held!==null&&runSiteOwner(held)!==pw)return kuni?OCC_HELD_KUNI:OCC_HELD;   /* 他国の実効支配域 */
-  return kuni?OCC_KUNI:OCC_OTHER;
+  /* 表は暦の月で持ち、手番に直す（依頼・8.5.0。期間は今のまま）*/
+  if(held!==null&&runSiteOwner(held)!==pw)return (kuni?OCC_HELD_KUNI:OCC_HELD)*TURNS_PER_MONTH;   /* 他国の実効支配域 */
+  return (kuni?OCC_KUNI:OCC_OTHER)*TURNS_PER_MONTH;
 }
 /* ------------------------------------------------------------
    **支城を占めたとき、域はどう動くか**（依頼・§27.7）
@@ -22947,6 +23356,7 @@ function runFortStrip(cellId,powerId){
 }
 /* 占拠の報せ（§31.5）。**取り込んだのか、切り離しただけなのかを分ける。**
    同じ「押さえた」でも、盤の上で起きたことが違う */
+/* 占めた結果を言葉にする。上端の帯の 2 段目（§31.1）の文に使う。札にはしない（8.5.0）*/
 const occText=o=>{
   const what=o.fort?"支城を":"土地を";
   if(o.took>0)return "が"+what+"押さえた（"+o.took+"升を領域に入れた）";
@@ -23008,11 +23418,7 @@ function runOccupyTick(){
   for(const u of playUnits.slice()){
     if(!u.occ||!u.occ.man)continue;
     if(u.occ.cell!==u.q.id){u.occ=null;continue;}   /* 離れれば積んだ月は消える */
-    const r=runOccupy(u.id);
-    if(r&&r.took!==undefined){
-      const nm=isLink(u.bushou)?linkValue(u.bushou):"";
-      runTell(nm+occText(r),"占拠",u.q.id);
-    }
+    runOccupy(u.id);                           /* 占めたことは札で報せない（依頼・8.5.0）*/
   }
 }
 /* 1月ぶん積む。積み切ったら升を取る。返すのは残りの月数、または取った印 */
@@ -23483,7 +23889,7 @@ function runAbsorb(unitId,foeUnitId){
     o.hei=Math.min(o.hei||0,unitHeiMax(o));
     /* **備えは新しい主の蔵から立てる**（§26.5）。独立勢力は蔵を持たない */
     o.sonae=o.hei>0?runSonaeOf(home,o.hei,true):[];   /* 蔵から引く。帰城で返るぶんが無から湧かない */
-    o.hyoro=Math.min(CARRY_MAX.hyoro,eatOf(o.hei)*MARCH_MONTHS);
+    o.hyoro=Math.min(CARRY_MAX.hyoro,eatMonthOf(o.hei)*MARCH_MONTHS);
     o.work=null; o.occ=null; o.done=null; o.wait=0; playStamp++;
     /* **取り込んだ隊も城の指針に従う**（依頼・§28.4）。
        城から隊を出すときと同じく、城の望み（`runAIWant`。指針の重みが掛かる）から引き、
@@ -23565,7 +23971,7 @@ function runReturnUnit(unitId,siteId,viaPass){
   /* **出した月のうちに城へ戻ることはできない**（依頼・§25.4）。
      出して即消える隊は、人の目には出していないのと同じに見える。
      NPC の「用が無いから帰る」「傷んだから帰る」は、どれもここで止まり、翌月に判じ直す */
-  if(u.exit&&u.exit.at===runMonthKey())return false;
+  if(u.exit&&u.exit.at===runTurnKey())return false;
   /* `viaPass` は、味方を通り抜けて城の隣まで届くと確かめたとき（`runEnterByPass`）*/
   if(!viaPass&&runAIDist(u.q.id,bs.cell)>1)return false;
   const mine=isLink(u.power)?u.power.id:null;
@@ -23654,11 +24060,11 @@ function runWithdraw(unitId){
    ------------------------------------------------------------ */
 function runRestBushou(bushouId){
   const b=byId(playBushou,bushouId); if(!b)return false;
-  b.rest=ymNow(); playStamp++;
+  b.rest=runNowTurnNo(); playStamp++;
   return true;
 }
 /* この月に城へ入ったか。**入った月には出せない** */
-const runJustIn=b=>!!b&&b.rest===ymNow();
+const runJustIn=b=>!!b&&b.rest===runNowTurnNo();
 
 /* 武将を別の城へ移す。**移動の隊が着いた先で解ける**（§27.2）*/
 function runTransferBushou(unitId,siteId){
@@ -23682,9 +24088,9 @@ function runTransferBushou(unitId,siteId){
    ------------------------------------------------------------ */
 /* **兵糧の値**（§27.3）。**銭100で兵糧5**、すなわち兵糧1つが銭20。
    売るときは兵糧3つで銭1 */
-const RICE_BUY_KANE=100, RICE_BUY_RICE=5;
+const RICE_BUY_KANE=100, RICE_BUY_RICE=20;   /* 8.5.0 で値を 1/4 に（依頼）。銭100で兵糧20 */
 const RICE_BUY=RICE_BUY_RICE/RICE_BUY_KANE;    // 銭1で買える兵糧
-const RICE_SELL=3;                             // 兵糧いくつで銭1
+const RICE_SELL=12;                            // 兵糧いくつで銭1（8.5.0 で値を 1/4 に。依頼）
 
 
 /* 兵糧の売り買い。**n が正なら買い、負なら売り** */
@@ -23825,6 +24231,9 @@ function runRepair(siteId,n,powerId){
     /* 屋敷が建つ。**領有を先に移してから耐久度を積む。**
        積んでから移すと、耐久度が 1 以上なのに主のいない一瞬ができる */
     runSetSiteOwner(siteId,powerId);
+    /* **開拓の札**（依頼・8.5.0）。「〇〇家が△△城を開拓しました」 */
+    const pw=byId(playPowers,powerId), bs=byId(BASE_SITES,siteId);
+    if(pw)runTell(pw.label+"が"+st.name+"を開拓しました","開拓",bs?bs.cell:null);
   }
   return runSetTaikyu(siteId,st.taikyu+n);
 }
@@ -24025,7 +24434,7 @@ function runPlanAt(type,site,cellId,free,unitId,want,ask){
          潰せば、足りないものを足りないもので埋めるだけになる。
 
          **建てられる分類が変わったのに升が埋まっている**という場は、
-         盤が育ちきった城でふつうに起きる。逃げ道を閉ざすと、
+         盤が育ちきった城で標準に起きる。逃げ道を閉ざすと、
          **その城はそこで育つのをやめる**
          ------------------------------------------------------------ */
       if(!runTearOK(site,cellId))return null;
@@ -24141,7 +24550,7 @@ function runGrowSkill(bushouId,key,odds){
   if(key==="ninja"){                             /* 心得は有るか無いか */
     if(b.ninja)return false;
     b.ninja=true; playStamp++;
-    runTell(b.name+"、忍びの術を会得","技能",runBushouCell(b));
+    runTell(b.name+"が忍術を会得しました","技能",runBushouCell(b));
     return true;
   }
   const v=Math.max(1,Math.min(5,b[key]||SKILL_MID));
@@ -24149,7 +24558,7 @@ function runGrowSkill(bushouId,key,odds){
   /* **鉄騎は騎馬の上に立つ**（§31.2）。騎馬の適性を超えては上がらない */
   if(key==="kiki"&&v>=Math.max(1,Math.min(5,b.kiba||SKILL_MID)))return false;
   b[key]=v+1; playStamp++;
-  runTell(b.name+"の"+(SKILL_NAME[key]||key)+"、上達","技能",runBushouCell(b));
+  runTell(b.name+"の"+(SKILL_NAME[key]||key)+"が"+"DCBAS"[v]+"に上達しました","技能",runBushouCell(b));
   return true;
 }
 const SKILL_NAME={nou:"農業", shou:"商業", ken:"建築", tou:"登用",
@@ -24175,8 +24584,9 @@ function runSkillOf(unitId,key){
 }
 /* その隊がその分類を建てるのにかかる月数（§24.6）。
    **率いる者の適性で伸び縮みする** */
+/* **普請にかかる手番の数**（8.5.0）。表（`BUILD_MONTHS`）は暦の月で持ち、手番に直す（依頼：期間は今のまま）*/
 function runMonthsOf(unitId,cat,lv){
-  const raw=buildMonthsOf(cat,lv);
+  const raw=buildMonthsOf(cat,lv)*TURNS_PER_MONTH;
   const key=CAT_SKILL[cat]; if(!key)return raw;
   return Math.max(1,Math.round(raw*SKILL_MONTH[runSkillOf(unitId,key)-1]));
 }
@@ -24268,7 +24678,15 @@ function runRepairTo(siteId){
      段0〜2は屋敷、国造りは館、段3は城Lv.1、段4は城Lv.2、段5は城Lv.3。
      目指す段を越えた城を下げることはしない。無主の拠点を起こすとき（屋敷）と、人が指す家の城は縛らない */
   const ow=runSiteOwner(siteId);
-  if(ow&&ow!==playerPower()&&lv+1>shiGoalLv(runAIShishin(siteId).id))return null;
+  if(ow&&ow!==playerPower()){
+    const goal=shiGoalLv(runAIShishin(siteId).id);
+    if(lv<goal)return lv+1;
+    /* **目指す段に居るあいだは、その段を保つ**（依頼・8.5.0）。耐久度が帯のまん中
+       （城 Lv.2 なら 700）を切ったら、同じ段のまま帯の上限（799）まで上げ直す。
+       段が一つ落ちてから上げ直すのではない */
+    if(lv===goal&&lv>0&&st.taikyu<startTaikyu(lv))return lv;
+    return null;
+  }
   return lv+1;
 }
 /* **一人がひと月に積む耐久度**（§27.1）。帯の幅 `FUSHIN_WIDTH` を、上げる先の素の月数
@@ -24277,10 +24695,25 @@ function runRepairTo(siteId){
 const FUSHIN_WIDTH=200;
 function runFushinRate(unitId,to){
   const raw=SITE_MONTHS[Math.max(1,to||1)-1]??SITE_MONTHS[SITE_MONTHS.length-1];
-  return FUSHIN_WIDTH/raw/SKILL_MONTH[runSkillOf(unitId,"ken")-1];
+  return FUSHIN_WIDTH/(raw*TURNS_PER_MONTH)/SKILL_MONTH[runSkillOf(unitId,"ken")-1];   /* 一人が 1 手番に積む量（8.5.0）*/
 }
-/* 普請の目当ての耐久度。段を上げるならその帯のまん中、Max なら上限 */
-const repairTaikyuOf=to=>to>=REPAIR_MAX?TAIKYU_MAX:startTaikyu(to);
+/* 帯の上限の耐久度。次の帯の下限の一つ下（城 Lv.2 なら 799）。いちばん上の帯は 1000 */
+const topTaikyu=level=>{
+  const lab={0:"更地",1:"屋敷",2:"館",3:"城 Lv.1",4:"城 Lv.2",5:"城 Lv.3"}[level];
+  const i=TAIKYU_BAND.findIndex(b=>b.obj===lab);
+  return i<0||i+1>=TAIKYU_BAND.length?TAIKYU_MAX:TAIKYU_BAND[i+1].min-1;
+};
+/* 普請の目当ての耐久度。段を上げるならその帯のまん中、Max なら上限。
+   **NPC の城で、上げる先（または保つ段）が指針の目指す段そのものなら、その帯の上限**（依頼・8.5.0）。
+   城 Lv.2 を目指す城は 799 まで上げ、700 を切ったらまた 799 まで上げ直す */
+function repairTaikyuOf(to,siteId){
+  if(to>=REPAIR_MAX)return TAIKYU_MAX;
+  if(siteId!==undefined){
+    const ow=runSiteOwner(siteId);
+    if(ow&&ow!==playerPower()&&to===shiGoalLv(runAIShishin(siteId).id))return topTaikyu(to);
+  }
+  return startTaikyu(to);
+}
 function runNeedsRepair(siteId,mine){
   const st=byId(playSites,siteId); if(!st)return false;
   const ow=runSiteOwner(siteId);
@@ -24342,7 +24775,7 @@ function runStartRepair(unitId,siteId){
      どの城を普請しているのかを言う */
   u.dir=runFaceTo(u.q.id,bs.cell);
   playStamp++;
-  return {site:siteId, name:st.name, taikyu:st.taikyu, goal:repairTaikyuOf(st.fushin.to), got,
+  return {site:siteId, name:st.name, taikyu:st.taikyu, goal:repairTaikyuOf(st.fushin.to,siteId), got,
           men:runFushinMen(siteId).length};
 }
 /* いまその拠点を普請している隊。**隣に立っている者だけ数える** */
@@ -24557,7 +24990,7 @@ function runChutonOK(powerId,fortCell,unitId){
    仲の悪い隣 ＝ 隣接大名で友好が `AI_MIND_BAD` 未満（同盟・休戦を除く）。
    その隣の側 ＝ 支城から `CHUTON_SIDE`（2升）の内に、その家の国（グレーゾーン）の升がある。
    詰めた隊は `CHUTON_MONTHS` で城へ戻り、別の隊と交代する（依頼：交代制）*/
-const CHUTON_SIDE=2, CHUTON_MONTHS=12;
+const CHUTON_SIDE=2, CHUTON_MONTHS=6;   /* 交代は 6 か月（依頼・8.5.0）*/
 function runBadNeighbors(pw){
   const out=new Set();
   for(const o of runNearPowers(pw)){
@@ -24780,7 +25213,7 @@ function runAIGoal0(u){
        **バグ**：役職の定員で測っていたため、城の兵が少なく定員の半分未満で出た軍勢
        （家老が1500で出るなど）が、出たその月に「傷んだ」と見て城へ戻っていた（6か月で8隊）*/
     const base=Math.min(cap,u.hei0||cap);
-    /* **3か月で戻れる見込みの無い軍勢は、戻らない**（依頼・`runIntruderFor`）*/
+    /* **1か月で戻れる（相手の升へ着ける）見込みの無い軍勢は、戻らない**（依頼・`runIntruderFor`）*/
     const intruder=runIntruderFor(u,pw);
     if(!intruder&&base>0&&(u.hei<base*AI_FORT_REST
                ||(u.rest2&&u.hei<cap*AI_FORT_FULL))){
@@ -25178,7 +25611,7 @@ const DOKU_AVOID_COST=30;
 function runDokuDanger(){
   const out=new Set();
   for(const u of playUnits){
-    if(u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="独立勢力")continue;
+    if(!runIsRooted(u))continue;                 /* 支城を占めた一揆も同じ（依頼・8.6.6）*/
     out.add(u.q.id);
     const c=BASE_CELLS[u.q.id-1]; if(!c)continue;
     for(const [dq,dr] of DIR6[c.r&1]){const n=cellOf(c.q+dq,c.r+dr); if(n)out.add(n.id);}
@@ -25755,7 +26188,7 @@ function runGunHere(u,name,mine,moved){
     if(runIsFort(u.q.id)&&runCanOccupy(u.id,u.q.id)){
       const occ0=runOccupy(u.id);
       if(occ0&&occ0.took!==undefined)return name+occText(occ0);
-      if(occ0)return name+"が支城を囲んでいる（あと"+occ0.left+"月）";
+      if(occ0)return name+"が支城を囲んでいる（あと"+turnsText(occ0.left)+"）";
     }
     /* **支城で休んでいる隊は、満ちるまでそこに居る**（依頼・§27.4.1）。
        ここに手を置かないと、行き先（支城）に着いた隊は「用が済まない」
@@ -25771,7 +26204,7 @@ function runGunHere(u,name,mine,moved){
     }
     if(runAIGoal(u)===null||runAIGoal(u)===u.q.id){const occ=runOccupy(u.id);
      if(occ&&occ.took!==undefined)return name+occText(occ);
-     if(occ)return name+"が土地を押さえている（あと"+occ.left+"月）";}
+     if(occ)return name+"が土地を押さえている（あと"+turnsText(occ.left)+"）";}
     /* ここから下は「引き上げる」道である。**動いたあとには通らない。**
        踏み込んだその月に引き返しては、出した意味がない */
     if(moved)return null;
@@ -26127,7 +26560,7 @@ function runAIHere(u,name,type,mine,moved){
   if(type==="農業"&&!u.work
      &&!(hLv!==null&&(SHI_NO_LEVEE.has(runAIShishin(hLv).id)||runAIHoldWork(hLv)))){
     const r=runStartLevee(u.id,hLv!==null?kaneKeepOf(hLv):0);
-    if(r)return name+"が土手を盛りにかかった（あと"+r.months+"月）";
+    if(r)return name+"が土手を盛りにかかった（あと"+turnsText(r.months)+"）";
   }
 
   /* **抱えている普請の升からは離れない**（§24.6）。離れれば工事は止まり、
@@ -26141,7 +26574,7 @@ function runAIHere(u,name,type,mine,moved){
       const men=fix?runFushinMen(w.fix).length:1;
       const fst=fix?byId(playSites,w.fix):null;
       return name+"が"+nm+"を普請している（"+(fst&&fst.fushin
-          ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to):"あと"+Math.ceil(w.left)+"月")
+          ?"耐久度"+fst.taikyu+"／"+repairTaikyuOf(fst.fushin.to,fst.id):"あと"+turnsText(w.left))
         +(men>1?"・"+men+"人":"")+"）";
     }
     /* 離れてしまったなら、戻る。**動いたあとにここへ来たなら、もう一度は動かない**
@@ -26187,9 +26620,9 @@ function runAIHere(u,name,type,mine,moved){
     }
     const done=(u.back||!rankOK)?null:runBuild(u.id);
     if(done)return done.cat==="開墾"
-      ?(name+"が地を起こしにかかった（"+done.left+"月）")
+      ?(name+"が地を起こしにかかった（"+turnsText(done.left)+"）")
       :(name+"が"+done.label+"の普請に"
-        +(done.up?"かかった":"取りかかった")+"（"+done.left+"月）");
+        +(done.up?"かかった":"取りかかった")+"（"+turnsText(done.left)+"）");
   }
   return null;
 }
@@ -26509,7 +26942,7 @@ function runAIAct(u){
      出た升の踏み代（川・雪）が持ち分を使い切れば、その月はもう動けない。
      **バグ**：一歩が出ないのを「届かない行き先」と見て、出たその月に城へ帰していた。
      川や雪の升にしか出口の無い城（黒川城・白河小峰城など）は、どの隊も盤に残らなかった */
-  if(u.exit&&u.exit.cell===u.q.id&&u.exit.at===runMonthKey()){
+  if(u.exit&&u.exit.cell===u.q.id&&u.exit.at===runTurnKey()){
     runFaceThreat(u);
     return name+"の"+type+"は城を出た";
   }
@@ -26520,7 +26953,7 @@ function runAIAct(u){
     u.wait=(u.wait||0)+1;
     if(u.wait<=AI_WAIT_MAX){
       runFaceThreat(u);                          /* 待つときも敵に相対する */
-      return name+"の"+type+"は次の月を待った";
+      return name+"の"+type+"は次の手番を待った";
     }
   }
   u.wait=0;
@@ -26638,7 +27071,7 @@ function runAISwap(u,goal){
   const f=runAIField(goal,moveOf(u),u.state==="sui"?"sui":"sagyo");
   const here=f.get(u.q.id); if(here===undefined)return false;
   const c=BASE_CELLS[u.q.id-1]; if(!c)return false;
-  const mk=runMonthKey();
+  const mk=runTurnKey();
   let best=null,bd=here;
   for(const [dq,dr] of DIR6[c.r&1]){
     const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
@@ -26805,15 +27238,15 @@ const runIntruder=memoStamp(function runIntruder0(powerId,foeId){
 /* ------------------------------------------------------------
    **踏まれたとき、その軍勢が迎え撃ちに戻るか**（依頼・§32.3）
    ------------------------------------------------------------
-   領内に入った敵の軍勢のうち、**いまの状態で `INTRUDER_BACK_MONTHS`（6か月。8.3.0 までは 3か月。依頼）のうちに
+   領内に入った敵の軍勢のうち、**いまの状態で `INTRUDER_BACK_MONTHS`（1か月＝4手番。依頼・8.5.0。8.4.x は 6か月、8.3.0 までは 3か月）のうちに
    着ける見込みのあるもの**だけを相手にする。いちばん近いものを返す。
    見込みは踏み代で測る（`runAIField`。雪・治水・街道を含むいまの踏み代）。
    遠く離れた軍勢まで呼び戻すと、城攻めも占拠も途中で捨てて、着く前に相手が去る。
    ------------------------------------------------------------ */
-const INTRUDER_BACK_MONTHS=6;
+const INTRUDER_BACK_MONTHS=1;
 function runIntruderFor(u,powerId){
   const ix=runDomainIndex();
-  const budget=moveOf(u), lim=budget*INTRUDER_BACK_MONTHS;
+  const budget=moveOf(u), lim=budget*INTRUDER_BACK_MONTHS*TURNS_PER_MONTH;   /* 1 か月＝4 手番ぶんの歩き（8.5.0）*/
   const here=u.q.id;
   let best=null,bd=Infinity;
   for(const o of playUnits){
@@ -27550,7 +27983,7 @@ function runWorkGain(siteId){
     const dan=w.cat==="開墾"?1:Math.max(0,objLv({label:w.label})-now);
     const kane=w.cat==="町"?dan*KANE_PER_MACHI*(runMachiBonus(w.cell)?MACHI_BONUS:1)
               :w.cat==="港"&&!w.up?KANE_PER_MINATO:0;
-    out.push({cat:w.cat, dan, kane, left:Math.max(1,Math.ceil(w.left||1))});
+    out.push({cat:w.cat, dan, kane, left:Math.max(1,Math.ceil((w.left||1)/TURNS_PER_MONTH))});   /* 残りは手番。見積りは月で */
   }
   return out;
 }
@@ -27575,7 +28008,7 @@ const runAIFeedShort=memoStamp(function runAIFeedShort0(siteId){
      **バグ**（v7.32.0〜7.97.4）：蔵の量だけで測り、穫れを数えていなかった。
      1年の穫れが食いの17倍ある三戸城でも、蔵が1年ぶんに届かないだけで「兵糧不足」と出ていた
      ------------------------------------------------------------ */
-  const eat=eatOf(st.hei);
+  const eat=eatMonthOf(st.hei);
   const d=runFarmDan(siteId);
   const now=(playProgress[0]||{}).month||1;
   /* **建てかけの畑・水田・開墾地は、できあがる月から穫れに足す**（依頼）*/
@@ -28163,7 +28596,7 @@ const riceMonthsLeft=()=>{
    畑は冬のほかは毎月入る（§21.3）ので、**畑で食いが賄えている城は
    蔵を厚く持たなくてよい。** 賄えていないぶんだけ買い足す */
 const riceWantOf=st=>{
-  const eat=eatOf(st.hei);
+  const eat=eatMonthOf(st.hei);
   const d=runFarmDan(st.id);
   const now=(playProgress[0]||{}).month||1;
   const m=riceMonthsLeft()+AI_RICE_SPARE;
@@ -28303,8 +28736,27 @@ const AI_TURN_MS=1200;         // 手番と手番のあいだ
 const AI_SKIP_MS=140;          // 何もしなかった勢力を飛ばすあいだ
 /* **速さは ×1・×2・→ の3つ**（依頼）。×1 は以前の ×4 の速さ、×2 はその倍。
    → は待ちを置かず最速で回す（間合いを 0 にする。報せを読ませる間だけは残る）*/
-const AI_SPEEDS=[{v:4,label:"×1"},{v:8,label:"×2"},{v:Infinity,label:"→"}];
-let aiOn=false, aiSpeed=AI_SPEEDS[0].v, aiTimer=0, aiWhat="", aiMoved=false;
+/* ------------------------------------------------------------
+   **再生の段は 4 つ**（依頼・8.5.0・§25.5）。倍率（×1）ではなく、何を見せるかで名を付ける。
+   div    一般の間合い（§25.5 の表）を割る数。Infinity は待ちを置かない
+   tellMs 札を出しておく時間。kinds は出す札の種（null は全部）
+   bat    戦闘画面を出すか。0 は出さない（計算だけ回す）。数は拍の間合いを割る数
+   camUnit 手番の隊ごとに盤をそこへ飛ばす（詳細 だけ）
+   ------------------------------------------------------------ */
+const TELL_MAIN=new Set(["落城","逃避","討死","捕縛","滅亡","家督","家名","病没","一揆","開拓"]);
+const TELL_KEY =new Set(["落城","滅亡","家名","開拓"]);
+const AI_MODES=[
+ {label:"詳細", div:1,        tellMs:3000, kinds:null,      bat:4, camUnit:true},   /* 全部の札。隊の動きを追える。戦は等速。手番ごとに本拠と隊へ飛ぶ */
+ {label:"標準",   div:4,        tellMs:2000, kinds:TELL_MAIN, bat:6},                 /* 主な札。速いが速すぎない。戦は 1.5 倍 */
+ {label:"快速",   div:Infinity, tellMs:1000, kinds:TELL_MAIN, bat:0},                 /* 主な札。できるだけ速く。戦は見せない */
+ {label:"要点",     div:Infinity, tellMs:1000, kinds:TELL_KEY,  bat:0},                 /* 落城・滅亡・家名・開拓だけ。できるだけ速く */
+];
+let aiMode=0;
+const aiModeOf=()=>AI_MODES[aiMode];
+const aiDiv =()=>aiModeOf().div;               /* 一般の間合いを割る */
+const batDiv=()=>aiModeOf().bat||4;            /* 戦の拍を割る（出さない段では使わない）*/
+const isTellShown=k=>{const ks=aiModeOf().kinds; return !ks||ks.has(k);};   /* この段で出す札か */
+let aiOn=false, aiTimer=0, aiWhat="", aiMoved=false;
 
 /* 知らせの帯。**ここは読むだけ。** 盤面には触らない */
 function drawAI(){
@@ -28318,14 +28770,14 @@ function drawAI(){
   const b=el("aiRun");
   b.textContent=aiOn?"■":"▶";
   aiOn?b.setAttribute("aria-pressed","true"):b.removeAttribute("aria-pressed");
-  el("aiSpeed").textContent=(AI_SPEEDS.find(x=>x.v===aiSpeed)||AI_SPEEDS[0]).label;
+  el("aiSpeed").textContent=aiModeOf().label;
   /* 人の手番のあいだだけ「手番を終える」を出す */
   const mine=playerPower();
   const now=playProgress[0]&&byId(playPowers,
     (playProgress[0].order||[])[playProgress[0].at]);
   el("aiEnd").hidden=!(mine&&now&&now.id===mine);
-  const g=playProgress[0];
-  el("aiWhat").textContent=(g?g.year+"年"+g.month+"月　":"")+aiWhat;
+  /* **文は上端の帯の 2 段目へ**（依頼・§10.19）。年月は 1 段目にあるので添えない */
+  el("hMsg").textContent=aiWhat;
 }
 
 /* 1つだけ進める。返すのは、次に呼ぶまで置く間合い（ミリ秒）*/
@@ -28336,7 +28788,7 @@ function onAIOnce(){
   /* **報せを出しているあいだは盤を進めない**（§31.5）。読ませるために出す札を、
      読み終わる前に次の出来事で流しては、出す意味がない */
   if(tellTimer)return tellMs();
-  if(playTells.length){ onTellPump(); return tellMs(); }
+  if(playTells.length){ onTellPump(); if(tellTimer)return tellMs(); }   /* この段で出さない札だけなら待たない */
   /* **戦が開いているあいだは手番を進めない**（§31.1）。
      閉じるまで盤は動かないので、待つよりほかにない */
   const B=playBattle[0];
@@ -28348,22 +28800,21 @@ function onAIOnce(){
          `batPhase` が 0 に戻るのは受け手の番を**送り始めた**ときで、
          矢はまだ 0.5 秒ずつ流れている。ここで閉じると、
          **最後の番の打ち合いを見せる前に画面が消える** */
-      if(B.over&&batPhase===0&&batToldOver()){ onBatClose(); drawAI(); return AI_STEP_MS/aiSpeed; }
+      if(B.over&&batPhase===0&&batToldOver()){ onBatClose(); drawAI(); return AI_STEP_MS/aiDiv(); }
       /* **画面が出るまで打ち合わない**（§31.3）。
          盤が戦う升へ飛び、そこを見せてから最初の拍へ入る */
       if(!batShow){
         onBatOpen();
         aiWhat=B.atk.label+"　対　"+B.def.label+"　"+(B.field||"")+"にて";
         drawAI();
-        return BAT_OPEN_MS/aiSpeed;
+        return BAT_OPEN_MS/batDiv();
       }
       onBatHalf();
       aiWhat=B.atk.label+"　対　"+B.def.label+"　"+batTurn;
       drawAI(); drawBattle();
       /* **番の間合いは、矢を送り終えるまでの時よりは長く取る**（§31.5）。人が開いた戦（`onBatTick`）と同じ。
          バグ：観戦では間合いを固定していたため、備えの多い城攻めで最後の矢が出る前に次の拍へ進んでいた */
-      return isFinite(aiSpeed)
-        ?Math.max(BAT_MS/aiSpeed,batStepList.length*BAT_ARROW_MS/aiSpeed+600):0;
+      return Math.max(BAT_MS/batDiv(),batStepList.length*BAT_ARROW_MS/batDiv()+600);
     }
     aiOn=false; clearTimeout(aiTimer); aiTimer=0;
     aiWhat="戦のさなか";
@@ -28384,19 +28835,26 @@ function onAIOnce(){
     const act=runAIStep(pw.id);
     if(act!==null){
       aiWhat=pw.label+"　"+act; aiMoved=true;
+      /* **詳細 の段では、手番の隊ごとに盤をそこへ飛ばす**（依頼・§25.5）。
+         いま動いた隊は、手番の済んだ隊の控えのいちばん後ろ（0 は城の下知）*/
+      if(aiModeOf().camUnit){
+        const g0=playProgress[0], last=g0&&g0.acted?g0.acted[g0.acted.length-1]:0;
+        const u0=last?byId(playUnits,last):null;
+        if(u0&&isLink(u0.q))drawLookAt(u0.q.id);
+      }
       /* **戦が開いたら、その手でただちに盤を飛ばす**（§31.3）。
          次の呼びまで待つと、盤は前の土地を映したまま一拍置くことになる */
       if(playBattle[0]){
         onBatOpen();
         aiWhat=pw.label+"　"+act;
         drawAI(); drawHud(); drawSite();
-        return BAT_OPEN_MS/aiSpeed;
+        return BAT_OPEN_MS/batDiv();
       }
       drawAI(); drawHud(); drawSite(); queueDraw();
-      return AI_STEP_MS/aiSpeed;
+      return AI_STEP_MS/aiDiv();
     }
   }
-  const wait=(aiMoved?AI_TURN_MS:AI_SKIP_MS)/aiSpeed;
+  const wait=(aiMoved?AI_TURN_MS:AI_SKIP_MS)/aiDiv();
   aiMoved=false;
   runTurnNext();
   const nx=runNowPower();
@@ -28459,8 +28917,8 @@ function onBatTick(){
   /* **番の間合いは、矢を送り終えるまでの時よりは長く取る**（§31.5）。
      1部隊ずつ 0.5 秒で送るので、備えが5つなら 2.5 秒かかる。
      間合いを詰めると、**最後の備えの矢が出る前に次の拍へ進む** */
-  const need=batStepList.length*BAT_ARROW_MS/Math.max(1,aiSpeed)+600;
-  batTimer=setTimeout(onBatTick,Math.max(BAT_MS/aiSpeed,need));
+  const need=batStepList.length*BAT_ARROW_MS/batDiv()+600;
+  batTimer=setTimeout(onBatTick,Math.max(BAT_MS/batDiv(),need));
 }
 function onBatStop(){ batOn=false; clearTimeout(batTimer); batTimer=0; batStepStop(); }
 
@@ -28484,11 +28942,9 @@ function onBatStop(){ batOn=false; clearTimeout(batTimer); batTimer=0; batStepSt
 
    **出しておく時間は速さの段で決まる**（依頼）。×1 は 3秒、×2 は 1秒、→ は出さない。
    ------------------------------------------------------------ */
-const TELL_MS=3000;            // 報せを出しておく間合い（×1）
-const TELL_MS2=1000;           // ×2 のとき
-/* いまの速さで報せを出しておく間合い。→ なら 0（出さない）*/
-/* **上から見る向きのときも 0（出さない）。速さは問わない**（依頼）*/
-const tellMs=()=>(view.cam==="top"||!isFinite(aiSpeed))?0:aiSpeed>=AI_SPEEDS[1].v?TELL_MS2:TELL_MS;
+/* いまの段で報せを出しておく間合い（`AI_MODES`）。
+   **上から見る向きのときは 0（出さない）。段は問わない**（依頼）*/
+const tellMs=()=>view.cam==="top"?0:aiModeOf().tellMs;
 let tellNow=null, tellTimer=0;
 function drawTell(){
   const box=document.getElementById("tell"); if(!box)return;
@@ -28508,14 +28964,16 @@ let tellBusy=false;
 function backToCursor(){ if(sel!==null&&sel!==undefined)drawLookAt(sel); }
 function onTellPump(){
   if(tellTimer||tellBusy)return;
-  /* **→ のときは札を出さない**（依頼）。溜まった報せは読まずに流す */
+  /* **上から見る向きでは札を出さない**（依頼）。溜まった報せは読まずに流す */
   if(tellMs()===0){
     while(runTellTake());
     tellNow=null; drawTell();
     return;
   }
   tellBusy=true;
+  /* **この段で出さない種の札は読まずに流す**（依頼・§25.5）*/
   tellNow=runTellTake();
+  while(tellNow&&!isTellShown(tellNow.kind))tellNow=runTellTake();
   /* **札を出してから盤を飛ばす。** 逆にすると、飛ぶ途中でここが呼び返される */
   drawTell();
   /* **報せを出すときは、それが起きた升へ盤が飛ぶ**（依頼・§31.5）。
@@ -28539,7 +28997,7 @@ function onBatOpen(){
   batOpenTimer=setTimeout(()=>{
     batOpenTimer=0; batShow=true;
     drawBattle(); drawAI();
-  },BAT_OPEN_MS/aiSpeed);
+  },BAT_OPEN_MS/batDiv());
   return true;
 }
 function onBatForget(){
@@ -28650,14 +29108,13 @@ function onAINext(){                             /* 1つだけ進める */
   onAIOnce();
 }
 function onAISpeed(){
-  const i=AI_SPEEDS.findIndex(x=>x.v===aiSpeed);
-  aiSpeed=AI_SPEEDS[(i+1)%AI_SPEEDS.length].v;
+  aiMode=(aiMode+1)%AI_MODES.length;
   onSkipShow();
   drawAI();
 }
-/* 戦闘画面を出すかを run へ渡す（依頼）。上から見る向き、または斜めで → のときは出さない */
+/* 戦闘画面を出すかを run へ渡す（依頼）。上から見る向き、または戦を見せない段（快速・要点）のときは出さない */
 function onSkipShow(){
-  runSkipShow=view.cam==="top"||!isFinite(aiSpeed);
+  runSkipShow=view.cam==="top"||aiModeOf().bat===0;
 }
 
 /* ============================================================
@@ -28704,8 +29161,8 @@ function saveGame(){
 /* ファイルにする名。**年月を入れる。** どの時点の盤かが名で分かる */
 function saveName(){
   const g=playProgress[0];
-  const y=g?g.year:1551, m=g?String(g.month).padStart(2,"0"):"01";
-  return `sengoku_${y}${m}.json`;
+  const y=g?g.year:1551, m=g?String(g.month).padStart(2,"0"):"01", j=runJunOf(g);
+  return `sengoku_${y}${m}_${j}.json`;
 }
 
 /* **ロードの進み**（依頼）。盤を作る段の名と、進みの棒を出す。
