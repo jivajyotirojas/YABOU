@@ -2166,7 +2166,14 @@ function snowOf(c){
      0.5度ほどで消す（私の判断）。北緯37.05度より北（いまの奥羽の盤）は変えない */
   if(c.lat<37.05){
     const side=1.85*(c.lat-36.55)-0.80*(c.lon-138.20);   /* 正なら日本海側 */
-    if(side<0)west*=cl(1+side/0.5);
+    /* **9.0.0 で足した土地（三河・尾張・美濃・飛騨・越中・能登・加賀・越前。`WEST_ZONE` の内）は、
+       分水嶺を（138.20,36.55）→ 位山 →（136.40,35.30 関ヶ原）の線とみなす**（依頼：史実に基づいて）。
+       上の線をそのまま南西へ延ばすと、郡上・揖斐・関ヶ原が太平洋側に入り雪がほとんど降らなかった。
+       実際は、若狭湾から伊勢湾へ抜ける低い所（関ヶ原）を通って雪が入り、郡上・揖斐・関ヶ原・飛騨は雪が多く、
+       濃尾平野・東濃・三河は少ない。元の盤の升は元の線のまま（元の盤の雪は変わらない）*/
+    const sideW=c.lat-(36.55+0.694*(c.lon-138.20));      /* 正なら日本海側。緯度の度で測る */
+    if(c.west){ if(sideW<0)west*=cl(1+sideW/0.5); }   /* `west` はセルベースの欄（メイクが書く）*/
+    else if(side<0)west*=cl(1+side/0.5);
   }
   const w = 0.52*lat + 0.44*alt + 0.26*west
           + 0.20*(c.vns-0.5)                     /* 地形のうねり */
@@ -14436,9 +14443,10 @@ function* makeCells(){
                lon:+c.lon.toFixed(4), lat:+c.lat.toFixed(4),
                g:+c.g.toFixed(4), glow:+c.glow.toFixed(4),
                vns:+vns(c.lon*31+3,c.lat*31+7).toFixed(4),
-               gx:+c.gx.toFixed(5), gy:+c.gy.toFixed(5)});
+               gx:+c.gx.toFixed(5), gy:+c.gy.toFixed(5),
+               west:c.west?1:0});                /* 9.0.0 で足した土地か（`WEST_ZONE` の内）。雪の分水嶺の線を分ける（§10.16）*/
     /* 始まりの月（1551年1月）の雪を積んでおく（§10.16）*/
-    const snow0=snowBits({type:c.t,lat:c.lat,lon:c.lon,m:c.m,q:c.q,r:c.r,
+    const snow0=snowBits({type:c.t,lat:c.lat,lon:c.lon,m:c.m,q:c.q,r:c.r,west:c.west?1:0,
                           vns:vns(c.lon*31+3,c.lat*31+7)},1,0,0,false);   /* 始まりの月は揺らぎ無し */
     play.push({id:c.cid, effect:(c.effect||0)|snow0,
                object:objs.atCell.get(c.cid)??"-",
