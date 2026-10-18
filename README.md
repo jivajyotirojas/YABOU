@@ -14,6 +14,27 @@ https://jivajyotirojas.github.io/YABOU/
 `main` に入ると GitHub Actions（`.github/workflows/deploy.yml`）が `gh-pages` ブランチへ出し、そこが公開される。
 `index.html` は `sengoku.html` へ飛ばすだけの入口。
 
+## 動作環境（WebGL2）
+
+地図は WebGL2 で描く。ブラウザが WebGL2 を使えないと、起動しても地図が出ず、
+下端に「この環境では地図を描けません（WebGL2 が使えません）」と出る（保存・読込は動く）。
+
+- 使えるブラウザ：Chrome・Edge（56 以降）、Firefox（51 以降）、Safari（15 以降）。
+  いずれも最近の版なら、ふつうは何もしなくてよい
+- ファイルを手元に保存して直接開いてもよい（`file://` で動く）。
+  チャットやメールのアプリの中のプレビューでは WebGL が使えないことが多いので、ブラウザで開く
+
+それでも出ないときは、ブラウザ側で WebGL が止められている。確かめ方と直し方は次のとおり。
+
+| ブラウザ | 確かめる所 | 直し方 |
+|---|---|---|
+| Chrome | アドレス欄に `chrome://gpu`。「WebGL2」の行が Hardware accelerated なら使える | 設定 → システム →「グラフィック アクセラレーションが使用可能な場合は使用する」を入にして再起動。GPU が遮断一覧に入っていて Software only・Disabled のときは `chrome://flags/#ignore-gpu-blocklist` を Enabled にする |
+| Edge | `edge://gpu`。見方は Chrome と同じ | 設定 → システムとパフォーマンス →「利用可能な場合はグラフィックス アクセラレータを使用する」を入にして再起動。遮断されているときは `edge://flags/#ignore-gpu-blocklist` を Enabled |
+| Firefox | `about:support` →「グラフィック」の「WebGL 2 ドライバー レンダラー」。失敗・blocked と出ていれば止められている | `about:config` で `webgl.disabled` を `false`、`webgl.force-enabled` を `true` にして再起動。ほかの `webgl.*` は触らない |
+| Safari | 15 以降は最初から使える | 14 以前は メニュー「開発」→「実験的な機能」→「WebGL 2.0」を入にする（「開発」メニューは 設定 → 詳細 → 「メニューバーに"開発"メニューを表示」で出す） |
+
+企業や学校の端末では、設定で WebGL が切られていて上の操作ができないことがある。その場合は管理者に相談する。
+
 ## 事前に試す（PR プレビュー）
 
 PR を作ると、その PR の中身だけを載せたページが別の URL に出る（`.github/workflows/preview.yml`）。
