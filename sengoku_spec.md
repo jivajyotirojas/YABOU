@@ -2002,6 +2002,7 @@ Civilization VI・Dorfromantik・Shogun 2 の地図（限定パレット、升�
 | **拠点** | その升と、隣接1升 | **その拠点の主だけ** |
 | **独立勢力の隊** | その升と、隣接1升 | 誰も入れない |
 | **独立勢力が占拠している支城** | その升と、隣接1升 | 誰も入れない |
+| **支城を占めた一揆の隊**（依頼・8.6.6） | その升と、隣接1升 | 誰も入れない |
 
 **拠点から2升以内でその拠点の国の升（拠点固有の土地。`SITE_OWN_RANGE`）は、1551年の初めの有効領域に必ず入れる**（依頼。v8.1.4）。史実の勢力圏に関わらない。
 またこの升のうちに**平地か寒冷平地を3升以上置く**。足りなければ丘陵を平地（寒冷の地は寒冷平地）にする。山地は削らない。街道の升を先に、つぎに城に近い升から（盤では10か所・24升を変えた）。
@@ -2018,6 +2019,7 @@ Civilization VI・Dorfromantik・Shogun 2 の地図（限定パレット、升�
 手番ごとに、独立勢力の隊の升と隣接1升をどの拠点の域からも外し、切れた先も落とす（`runCarveDokuritsu`。
 `runDomainTrimAll` の中で行うので、古いセーブもその手番で揃う）。拠点の升そのものは外さない。
 剥がしたのではなく押さえられない土地だったので、友好は動かさない。
+**支城を占めた一揆の隊も同じに外す**（依頼・8.6.6・§21.4）。独立勢力と、支城を占めた一揆の隊をまとめて「根を張っている隊」と呼ぶ（`runIsRooted`）。
 
 **この問いに答える先は1か所にする**（`runBanIndex`）。統治力の道と軍勢の道が別々に判じていると、
 片方だけに例外が残る。
@@ -3531,8 +3533,17 @@ NPCは、領内を踏まれて籠城に徹する城が、留守＋1000 に届く
 - **一揆の隊は、真っ黒の旗の、軍勢と同じ絵の隊。** 名札は、本土なら「百姓一揆 〇〇」（〇〇は百姓の男の名。ランダム武将の名簿のうち通称の形の名）、蝦夷地なら「アイヌ一揆 〇〇」（アイヌの名の名簿。ランダム武将の名簿には入れない）。
 - 一揆は一揆ごとに勢力を持ち、手番は独立勢力のあと。兵糧は一年ぶんを持って立つ（私の判断）。
 - **目指す城が更地になっていれば、隣の国の拠点へ向かう**（依頼）。隣の国は国（グレーゾーン）が接している国で、その中で一揆にいちばん近い、更地でない拠点（私の判断）。
-- **道すがら、周りの建物を荒らしながら城へ寄せ、城攻めをする。** 荒らすのは、立っている升と隣の升のうち、その拠点の主の実効支配域にある建物を、手番ごとに一つ（私の判断）。荒らせば順応も下がる。
-- **城の隣に着いていなければ、隣に立つ敵の隊を討って道を開ける**（依頼）。城の隣の升に立つ隊を先に、次に城に近い隊（私の判断）。
+- **一揆は、起きた升から1升ずつ動いて、拠点か、その国の支城へ向かう**（依頼・8.6.6。それまでは軍勢と同じ踏み代で何升も歩いた）。行き先は、一揆が起きた拠点と、その拠点の国（グレーゾーン）の内にある支城のうち、**いまの升からいちばん近いところ**（歩数。私の判断）。独立勢力やほかの一揆が占めている支城と、更地の拠点は外す。一度決めた行き先は、行けなくなるまで変えない（私の判断）。拠点が更地で、向かえる支城も無ければ、下の「隣の国の拠点」へ向かう。
+- **動いた先の升に建物があれば狼藉する**（依頼・8.6.6）。荒らしは軍勢の狼藉（§27.6）と同じ決まり（町・村・畑・水田・港・関所。段が1つ落ち、Lv.1 なら消える。荒らせば友好と順応が下がる）。それまでの「立っている升と隣の升の建物を手番ごとに一つ荒らす」はやめた。動かなかった手番は荒らさない。
+- **行き先に着いていなければ、隣に立つ敵の隊を討って道を開ける**（依頼）。行き先に近い隊から（私の判断）。支城に立っている隊も、ここで討つ。討った手番は動かない。
+- **支城の升に入れば、そこを占める**（依頼・8.6.6）。行き先でない支城でも、入れば占める。**家にはならず、勢力は一揆のまま**（依頼）。占めた一揆の隊は**独立勢力と同じに振る舞う**：
+  - その升から動かない。
+  - **周りから有効領域を奪う。** その升と隣接1升は、どの拠点の域からも外れ、誰も取れない（§11.2.2。`runIsRooted`）。
+  - **隣に来た隊を討つ**（独立勢力の手番 `runDokuritsuAct` と同じ。相手の軍勢より兵が少なければ、その軍勢には仕掛けない）。勝っても相手の升へ進まない。
+  - 兵糧を食わない（独立勢力と同じ。占めた支城が養う＝私の判断）。
+  - 兵は戻らない（独立勢力の戻りは肩書ごとの数で、家の持ち物なので、一揆には付けない＝私の判断）。
+  - ほかの家から見れば、**他国の軍勢の侵入のまま**（下）。追い払い・討つ相手で、取り込み（§28.4）や国衆（§32.7）の相手にはならない（私の判断）。
+  - 支城が無くなれば（取り壊しなど）、また行き先へ歩き出す。
 - **城を落とせば、一揆の将がその拠点を乗っ取る。** 無主の拠点で家を興すときと同じく、苗字を得て家を興す。**もとの主の家とは友好 0、外交方針は強気**（強気は変わらない）。アイヌの将は苗字を名乗らず、家の名はその名のまま（私の判断）。
 - 隊も城も失った一揆は消える。
 - **一揆で敗れた武将は、ランダム武将（§19.5）と同じ要領**（依頼）。一揆の隊が崩れたとき、また城攻めに敗れて退いたとき、率いていた者に苗字が無ければ、捕縛・討ち死に・落ち延びの判じを受けずに消える（札は出さない）。苗字のある者は従来どおり判じを受ける。
@@ -3659,7 +3670,7 @@ NPCは、領内を踏まれて籠城に徹する城が、留守＋1000 に届く
 
 **升に問う**
 
-`runCanStand`　`runCanPass`　`runPostureTo`　`runReachAs`　`runIsMinato`　`runCanBuild`　`runIsHarborSpot`　`runCanWork`　`runCanPut`　`runCanSettle`　`runStepCost`　`runReach`　`runGates`　`runSeaGates`　`runAIMinatoWant`　`runIsFort`　`runIsWild`　`runIsBroken`　`runIsFresh`　`runGuard`　`runFacing`　`runDomainIndex`　`runDomainOf`　`runDomainOwnerSite`　`runMakeDomain`　`runGrowDomain`　`runGrowByFort`　`runBanIndex`　`runCanHold`　`runTakeCell`　`runKuniOwner`　`runOccMonths`　`runCanOccupy`　`runOccupy`　`runCanPutAny`　`runCanPutAny2`　`runCanPutFree`　`runCanPutNew`　`runCanWalk`　`runDomainNear`　`runDomainTrim`　`runDomainTrimAll`　`runCarveDokuritsu`　`runDropCell`　`runInKuni`　`runKuniIndex`　`runKuniSite`　`runSiteOwnIndex`　`runCatIndex`　`runCatNum`　`runHasCat`　`runHasCatKuni`　`runTownCells`　`runFortCells`　`runFreeCellsFor`　`runNearFort`　`runGrowCost`　`runGrowCtx`　`runGrowOK`　`runJunnoAtCell`　`runBehindCell`　`runIsSeki`　`runSekiInKuni`　`runSekiStop`　`runSekiHalts`　`runSekiStopOnPath`　`runSekiSpot`　`runSekiFace`　`runSekiBadCells`　`runSekiWant`　`runSekiCells`　`runSekiWorkInKuni`　`runEnterByPass`　`runFortGain`　`runFortStrip`　`runFortFeeds`　`runFortFeedsFor`
+`runCanStand`　`runCanPass`　`runPostureTo`　`runReachAs`　`runIsMinato`　`runCanBuild`　`runIsHarborSpot`　`runCanWork`　`runCanPut`　`runCanSettle`　`runStepCost`　`runReach`　`runGates`　`runSeaGates`　`runAIMinatoWant`　`runIsFort`　`runIsWild`　`runIsBroken`　`runIsFresh`　`runGuard`　`runFacing`　`runDomainIndex`　`runDomainOf`　`runDomainOwnerSite`　`runMakeDomain`　`runGrowDomain`　`runGrowByFort`　`runBanIndex`　`runCanHold`　`runTakeCell`　`runKuniOwner`　`runOccMonths`　`runCanOccupy`　`runOccupy`　`runCanPutAny`　`runCanPutAny2`　`runCanPutFree`　`runCanPutNew`　`runCanWalk`　`runDomainNear`　`runDomainTrim`　`runDomainTrimAll`　`runCarveDokuritsu`　`runIsRooted`　`runDropCell`　`runInKuni`　`runKuniIndex`　`runKuniSite`　`runSiteOwnIndex`　`runCatIndex`　`runCatNum`　`runHasCat`　`runHasCatKuni`　`runTownCells`　`runFortCells`　`runFreeCellsFor`　`runNearFort`　`runGrowCost`　`runGrowCtx`　`runGrowOK`　`runJunnoAtCell`　`runBehindCell`　`runIsSeki`　`runSekiInKuni`　`runSekiStop`　`runSekiBreak`　`runSekiHalts`　`runSekiStopOnPath`　`runSekiSpot`　`runSekiFace`　`runSekiBadCells`　`runSekiWant`　`runSekiCells`　`runSekiWorkInKuni`　`runEnterByPass`　`runFortGain`　`runFortStrip`　`runFortFeeds`　`runFortFeedsFor`
 
 **設営**
 
@@ -3695,7 +3706,7 @@ NPCは、領内を踏まれて籠城に徹する城が、留守＋1000 に届く
 
 **一揆**
 
-`runIkkiAct`　`runIkkiFound`　`runIkkiName`　`runIkkiNextSite`　`runIkkiRise`　`runIkkiTick`
+`runIkkiAct`　`runIkkiAim`　`runIkkiAimOk`　`runIkkiStep`　`runIkkiHold`　`runIkkiFound`　`runIkkiName`　`runIkkiNextSite`　`runIkkiRise`　`runIkkiTick`
 
 **NPC の判断**
 
@@ -5749,6 +5760,7 @@ null なら兵科で決まる（§26.5）。野戦（平場・支城）ではそ
 - **浪人は家を持たないので、どの家の関所でも止まりうる**（割は同じ 0.60）。
 - 止めるのは、その関所が立つ有効領域を持つ家から見て、よその家の隊。誰の有効領域にもない関所は止めない（依頼）。
 - 同盟を結んでいる相手は止めない（依頼・§28.1）。休戦の相手は止める（依頼）。
+- **関所は、よその家の軍勢を一度止めたら壊れる**（依頼・8.6.6）。止めたとは、止める相手の軍勢（一揆の隊を含む）が関所の升で移動を終えたこと（見える隊は関所の升より先へ進めないので、関所の升に入った軍勢はみな止められている）。壊れた関所は消え、建て直すにはまた普請する。**見えない隊を止めても壊れない**（敵軍ではない）。札は出さない（止めたことを報せないのと同じ）。
 
 **関所の値打ちは、軍勢を国境の手前で踏み留まらせることにある。** 城の前に置いても、得はほとんど無い。
 

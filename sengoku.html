@@ -806,7 +806,7 @@ function onDevToggle(){
    「v7」のように一つの数だけで数えていたため、**何が増えて何が直ったのかが
    版の名から読めなかった。** 版は画面の隅と、この一箇所だけが持つ（§1.6）。
    ============================================================ */
-const VERSION="8.6.5";
+const VERSION="8.6.6";
 /* ============================================================
    テーブルベースデータ ── 以下、関数の名は §2 のとおり、
    属するプログラムを接頭辞で示す
@@ -15828,7 +15828,6 @@ function runIkkiRise(siteId){
   playStamp++;
   return row;
 }
-/* 一揆の隊の手番。周りの建物を一つ荒らし、城の隣なら攻め、でなければ城へ寄る */
 /* **目指す城が更地なら、隣の国の拠点へ向かう**（依頼）。隣の国は、国（グレーゾーン）が
    接している国。その中で一揆にいちばん近い、更地でない拠点（私の判断）。無ければ null */
 function runIkkiNextSite(u){
@@ -15850,52 +15849,117 @@ function runIkkiNextSite(u){
   }
   return best;
 }
+/* ------------------------------------------------------------
+   **一揆の行き先**（依頼・8.6.6・§21.4）
+   ------------------------------------------------------------
+   **拠点か、その国の支城へ向かう。** 支城は、一揆が起きた拠点の国（グレーゾーン）の
+   内にあるもの。そのうち**いまの升からいちばん近い**ところ（歩数。私の判断）。
+   独立勢力や、ほかの一揆が占めている支城は外す。拠点は更地なら外す。
+   一度決めた行き先は、行けなくなるまで変えない（毎手番引き直すと、近さが並ぶ所で行き来する）
+   ------------------------------------------------------------ */
+function runIkkiAimOk(u,cell){
+  const bs=byId(BASE_SITES,u.ikki); if(!bs)return false;
+  if(cell===bs.cell){const st=byId(playSites,u.ikki); return !!st&&st.taikyu>0;}
+  if(!runIsFort(cell))return false;
+  const dom=BASE_CELLGROUPS[bs.domain-1]; if(!dom||!dom.cells.includes(cell))return false;
+  return !playUnits.some(o=>o.id!==u.id&&isLink(o.q)&&o.q.id===cell&&runIsRooted(o));
+}
+function runIkkiAim(u){
+  if(u.ikkiAim!==undefined&&u.ikkiAim!==null&&runIkkiAimOk(u,u.ikkiAim))return u.ikkiAim;
+  const bs=byId(BASE_SITES,u.ikki); if(!bs)return null;
+  const dom=BASE_CELLGROUPS[bs.domain-1];
+  const cand=[bs.cell,...(dom?runFortList().filter(id=>dom.cells.includes(id)):[])];
+  let best=null,bd=Infinity;
+  for(const id of cand){
+    if(!runIkkiAimOk(u,id))continue;
+    const d=runAIDist(u.q.id,id); if(d<bd){bd=d;best=id;}
+  }
+  u.ikkiAim=best;
+  return best;
+}
+/* **一揆は1升ずつ動く**（依頼・8.6.6）。隣の升のうち、行き先へいちばん近づく升。
+   道（踏み代）で通じていなければ、歩数で近づく升（`runAIStepTo` と同じ）*/
+function runIkkiStep(u,goal){
+  const c=BASE_CELLS[u.q.id-1]; if(!c)return null;
+  const reach=runReach(u.id);
+  const nb=DIR6[c.r&1].map(([dq,dr])=>cellOf(c.q+dq,c.r+dr)).filter(n=>n&&reach.has(n.id)).map(n=>n.id);
+  const f=runAIField(goal,moveOf(u),"sagyo");
+  const here=f.get(u.q.id);
+  let best=null,bd=here===undefined?Infinity:here;
+  for(const id of nb){const d=f.get(id); if(d!==undefined&&d<bd){bd=d;best=id;}}
+  if(best!==null||here!==undefined)return best;
+  let bh=runAIDist(u.q.id,goal);
+  for(const id of nb){const d=runAIDist(id,goal); if(d<bh){bh=d;best=id;}}
+  return best;
+}
+/* 支城を占める（依頼・8.6.6）。**家にはならない。** 勢力は一揆のまま、
+   そこから動かず、周りの域を奪い（`runIsRooted`）、隣に来た隊を討つ（`runDokuritsuAct`）*/
+function runIkkiHold(u){
+  const cell=u.q.id;
+  u.ikkiFort=cell; u.ikkiAim=null;
+  playStamp++;
+  runDomainTrimAll();                            /* 周りの升を、いまの域から外す */
+  const o=objectAtCell(cell);
+  return o&&o.name?o.name:"支城";
+}
+/* 一揆の隊の手番（依頼・8.6.6・§21.4）。
+   支城を占めていれば、独立勢力と同じに隣の隊を討つだけ。
+   でなければ、行き先（拠点か国の支城）へ1升寄り、入った升の建物を荒らす（狼藉）。
+   拠点の隣に着けば拠点を攻め、支城の升に入ればそこを占める */
 function runIkkiAct(u){
   const name=isLink(u.bushou)?linkValue(u.bushou):"";
-  {const st0=byId(playSites,u.ikki);
-   if(st0&&!(st0.taikyu>0)){const nx=runIkkiNextSite(u); if(nx!==null)u.ikki=nx;}}
-  const bs=byId(BASE_SITES,u.ikki); if(!bs)return null;
-  const owner=runSiteOwner(u.ikki);
-  /* 荒らす。立っている升と隣の升のうち、その拠点の主の実効支配域にある建物 */
-  const c=BASE_CELLS[u.q.id-1];
-  const around=[u.q.id,...DIR6[c.r&1].map(([dq,dr])=>{const n=cellOf(c.q+dq,c.r+dr);return n?n.id:null;}).filter(x=>x)];
-  let rav=null;
-  for(const id of around){
-    const o=objectAtCell(id); if(!o)continue;
-    const b=byId(BASE_OBJECTS,o.label.id); if(!b||!WEAR_CAT.includes(b.cat))continue;
-    const ds=runDomainOwnerSite(id); if(ds===null||(owner&&runSiteOwner(ds)!==owner))continue;
-    const r=runObjDown(id); if(r){rav=r;break;}
+  if(runIsRooted(u)){
+    if(runIsFort(u.q.id)){const t=runDokuritsuAct(u); return t===null?null:name+"の一揆"+t.slice(name.length);}
+    u.ikkiFort=null; playStamp++;                /* 支城が無くなった。また歩く */
   }
-  let msg=rav?name+"の一揆が"+rav.label+"を荒らした":null;
-  /* **城の隣に着いていなければ、隣に立つ敵の隊を討って道を開ける**（依頼）。
-     城の隣の升に立つ隊を先に、次に城に近い隊（私の判断）。
+  /* 立っている升が支城なら占める（戦で踏み込んだときなど）*/
+  if(runIsFort(u.q.id)&&!playUnits.some(o=>o.id!==u.id&&isLink(o.q)&&o.q.id===u.q.id&&runIsRooted(o)))
+    return name+"の一揆が"+runIkkiHold(u)+"を占拠した";
+  let aim=runIkkiAim(u);
+  if(aim===null){
+    /* **拠点が更地で、国に向かえる支城も無ければ、隣の国の拠点へ向かう**（依頼）*/
+    const nx=runIkkiNextSite(u);
+    if(nx!==null){u.ikki=nx; u.ikkiAim=null; aim=runIkkiAim(u);}
+  }
+  if(aim===null)return name+"の一揆は留まった";
+  const bs=byId(BASE_SITES,u.ikki);
+  const toSite=!!bs&&aim===bs.cell;
+  const reach=toSite?1:0;                        /* 拠点は隣から攻める。支城はその升に入る */
+  /* **行き先に着いていなければ、隣に立つ敵の隊を討って道を開ける**（依頼）。
+     行き先に近い隊から（私の判断）。支城に立つ隊も、ここで討つ。
      バグ：城の隣の升が普請の隊で埋まると、一揆は2升手前で普請が終わるまで留まっていた */
-  if(runAIDist(u.q.id,bs.cell)>1){
+  if(runAIDist(u.q.id,aim)>reach){
     const mine=isLink(u.power)?u.power.id:null;
+    const c=BASE_CELLS[u.q.id-1];
     let foe=null,fv=Infinity;
-    for(const id of around.slice(1)){
-      for(const o of runOpenUnits(id)){
+    for(const [dq,dr] of DIR6[c.r&1]){
+      const n=cellOf(c.q+dq,c.r+dr); if(!n)continue;
+      for(const o of runOpenUnits(n.id)){
         const op=isLink(o.power)?o.power.id:null;
         if(o.id===u.id||!runAIFoe(mine,op))continue;
-        const dd=runAIDist(o.q.id,bs.cell);
+        const dd=runAIDist(o.q.id,aim);
         if(dd<fv){fv=dd;foe=o;}
       }
     }
     if(foe){
       const r=runAttackUnit(u.id,foe.id);
       if(r&&r.battle)return name+"の一揆が"+foe.label+"に襲いかかった";
-      if(r)return (msg?msg+"。":"")+name+"の一揆が"+foe.label+"を討った";
+      if(r)return name+"の一揆が"+foe.label+"を討った";
     }
   }
-  if(runAIDist(u.q.id,bs.cell)===1){
+  if(toSite&&runAIDist(u.q.id,aim)===1){
     const r=runAttackSite(u.id,u.ikki);
     if(r&&r.battle)return name+"の一揆が"+((byId(playSites,u.ikki)||{}).name||"城")+"へ攻め寄せた";
     if(r)return name+"の一揆が"+(byId(playSites,u.ikki)||{}).name+"を攻めた";
-    return msg||name+"の一揆が城を囲んでいる";
+    return name+"の一揆が城を囲んでいる";
   }
-  const to=runAIStepTo(u.id,bs.cell);
-  if(to!==null&&runMoveUnit(u.id,to))return (msg?msg+"。":"")+name+"の一揆が城へ向かった";
-  return msg||name+"の一揆は留まった";
+  const to=runIkkiStep(u,aim);
+  if(to===null||!runMoveUnit(u.id,to))return name+"の一揆は留まった";
+  /* **動いた先に建物があれば狼藉する**（依頼・8.6.6）。荒らしは `runRavage` ただ1つ（§27.6）*/
+  const rav=runRavage(u.id,u.q.id);
+  const msg=rav?name+"の一揆が"+rav.label+"を荒らした":null;
+  if(runIsFort(u.q.id))return (msg?msg+"。":"")+name+"の一揆が"+runIkkiHold(u)+"を占拠した";
+  return msg||name+"の一揆が"+(toSite?"城":"支城")+"へ向かった";
 }
 /* 一揆が拠点を取った。**無主の拠点で家を興すときと同じ処理**（`runRaiseHouse`）で家を興す */
 function runIkkiFound(powerId,siteId,before){
@@ -15918,7 +15982,7 @@ function runIkkiFound(powerId,siteId,before){
     const uu=gg&&gg.units.length?byId(playUnits,gg.units[0]):null;
     if(uu)uu.label=pw.label+" "+x.name;
   }
-  for(const u of playUnits)if(isLink(u.power)&&u.power.id===powerId){u.ikki=null;
+  for(const u of playUnits)if(isLink(u.power)&&u.power.id===powerId){u.ikki=null; u.ikkiFort=null; u.ikkiAim=null;
     if(typeof u.label==="string"&&/一揆 /.test(u.label))u.label=pw.label+" "+u.label.replace(/^.*一揆 /,"");}
   /* **もとの主の家とは友好 0、外交方針は強気**（依頼）*/
   if(before){ runSetMind(powerId,before,0); pw.shiseiForce={[before]:"強気"}; }
@@ -16478,6 +16542,7 @@ function runTopGaikou(siteId){
    | **よその拠点** | その升と、隣接1升 |
    | **独立勢力の隊** | その升と、隣接1升 |
    | **独立勢力が占拠している支城** | その升と、隣接1升 |
+   | **支城を占めた一揆の隊** | その升と、隣接1升（依頼・8.6.6。`runIsRooted`）|
 
    自分の拠点の周りは当然に自分の域なので、ここでは数えない。
    ------------------------------------------------------------ */
@@ -16499,10 +16564,22 @@ function runBanIndex(){
   };
   for(const bs of BASE_SITES)put(bs.cell,runSiteOwner(bs.id));
   for(const u of playUnits){
-    if(u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="独立勢力")continue;
+    if(!runIsRooted(u))continue;
     put(u.q.id,null);
   }
   return banIndex;
+}
+/* ------------------------------------------------------------
+   **根を張っている隊か**（依頼・8.6.6）
+   ------------------------------------------------------------
+   独立勢力の隊と、**支城を占めた一揆の隊**（`ikkiFort`）。どちらも
+   その升から動かず、その升と隣接1升を誰の域にもさせず（不可侵・域の切り取り）、
+   隣に来た隊を討つ。**一揆は家にはならない**（依頼）。勢力は一揆のまま
+   ------------------------------------------------------------ */
+function runIsRooted(u){
+  if(!u||u.state==="-"||!isLink(u.type))return false;
+  if(linkValue(u.type)==="独立勢力")return true;
+  return u.ikkiFort!==undefined&&u.ikkiFort!==null&&isLink(u.q)&&u.q.id===u.ikkiFort;
 }
 /* ------------------------------------------------------------
    **拠点固有の土地**（依頼・§11.2.2）
@@ -16812,7 +16889,7 @@ function runDomainTrim(siteId){
 function runCarveDokuritsu(){
   const carve=new Set();
   for(const u of playUnits){
-    if(u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="独立勢力"||!isLink(u.q))continue;
+    if(!runIsRooted(u)||!isLink(u.q))continue;
     const c=BASE_CELLS[u.q.id-1]; if(!c)continue;
     carve.add(c.id);
     for(const [dq,dr] of DIR6[c.r&1]){const n=cellOf(c.q+dq,c.r+dr); if(n)carve.add(n.id);}
@@ -17249,7 +17326,8 @@ function runFeedUnits(newMonth=true){
     if(!playUnits.some(x=>x.id===u.id))continue;   /* もう盤に無い */
     if(!isLink(u.type)||u.state==="-")continue;
     const lb=linkValue(u.type);
-    if(lb==="独立勢力"){ u.hyoro=eatOf(u.hei); continue; }
+    /* 支城を占めた一揆も独立勢力と同じく食わない（依頼・8.6.6。占めた支城が養う＝私の判断）*/
+    if(lb==="独立勢力"||runIsRooted(u)){ u.hyoro=eatOf(u.hei); continue; }
     if(!(u.hei>0))continue;                      /* 兵を連れない隊は食わない */
     /* ------------------------------------------------------------
        **実効支配域の中の支城は、兵糧を補給し、兵を補う**（依頼・§27.4）
@@ -19163,6 +19241,7 @@ function runMoveUnit(unitId,cellId){
   const d=runDirTo(from,cellId);
   if(!runSetUnitCell(unitId,cellId))return false;
   u.dir=d!=="-"?d:runFaceTo(from,cellId);
+  runSekiBreak(u,cellId);                        /* よその軍勢を止めた関所は壊れる（依頼・8.6.6）*/
   playStamp++;
   return true;
 }
@@ -19514,6 +19593,22 @@ function runSekiStopOnPath(u,cellId){
     if(runSekiStop(u,id))return id;
   }
   return null;
+}
+/* ------------------------------------------------------------
+   **関所は、よその家の軍勢を一度止めたら壊れる**（依頼・8.6.6・§27.4）
+   ------------------------------------------------------------
+   止めたとは、その軍勢が関所の升で移動を終えたこと。見える隊は関所の升より
+   先へ進めない（`runReachAs`）ので、関所の升に入った軍勢はみな止められている。
+   **見えない隊（外交・忍者・移動・浪人）を止めても壊れない。** 敵軍ではない。
+   止められるかは `runSekiHalts` で判じる（自家・同盟の軍勢では壊れない）。
+   壊れた関所は消える。建て直すには、また普請する
+   ------------------------------------------------------------ */
+function runSekiBreak(u,cellId){
+  if(!u||!isLink(u.type)||linkValue(u.type)!=="軍勢")return false;
+  if(!runIsSeki(cellId))return false;
+  const mine=isLink(u.power)?u.power.id:null;
+  if(!runSekiHalts(cellId,mine))return false;
+  return runDelObject(cellId);
 }
 /* その隊は、いまこの升の関で止められるか（§27.4）。見えない隊は `SEKI_STOP` の割 */
 function runSekiStop(u,cellId){
@@ -21878,7 +21973,7 @@ function runAttackUnit(atkId,defId){
        **隣に来た隊を討った独立勢力が、そのまま本拠を離れて歩き出していた。**
        根を張っている者は、勝っても動かない */
     const aTb=isLink(a.type)?linkValue(a.type):"";
-    const went=(dTb==="独立勢力"||aTb==="独立勢力")
+    const went=(dTb==="独立勢力"||aTb==="独立勢力"||runIsRooted(a))   /* 支城を占めた一揆も動かない（8.6.6）*/
       ?false:runMoveUnit(atkId,cell);
     return {kind:"蹂躙", win:"atk", note:"蹴散らした", atkLost:0, defLost:0,
             ravaged, went, fate:(fate&&fate.how)?fate:null};
@@ -22603,9 +22698,10 @@ function runMakeDomain(siteId,fromRuin=false){
   /* **独立勢力の立つ升と、その隣接6升は引く**（§11.2.1）。そこは独立勢力が
      押さえている。メイク側（`makeEffective`）にはこの縛りが入っているのに
      ここには無かったため、**落城で域を作り直すたびに縛りが落ちていた。**
-     同じ縛りが、域を作る経路によって効いたり効かなかったりする形である */
+     同じ縛りが、域を作る経路によって効いたり効かなかったりする形である。
+     **支城を占めた一揆も同じ**（依頼・8.6.6・`runIsRooted`）*/
   for(const u of playUnits){
-    if(u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="独立勢力")continue;
+    if(!runIsRooted(u))continue;
     const c=BASE_CELLS[u.q.id-1]; if(!c)continue;
     taken.add(c.id);
     for(const [dq,dr] of DIR6[c.r&1]){
@@ -25515,7 +25611,7 @@ const DOKU_AVOID_COST=30;
 function runDokuDanger(){
   const out=new Set();
   for(const u of playUnits){
-    if(u.state==="-"||!isLink(u.type)||linkValue(u.type)!=="独立勢力")continue;
+    if(!runIsRooted(u))continue;                 /* 支城を占めた一揆も同じ（依頼・8.6.6）*/
     out.add(u.q.id);
     const c=BASE_CELLS[u.q.id-1]; if(!c)continue;
     for(const [dq,dr] of DIR6[c.r&1]){const n=cellOf(c.q+dq,c.r+dr); if(n)out.add(n.id);}
