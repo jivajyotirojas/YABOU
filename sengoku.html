@@ -23288,12 +23288,17 @@ function runHataOf(myoji,powerId){
 }
 
 /* 家の名を、継いだ者の苗字に改める。**苗字が同じなら何もしない**（§19.3）。
-   独立勢力は名乗りを持たないので触らない */
+   独立勢力は名乗りを持たないので触らない。
+   **家の名が苗字でない家は改めない**（9.0.0）。一向一揆は門徒の集まりで、誰が継いでも一揆である。
+   **家の名が継いだ者の苗字（2字以上）で終われば、苗字が同じとみる**（9.0.0）。能登畠山家を継いだ畠山の者は畠山家にならない。
+   1字の苗字は数えない。安東家を東の者が継げば東家になる */
+const IE_NAME_FIXED=new Set([93,95]);   // 越中一向一揆・加賀一向一揆
 function runRename(powerId,heir){
   const pw=byId(playPowers,powerId); if(!pw)return false;
-  if(pw.kind!=="daimyo")return false;
+  if(pw.kind!=="daimyo"||IE_NAME_FIXED.has(powerId))return false;
   const myoji=runMyojiOf(heir);
-  if(!myoji||myoji===runIeMyoji(pw.label))return false;
+  const ie=runIeMyoji(pw.label);
+  if(!myoji||myoji===ie||([...myoji].length>=2&&ie.endsWith(myoji)))return false;
   const was=pw.label;
   pw.label=myoji+"家";
   /* **旗も変わる。** 家が変わったのに旗がそのままでは、盤の色が嘘をつく */
